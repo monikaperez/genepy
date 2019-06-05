@@ -1,2 +1,0 @@
-sample_set_id	combined_seg_file	samples	fusions_star	rsem_genes_expected_count	rsem_genes_tpm	rsem_transcripts_expected_count	rsem_transcripts_isopct	rsem_transcripts_tpm	preprocessed_intervals	read_counts	read_counts_entity_ids	read_count_pon
-ALL_SAMPLES_WES	gs://fc-secure-fd4c24cf-6bfd-410a-9bca-e02642da12f8/2a6d448f-624e-45b6-b7d6-02b49d6cf654/aggregate_CN_segments_wrkflw/0f8477e0-8612-4594-a3dd-a0baaa1cb293/call-aggregate_CN_segments/ALL_SAMPLES_WES.called.seg	94 items										
