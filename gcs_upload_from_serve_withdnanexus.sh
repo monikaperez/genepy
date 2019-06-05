@@ -8,10 +8,11 @@ for i in $(cat list.txt); do
 done;
 # for 8 of them at a time, downloading them directly to the bucket in parrallel 
 
+# IF YOU DONT HAVE PARALLEL
+# (wget -O - pi.dk/3 || curl pi.dk/3/ || fetch -o - http://pi.dk/3) | bash
+echo "if you don't have paralllel run the following: (wget -O - pi.dk/3 || curl pi.dk/3/ || fetch -o - http://pi.dk/3) | bash"
 
-for i in $(cat urls.txt);  do 
-	curl -L -s $i | gsutil cp - "gs://fc-secure-fd4c24cf-6bfd-410a-9bca-e02642da12f8/immediate/bam_wg/"$(echo $i | cut -d \/ -f 7) &  
-done;
+cat urls.txt | parallel -j 10 'curl -L -s {} | gsutil cp - "gs://fc-secure-fd4c24cf-6bfd-410a-9bca-e02642da12f8/immediate/bam_wg/"$(echo {} | cut -d \/ -f 7)'
 
 
 for i in $(cat urls.txt); do
