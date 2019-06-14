@@ -1,0 +1,13 @@
+language: python
+cache:
+  directories:
+    - $HOME/.cache/pip
+
+python:
+  - 3.5
+
+install:
+  - pip install -r requirements.txt
+
+script:
+  - set -e && pytest && set +e
