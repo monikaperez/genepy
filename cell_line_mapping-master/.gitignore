@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*~
+celllinemapr/SOP.html
+__pycache__
+python/.cache
+*.egg-info
+*.pyc
+python/dist

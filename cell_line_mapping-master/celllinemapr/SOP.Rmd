@@ -1,0 +1,59 @@
+---
+title: 'SOP: Mapping cell line IDs'
+author: "Philip montgomery"
+date: "7/11/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This SOP describes how to use the R library for mapping cell line identifiers based on the situation. The authorative source for all cell line names and mappings is recorded in ArxSpan. However, it is difficult to query ArxSpan so every day, we export the mapping from arxspan and publish it internally as a CSV file at https://intranet.broadinstitute.org/~datasci/cell_lines/name_mapping.csv
+
+The R package celllinemapr pulls directly from this URL automatically.
+
+### Loading legacy data which contains CCLE names
+
+Moving forward, we are tracking cell lines by their Broad IDs which get assigned when the line is registered into
+ArxSpan. (As a result, we sometimes refer to these as ArxSpan IDs and are always of the form "ACH-XXXXXX")
+
+In order to join old data which has CCLE names to a dataset which use Broad IDs, you will need to remap the CCLE names to the Broad IDs. This can be done via ccle.to.arxspan()
+
+```{r ccle.to.arxspan}
+library(celllinemapr)
+ccle.to.arxspan(c('HS294T_SKIN','NCIH1581_LUNG'))
+```
+
+### Getting latest CCLE names
+
+Also, since CCLE names can change, the current name for a line may be different than with the one when a dataset was created. If you wish to get the latest name for a line you can use ccle.to.latest()
+
+```{r ccle.to.latest}
+ccle.to.latest('HEL9217_2013_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE')
+```
+
+### Looking up CCLE names by Broad ID
+
+The Broad ID are opaque and so often you will want a human readable label when reporting info about cell lines. One
+can map back to CCLE name via arxspan.to.ccle().
+
+```{r arxspan.to.ccle}
+  arxspan.to.ccle(c('ACH-000007', 'ACH-000008'))
+```
+
+### Using existing mapping
+
+The mapping functions only work within the Broad's internal network. You can use these methods and if you cannot reach the internal network, they will use the most recently cached mapping. 
+
+However, if you're running this code on a machine which does not have a cached mapping, you'll need to provide a copy of it yourself. You can do this by providing the "mapping" parameter to any of these methods.
+
+```{r arxspan.to.ccle.mapping}
+  map.df = data.frame(ccle_name=c("A101D_SKIN", "LS513_LARGE_INTESTINE"),
+                      canonical_ccle_name=c("A101D_FAKEMAPPING", "LS513_FAKEMAPPING"),
+                      broad_id=c('ACH-000008', "ACH-000007"))
+
+  arxspan.to.ccle(c('ACH-000007', 'ACH-000008'), mapping=map.df)
+```
