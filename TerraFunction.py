@@ -9,6 +9,7 @@ from google.cloud import storage
 import pdb
 
 def wait_for_submission(wm, submissions):
+	time = 0
   failed_submission = []
   timing = 0
   if type(submissions) is type(""):
@@ -27,7 +28,7 @@ def wait_for_submission(wm, submissions):
   # print and return well formated data
 
 
-def UploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fastq12", newsamples=None,samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fastq12", newsamples=None,samplesetname=None):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
