@@ -1,0 +1,3 @@
+gene	Chromosome	Start_position	end	type	classification	ref_allele	newbase	Protein_Change	patient
+RPL22	1	6257785	6257785	Frame_Shift_Del	DEL	T	-	p.K16fs	fh_22RV1_PROSTATE-Tumor
+SF3B2	11	65819899	65819900	In_Frame_Ins	INS	-	GCC	p.21_22insP	fh_HEC6_ENDOMETRIUM-Tumor
