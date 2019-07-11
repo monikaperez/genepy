@@ -9,6 +9,8 @@ options(repos = c(
 	"https://cran.cnr.berkeley.edu"))
 install.packages('celllinemapr')
 ```
+As one could not have access to intranet to download the name mapping. The name mapping file is directly available and can be put to work by executing this command:
+`mkdir ~/.celllinemapr && mkdir ~/.celllinemapr/data && cp naming.csv ~/.celllinemapr/data`
 
 ### Python
 ```

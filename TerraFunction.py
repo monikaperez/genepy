@@ -8,27 +8,44 @@ import pandas as pd
 from google.cloud import storage
 import pdb
 
-def wait_for_submission(wm, submissions):
-	time = 0
+
+def waitForSubmission(wm, submissions):
   failed_submission = []
   timing = 0
+  assert submissions is not None
   if type(submissions) is type(""):
     submissions = [submissions]
   for scount, submission_id in enumerate(submissions):
-    for wcount, i in enumerate(wm.get_submission(submission_id)["workflows"]):
+    finished = False
+    while not finished:
+      done = 0
+      failed = 0
+      finished = True
+      submission = wm.get_submission(submission_id)["workflows"]
+      for wcount, i in enumerate(submission):
+        if i['status'] not in {'Done', 'Aborted', 'Failed', 'Succeeded'}:
+          finished = False
+        elif i["status"] in {'Failed', 'Aborted'}:
+          failed += 1
+          if i["workflowEntity"]["entityName"] not in failed_submission:
+            print(i["workflowEntity"]["entityName"])
+            failed_submission.append(i["workflowEntity"]["entityName"])
+        elif i["status"] in {'Done', 'Succeeded'}:
+          done += 1
+      if not finished:
+        time.sleep(40)
+        print("status is: Done for " + str(done) + " jobs in submission " + str(scount) + ". " + str(timing) + ",5 mn elapsed.", end="\r")
+        timing += 1
+        time.sleep(20)
+        print("status is: Failed for " + str(failed) + " jobs in submission " + str(scount) + ". " + str(timing) + " mn elapsed.", end="\r")
+      else:
+        print(str(done / (done + failed)) + " of jobs Succeeded in submission " + str(scount) + ".")
 
-      while i['status'] not in {'Done', 'Aborted', 'Failed', 'Succeeded'}:
-        time.sleep(60)
-        timing+=1
-        print("status is: "+i['status']+" for submission "+str(scount)+", and workflow "+str(wcount)+" in "+str(timing)+" mn.",end="\r")
-      if i["status"] == 'Failed':
-        print(newsample.loc[i["workflowEntity"]["entityName"]]["attr_sex"])
-        print(i["workflowEntity"]["entityName"])
-        failed_submission.append(i["workflowEntity"]["entityName"])
+  return failed_submission
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fastq12", newsamples=None,samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -39,7 +56,7 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
   wm: the workspace terra
   sep: the separator (only takes the first part of the name before the sep character)
   updating: if needs
-  fformat
+  fformat bambai, fastq12, fastqR1R2
   newsamples
   samplesetname
   """
@@ -49,29 +66,29 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
   files = list_blobs_with_prefix(gcpfolder, prefix, '/')
   if fformat == "bambai":
     if newsamples is None:
-      data = {'sample_id': [], 'bam': [], 'bai': []} 
+      data = {'sample_id': [], 'bam': [], 'bai': []}
       for file in files:
-        if val.split('.')[-1] in ["bam","bai"]:
+        if val.split('.')[-1] in ["bam", "bai"]:
           name = file.split('/')[-1].split('.')[0].split(sep)[0][:-2]
           if name in data['sample_id']:
             pos = data['sample_id'].index(name)
             if file[-4:] == ".bam":
-              data['bam'].insert(pos, 'gs://'+gcpfolder+ '/'+ file)
+              data['bam'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file[-4:] == ".bai":
-              data['bai'].insert(pos, 'gs://'+gcpfolder+ '/' + file)
+              data['bai'].insert(pos, 'gs://' + gcpfolder + '/' + file)
           else:
             data['sample_id'].append(name)
             if file[-4:] == ".bam":
-              data['bam'].append('gs://'+gcpfolder+ '/' +file)
+              data['bam'].append('gs://' + gcpfolder + '/' + file)
             elif file[-4:] == ".bai":
-              data['bai'].append('gs://'+gcpfolder+ '/' +file)
+              data['bai'].append('gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq R1/R2 error", file)
         else:
-          print("unrecognized file type : "+file)
+          print("unrecognized file type : " + file)
       df = pd.DataFrame(data)
       df = df.set_index("sample_id")
-      df["participant"] = pd.Series(data['sample_id'],index=data['sample_id'])
+      df["participant"] = pd.Series(data['sample_id'], index=data['sample_id'])
       wm.upload_samples(df)
       wm.update_sample_set(samplesetname, df.index.values.tolist())
     else:
@@ -103,44 +120,53 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
       newsample = newsample.loc[~newsample.index.duplicated(keep='first')]
       newsample.to_csv("temp/samples.bambai.tsv", sep="\t")
       wm.upload_samples(newsample)
-      wm.update_sample_set(samplesetname,newsample.index)
-  if fformat == "fastq12":
+      wm.update_sample_set(samplesetname, newsample.index)
+  if fformat in {"fastq12", "fastqR1R2"}:
     data = {'sample_id': [], 'fastq1': [], 'fastq2': []}
     # print and return well formated data
     for file in files:
-      if file[-9:]==".fastq.gz" or file[-6:]==".fq.gz" :
+      if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
         name = file.split('/')[-1].split('.')[0].split(sep)[0][:-2]
         if name in data['sample_id']:
           pos = data['sample_id'].index(name)
-          if "R1" in file:
-            data['fastq1'].insert(pos, 'gs://'+gcpfolder+ '/'+ file)
-          elif "R2" in file:
-            data['fastq2'].insert(pos, 'gs://'+gcpfolder+ '/' + file)
-          elif file.split('.')[-3][-1]=='1':
-            data['fastq1'].insert(pos, 'gs://'+gcpfolder+ '/' +file)
-          elif file.split('.')[-3][-1]=='2':
-            data['fastq2'].insert(pos, 'gs://'+gcpfolder+ '/' +file)
+          if fformat == "fastqR1R2":
+            if "R1" in file:
+              data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+            elif "R2" in file:
+              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+            else:
+              raise Exception("No fastq R1/R2 error", file)
           else:
-            raise Exception("No fastq R1/R2 error", file)
+            if file.split('.')[-3][-1] == '1':
+              data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+            elif file.split('.')[-3][-1] == '2':
+              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+            else:
+              raise Exception("No fastq 1/2 error", file)
         else:
           data['sample_id'].append(name)
-          if "R1" in file:
-            data['fastq1'].append('gs://'+gcpfolder+ '/' +file)
-          elif "R2" in file:
-            data['fastq2'].append('gs://'+gcpfolder+ '/' +file)
-          elif file.split('.')[-3][-1]=='1':
-            data['fastq1'].append('gs://'+gcpfolder+ '/' +file)
-          elif file.split('.')[-3][-1]=='2':
-            data['fastq2'].append('gs://'+gcpfolder+ '/' +file)
+          if fformat == "fastqR1R2":
+            if "R1" in file:
+              data['fastq1'].append('gs://' + gcpfolder + '/' + file)
+            elif "R2" in file:
+              data['fastq2'].append('gs://' + gcpfolder + '/' + file)
+            else:
+              raise Exception("No fastq R1/R2 error", file)
           else:
-            raise Exception("No fastq R1/R2 error", file)
+            if file.split('.')[-3][-1] == '1':
+              data['fastq1'].append('gs://' + gcpfolder + '/' + file)
+            elif file.split('.')[-3][-1] == '2':
+              data['fastq2'].append('gs://' + gcpfolder + '/' + file)
+            else:
+              raise Exception("No fastq R1/R2 error", file)
       else:
-        print("unrecognized file type : "+file)
+        print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
     df = df.set_index("sample_id")
-    df["participant"] = pd.Series(data['sample_id'],index=data['sample_id'])
+    df["participant"] = pd.Series(data['sample_id'], index=data['sample_id'])
     wm.upload_samples(df)
     wm.update_sample_set(samplesetname, df.index.values.tolist())
+
 
 def updateAllSampleSet(newsample_setname, Allsample_setname='All_samples'):
   """
@@ -152,6 +178,12 @@ def updateAllSampleSet(newsample_setname, Allsample_setname='All_samples'):
   newsamples = list(refwm.get_sample_sets().loc[newsample_setname]['samples'])
   prevsamples.extend(newsamples)
   refwm.update_sample_set('All_samples', prevsamples)
+
+
+def addToSampleSet(wm, samplesetid, samples):
+  prevsamples = wm.get_sample_sets()[samplesetid].samples.tolist()
+  samples.extend(prevsamples)
+  refwm.update_sample_set(samplesetid, samples)
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
