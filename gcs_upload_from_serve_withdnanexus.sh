@@ -41,3 +41,6 @@ done;
 
 ## VERSION WITHOUT BREAKING LINES
 for i in $(cat urls.txt); do echo $i; sizeA=$(dx describe --json "immediate/bam/"$(echo $i | cut -d \/ -f 7) | jq '.size'); sizeB=$(gsutil du "gs://fc-secure-fd4c24cf-6bfd-410a-9bca-e02642da12f8/immediate/bam_wg/"$(echo $i | cut -d \/ -f 7) | cut -d \  -f 1); if (($sizeA!=$sizeB)); then echo "$i, $sizeB" > filters.txt; fi; echo "$sizeB, $sizeA"; done;
+
+#rename bunch
+for file in *.mapped.*; do mv "$file" "${file/mapped./}"; done

@@ -140,7 +140,7 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
             if file.split('.')[-3][-1] == '1':
               data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file.split('.')[-3][-1] == '2':
-              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data['falsstq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq 1/2 error", file)
         else:
@@ -168,16 +168,16 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
     wm.update_sample_set(samplesetname, df.index.values.tolist())
 
 
-def updateAllSampleSet(newsample_setname, Allsample_setname='All_samples'):
+def updateAllSampleSet(refwm, newsample_setname, Allsample_setname='All_samples'):
   """
   update the previous All Sample sample_set with the new samples that have been added. 
 
   It is especially usefull for the aggregate task 
   """
-  prevsamples = list(refwm.get_sample_sets().loc[Allsample_setnamegcp]['samples'])
+  prevsamples = list(refwm.get_sample_sets().loc[Allsample_setname]['samples'])
   newsamples = list(refwm.get_sample_sets().loc[newsample_setname]['samples'])
   prevsamples.extend(newsamples)
-  refwm.update_sample_set('All_samples', prevsamples)
+  refwm.update_sample_set(Allsample_setname, prevsamples)
 
 
 def addToSampleSet(wm, samplesetid, samples):
