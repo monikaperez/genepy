@@ -1,4 +1,4 @@
-# Jérémie Kalfon
+# Jeremie Kalfon
 # for BroadInsitute
 # in 2019
 
@@ -84,6 +84,7 @@ def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, 
            radius='radius', source=source)
   show(p)
 
+
 def bar():
   data['Year'] = data['Year'].astype(str)
   data = data.set_index('Year')
@@ -127,6 +128,7 @@ def bar():
   p.add_layout(color_bar, 'right')
 
   show(p)      # show the plot
+
 
 def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)'):
@@ -189,3 +191,64 @@ def selector(df, valtoextract):
   return to_plot_not, to_plot_yes
 
 # What pops up on hover?
+
+
+def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False):
+  """
+  data arrayLike of int / float/ bool of size(names*val)
+  names list like string
+  colors, list like size(names)
+
+  """
+  if not dataIsCorr:
+    corr = 1 - np.array(data).corrcoeff()
+  else:
+    corr = 1 - np.array(data)
+
+  colormap = ["#444444", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
+              "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a"]
+  TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save"
+
+  xname = []
+  yname = []
+  color = []
+  alpha = []
+  for i, name1 in enumerate(names):
+    for j, name2 in enumerate(names):
+      xname.append(name1)
+      yname.append(name2)
+
+      alpha.append(min(data[i, j], 0.9))
+
+      if colors[i] == colors[j]:
+        color.append(colormap[colors[i]])
+      else:
+        color.append('lightgrey')
+
+  data = dict(
+      xname=xname,
+      yname=yname,
+      colors=color,
+      alphas=alpha,
+      count=counts.flatten(),
+  )
+
+  p = figure(title=title if title is not None else "Correlation Matrix",
+             x_axis_location="above", tools=TOOLS,
+             x_range=list(reversed(names)), y_range=names,
+             tooltips=[('names', '@yname, @xname'), ('count', '@count')])
+
+  p.plot_width = 800
+  p.plot_height = 800
+  p.grid.grid_line_color = None
+  p.axis.axis_line_color = None
+  p.axis.major_tick_line_color = None
+  p.axis.major_label_text_font_size = "5pt"
+  p.axis.major_label_standoff = 0
+  p.xaxis.major_label_orientation = np.pi / 3
+
+  p.rect('xname', 'yname', 0.9, 0.9, source=data,
+         color='colors', alpha='alphas', line_color=None,
+         hover_line_color='black', hover_color='colors')
+
+  show(p)  # show the plot

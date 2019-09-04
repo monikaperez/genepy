@@ -1,5 +1,8 @@
 # Created by https://www.gitignore.io/api/r,macos,python,sublimetext
 # Edit at https://www.gitignore.io/?templates=r,macos,python,sublimetext
+### PERSO ###
+data/*
+
 
 ### macOS ###
 # General
