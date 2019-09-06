@@ -9,7 +9,7 @@ from google.cloud import storage
 import pdb
 
 
-def waitForSubmission(wm, submissions):
+def waitForSubmission(wm, submissions, raise_errors=True):
   failed_submission = []
   timing = 0
   assert submissions is not None
@@ -40,7 +40,8 @@ def waitForSubmission(wm, submissions):
         print("status is: Failed for " + str(failed) + " jobs in submission " + str(scount) + ". " + str(timing) + " mn elapsed.", end="\r")
       else:
         print(str(done / (done + failed)) + " of jobs Succeeded in submission " + str(scount) + ".")
-
+  if len(failed_submission) > 0 and raise_errors:
+    raise "failed submission"
   return failed_submission
   # print and return well formated data
 
@@ -168,22 +169,28 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
     wm.update_sample_set(samplesetname, df.index.values.tolist())
 
 
-def updateAllSampleSet(refwm, newsample_setname, Allsample_setname='All_samples'):
+def updateAllSampleSet(wm, newsample_setname, Allsample_setname='All_samples'):
   """
   update the previous All Sample sample_set with the new samples that have been added.
 
   It is especially useful for the aggregate task
   """
-  prevsamples = list(refwm.get_sample_sets().loc[Allsample_setname]['samples'])
-  newsamples = list(refwm.get_sample_sets().loc[newsample_setname]['samples'])
+  prevsamples = list(wm.get_sample_sets().loc[Allsample_setname]['samples'])
+  newsamples = list(wm.get_sample_sets().loc[newsample_setname]['samples'])
   prevsamples.extend(newsamples)
-  refwm.update_sample_set(Allsample_setname, prevsamples)
+  wm.update_sample_set(Allsample_setname, prevsamples)
 
 
 def addToSampleSet(wm, samplesetid, samples):
   prevsamples = wm.get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
   wm.update_sample_set(samplesetid, samples)
+
+
+def addToPairSet(wm, pairsetid, pairs):
+  prevpairs = wm.get_pair_sets()[pairsetid].pairs.tolist()
+  pairs.extend(prevpairs)
+  wm.update_sample_set(pairsetid, list(set(pairs)))
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):

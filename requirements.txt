@@ -1,0 +1,5 @@
+taigapy
+pandas
+numpy
+bokeh
+google-cloud-storage
