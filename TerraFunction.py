@@ -170,9 +170,9 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
 
 def updateAllSampleSet(refwm, newsample_setname, Allsample_setname='All_samples'):
   """
-  update the previous All Sample sample_set with the new samples that have been added. 
+  update the previous All Sample sample_set with the new samples that have been added.
 
-  It is especially usefull for the aggregate task 
+  It is especially useful for the aggregate task
   """
   prevsamples = list(refwm.get_sample_sets().loc[Allsample_setname]['samples'])
   newsamples = list(refwm.get_sample_sets().loc[newsample_setname]['samples'])
@@ -181,9 +181,9 @@ def updateAllSampleSet(refwm, newsample_setname, Allsample_setname='All_samples'
 
 
 def addToSampleSet(wm, samplesetid, samples):
-  prevsamples = wm.get_sample_sets()[samplesetid].samples.tolist()
+  prevsamples = wm.get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
-  refwm.update_sample_set(samplesetid, samples)
+  wm.update_sample_set(samplesetid, samples)
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
