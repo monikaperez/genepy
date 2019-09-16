@@ -153,7 +153,16 @@ def computeCov(bamfolder, ref="data/reference/genome.fa"):
 def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8):
   """
   /!/ should only be passed peaks with at least one good replicate
-
+  for each TFpeaksets, 
+  1. find the replicate that have the most peaks
+  2. correlate peaks and get in highest correlation order with the replicate found in 1
+  3. find overlap of both and get size of second replicate
+  4. if small(er)-> use only to increase statistics 
+    1. if a lot of uncalled peaks in replicate 2 at replicate 1 peaks (flag for mergebam)
+  5. if similar size -> get only intersect
+    2. add to intersect, find uncalled peaks in both replicates which are called in the other
+  6. repeat for all replicates
+  -------------------------
   if full overlap of one of the peak replicate, only use the overlapped one to increase confidence on peak
   if >80% average non overlap,
     print warning and percentage of overlap
@@ -174,6 +183,7 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
 
   create a new data frame containing merged peak size, reassembled peak data (p value etc..) and
   a boolean value for presence of each TF listed in previous df
+  ------------------------------------
 
   args:
   ----
@@ -356,6 +366,29 @@ def findAdditionalPeaks(peaks, tolookfor, filetofindin, folder, avgCov, window=2
   # if above a p-value of .1, mark as found, return the new marks with their p-value
 
 
+def createCorrMatrix(peaks, bams, folder='data/seqs', meanCov=meanCov, numthreads=False):
+  """
+  somewhat similar concept to computePeaksAt
+
+  # get pysam data
+  # ask for counts only at specific locus based on peak windows from mergedpeakset 
+  # append to an array
+  # return array, normalized
+  """
+  def findCoverageAt(bam, peaks=peaks, meanCov=meanCov):
+    res = np.zeroes(len(peaks))
+    for val in peaks.iteritems():
+      center = int((val['Start'] + val['End']) / 2)
+      for pileupcolumn in bam.pileup(contig=val['chromosome'], start=center - window,
+                                     stop=center + window - 1, truncate=True):
+        res[k] = sum(pileupcolumn.n) / meanCov
+    return res
+  numthreads = mp.cpu_count() if not numthreads else numthreads
+  pool = mp.Pool(numthreads)
+  results = pool.map(findCoverageAt, [pysam.AlignmentFile(bam, 'rb', threads=numthreads) for bam in bams])
+  pool.close()
+
+
 def annotatePeaks():
 
 
@@ -372,8 +405,11 @@ for each TF groups say
   
 
 FIND A WAY TO FILTER TO ONLY PLACES WITH H3K27AC marks??
+
+TAD points where most contacts on one side happened on this side. 
+specific distance. zone of most concentration of contacts for a peak region.
 """
-os.system("python mapEnhancerFromFactor.py -g GENOME_BUILD -i INPUT_CONSTITUENT_GFF -r RANKING_BAM -o OUTPUT_DIRECTORY [optional: -s STITCHING_DISTANCE -t TSS_EXCLUSION_ZONE_SIZE -c CONTROL_BAM]")
+os.system()
 
 
 def getCoLocalization():
