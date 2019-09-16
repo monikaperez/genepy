@@ -41,7 +41,7 @@ def waitForSubmission(wm, submissions, raise_errors=True):
       else:
         print(str(done / (done + failed)) + " of jobs Succeeded in submission " + str(scount) + ".")
   if len(failed_submission) > 0 and raise_errors:
-    raise "failed submission"
+    raise RuntimeError(str(len(failed_submission)) + " failed submission")
   return failed_submission
   # print and return well formated data
 
@@ -222,3 +222,32 @@ def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
   for blob in blobs:
     ret.append(blob.name)
   return(ret)
+
+
+def saveOmicsOutput(vm, pathto_cnvpng='segmented_copy_ratio_img',
+                    pathto_stats='sample_statistics',
+                    specific_cohorts=[],
+                    speicifc_celllines=[],
+                    is_from_pairs=True,
+                    pathto_snv='filtered_variants',
+                    pathto_seg='cnv_calls',
+                    datadir='gs://cclf_results/targeted/kim_sept/',
+                    specific_samples=[]):
+  if specific_cohorts:
+    samples = wm.get_samples()
+    samples = samples[samples.index.isin(specificlist)]
+  if is_from_pairs:
+    pairs = wm.get_pairs()
+    pairs = pairs[pairs['case_sample'].isin(specificlist)]
+  for i, val in samples.iterrows():
+    os.system('gsutil cp ' + val[pathto_seg] + ' ' + datadir + i + '/')
+    os.system('gsutil cp ' + val[pathto_cnvpng] + ' ' + datadir + i + '/')
+    os.system('gsutil cp ' + val[pathto_stats] + ' ' + datadir + i + '/')
+    if is_from_pairs:
+      snvs = pairs[pairs["case_sample"] == i][pathto_snv]
+      for snv in snvs:
+        if snv is not np.nan:
+          os.system('gsutil cp ' + snv + ' ' + datadir + i + '/')
+          break
+    else:
+      os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')

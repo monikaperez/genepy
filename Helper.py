@@ -14,6 +14,14 @@ from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
 from bokeh.models import HoverTool
+import matplotlib
+matplotlib.use('Agg')
+import venn
+
+
+def fileToList(filename):
+  with open(filename) as f:
+    return f.readlines()
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
@@ -126,6 +134,57 @@ def bar():
                        formatter=PrintfTickFormatter(format="%d%%"),
                        label_standoff=6, border_line_color=None, location=(0, 0))
   p.add_layout(color_bar, 'right')
+
+  show(p)      # show the plot
+
+
+def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
+            width=900, height=400, standoff=10, ylabel='', marks=[]):
+  """
+  args:
+  ----
+    df: df[Sample Start End Segment_Mean size]
+    sampleorder: list[Sample] <- for all samples present in the df
+  """
+  colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+  mapper = LinearColorMapper(palette=colors, low=df.Segment_Mean.min(), high=df.Segment_Mean.max())
+  if len(sample_order) == 0:
+    sample_order = list(set(df.Sample.tolist()))
+  TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
+  p = figure(title=title,
+             y_range=(df.End.max(), df.Start.min()),
+             x_range=sample_order,
+             x_axis_location="above", plot_width=width, plot_height=height,
+             tools=TOOLS, toolbar_location='below',
+             tooltips=[('pos', '@Start, @End'), ('relative CN', '@Sample')])
+
+  p.grid.grid_line_color = None
+  p.axis.axis_line_color = None
+  p.axis.major_tick_line_color = None
+  p.axis.major_label_text_font_size = "5pt"
+  p.axis.major_label_standoff = standoff
+  p.xaxis.major_label_orientation = pi / 3
+  pos = 0
+  # for i,val in enumerate(historder):
+  #    p.rect(x=pos,y=-7,width=len(orderbyhist[val]), height=10, fill_color=small_palettes['Viridis'][4][i])
+  #    p.text(x=pos+len(orderbyhist[val])/2, y=-9, text=str(val), text_color="#96deb3")
+  #    pos += len(orderbyhist[val])
+
+  p.rect(x="Sample", y="Start", width=0.9, height="size",
+         source=df.reset_index(drop=True),
+         fill_color={'field': 'Segment_Mean', 'transform': mapper},
+         line_color=None)
+
+  color_bar = ColorBar(color_mapper=mapper, major_label_text_font_size="5pt",
+                       ticker=BasicTicker(desired_num_ticks=len(colors)),
+                       formatter=PrintfTickFormatter(format="%.2f"),
+                       label_standoff=6, border_line_color=None, location=(0, 0))
+  p.add_layout(color_bar, 'right')
+  p.yaxis.axis_label = y_label
+  # p.yaxis.major_label_overrides={20:'Centromer'}
+  for val in marks:
+    hline = Span(location=val, dimension='width', line_color='green', line_width=0.2)
+    p.renderers.extend([hline])
 
   show(p)      # show the plot
 
@@ -252,3 +311,26 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
          hover_line_color='black', hover_color='colors')
 
   show(p)  # show the plot
+
+
+def venn(inp, names):
+  labels = venn.get_labels(inp, fill=['number', 'logic'])
+  if len(inp) == 2:
+    fig, ax = venn.venn2(labels, names=names)
+  if len(inp) == 3:
+    fig, ax = venn.venn3(labels, names=names)
+  if len(inp) == 4:
+    fig, ax = venn.venn4(labels, names=names)
+  if len(inp) == 5:
+    fig, ax = venn.venn5(labels, names=names)
+  if len(inp) == 6:
+    fig, ax = venn.venn6(labels, names=names)
+  fig.show()
+
+
+def grouped(iterable, n):
+  """
+  iterate over element of list 2 at a time python
+  s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
+  """
+  return izip(*[iter(iterable)] * n)

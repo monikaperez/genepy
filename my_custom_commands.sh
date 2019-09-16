@@ -43,6 +43,10 @@ function create_dx_urls_from(){
   done;
 }
 
+function gcpconnect(){
+  fswatch -o . | while read f; do rsync -zrq --max-size=200m  ./ $1:current; done & \
+  ssh -L 8157:127.0.0.1:8890 \-R 52698:localhost:52698 $1 
+}
 
 function upload_urls_to_gcp(){ 
   echo "if you don't have paralllel run the following: \
@@ -61,7 +65,7 @@ function get_unuploadedfiles_from_dx_to_gcp(){
       echo "$i $sizeB" > filters.txt;
     fi;
     echo "$sizeB, $sizeA";
-done;
+  done;
 }
 
 
