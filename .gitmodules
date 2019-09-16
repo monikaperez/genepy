@@ -4,3 +4,6 @@
 [submodule "epiigenetics/rose"]
 	path = epiigenetics/rose
 	url = https://bitbucket.org/young_computation/rose.git
+[submodule "epigenetics/rose"]
+	path = epigenetics/rose
+	url = https://bitbucket.org/young_computation/rose.git
