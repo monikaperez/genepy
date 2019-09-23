@@ -17,6 +17,8 @@ from bokeh.models import HoverTool
 import matplotlib
 matplotlib.use('Agg')
 import venn
+import sys
+from PIL import Image
 
 
 def fileToList(filename):
@@ -334,3 +336,20 @@ def grouped(iterable, n):
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
   return izip(*[iter(iterable)] * n)
+
+
+def mergeImages(images, outputpath):
+  images = list(map(Image.open, images))
+  widths, heights = zip(*(i.size for i in images))
+
+  total_width = max(widths)
+  max_height = sum(heights)
+
+  new_im = Image.new('RGB', (total_width, max_height))
+
+  y_offset = 0
+  for im in images:
+    new_im.paste(im, (0, y_offset))
+    y_offset += im.size[0]
+
+  new_im.save(outputpath)
