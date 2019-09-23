@@ -320,7 +320,7 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
         wmto.update_sample_set(i, val.samples)
 
 
-def renametsvs(wmfrom, wmto=None, name index_func=None):
+def renametsvs(wmfrom, wmto=None, index_func=None):
   data = {}
   try:
     a = wmfrom.get_participants()
