@@ -224,7 +224,7 @@ def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
   return(ret)
 
 
-def saveOmicsOutput(vm, pathto_cnvpng='segmented_copy_ratio_img',
+def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
                     pathto_stats='sample_statistics',
                     specific_cohorts=[],
                     speicifc_celllines=[],
@@ -251,3 +251,143 @@ def saveOmicsOutput(vm, pathto_cnvpng='segmented_copy_ratio_img',
           break
     else:
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
+
+
+# ["gs://fc-ed07d172-7980-475e-81de-108a694a3532/",
+#  "gs://fc-c23078b3-05b3-4158-ba8f-2b1eeb1bfa16/",
+#  "gs://fc-51050008-201e-4a40-8ec7-28b6fb2b1885/"]
+# "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
+def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None):
+  data = {}
+  try:
+    a = wmfrom.get_participants()
+    data.update({'participants': a})
+  except:
+    print('no participants')
+  try:
+    a = wmfrom.get_samples()
+    data.update({'samples': a})
+  except:
+    print('no samples')
+  try:
+    a = wmfrom.get_pair_sets()
+    data.update({'pair_sets': a})
+  except:
+    print('no pair_sets')
+  try:
+    a = wmfrom.get_pairs()
+    data.update({'pairs': a})
+  except:
+    print('no pairs')
+  try:
+    a = wmfrom.get_sample_sets()
+    data.update({'sample_sets': a})
+  except:
+    print('no sample_sets')
+  # currently works only for sample, sample
+  for k, entity in data.iteritems():
+    for k, val in entity.iterrows():
+      for i, v in enumerate(val):
+        if type(v) is str:
+          for prev in prevgslist:
+            v = v.replace(prev, newgs)
+          val[i] = v
+        if type(v) is list:
+          ind = []
+          for j in v:
+            for prev in prevgslist:
+              j = j.replace(prev, newgs)
+            ind.append(j)
+          val[i] = ind
+        entity.loc[k] = val
+    if wmto is None:
+      wmto = wmfrom
+    if "participants" in data:
+      wmto.upload_participants(data['participants'])
+    if "samples" in data:
+      wmto.upload_samples(data['samples'])
+    if "pairs" in data:
+      wmto.upload_pairs(data['pairs'])
+    if "pair_set" in data:
+      pairset = data['pair_set'].drop('pairs', 1)
+      wmto.upload_entities('pair_set', pairset)
+      for i, val in data['pair_set'].iterrows():
+        wmto.update_pair_set(i, val.pairs)
+    if "sample_set" in data:
+      sampleset = data['sample_set'].drop('samples', 1)
+      wmto.upload_entities('sample_set', sampleset)
+      for i, val in data['sample_set'].iterrows():
+        wmto.update_sample_set(i, val.samples)
+
+
+def renametsvs(wmfrom, wmto=None, name index_func=None):
+  data = {}
+  try:
+    a = wmfrom.get_participants()
+    data.update({'participants': a})
+  except:
+    print('no participants')
+  try:
+    a = wmfrom.get_samples()
+    data.update({'samples': a})
+  except:
+    print('no samples')
+  try:
+    a = wmfrom.get_pair_sets()
+    data.update({'pair_sets': a})
+  except:
+    print('no pair_sets')
+  try:
+    a = wmfrom.get_pairs()
+    data.update({'pairs': a})
+  except:
+    print('no pairs')
+  try:
+    a = wmfrom.get_sample_sets()
+    data.update({'sample_sets': a})
+  except:
+    print('no sample_sets')
+  # currently works only for sample, sample
+  for k, entity in data.iteritems():
+    ind = []
+    for i in entity.index:
+      pos = val.find('-SM')
+      if pos != -1:
+        val = val[pos + 1:]
+      pos = val.find('-SM')
+      if pos != -1:
+        val = val[:9] + val[pos + 1:]
+      ind.append(val)
+    entity.index = ind
+    for k, val in entity.iterrows():
+      for i, v in enumerate(val):
+        if type(v) is list or type(v) is str:
+          ind = []
+          for j in v:
+            pos = j.find('-SM')
+            if pos != -1:
+              j = j[pos + 1:]
+            pos = j.find('-SM')
+            if pos != -1:
+              j = j[:9] + j[pos + 1:]
+            ind.append(j)
+          val[i] = ind
+        entity.loc[k] = val
+    if wmto is None:
+      wmto = wmfrom
+    if "participants" in data:
+      wmto.upload_participants(data['participants'])
+    if "samples" in data:
+      wmto.upload_samples(data['samples'])
+    if "pairs" in data:
+      wmto.upload_pairs(data['pairs'])
+    if "pair_set" in data:
+      pairset = data['pair_set'].drop('pairs', 1)
+      wmto.upload_entities('pair_set', pairset)
+      for i, val in data['pair_set'].iterrows():
+        wmto.update_pair_set(i, val.pairs)
+    if "sample_set" in data:
+      sampleset = data['sample_set'].drop('samples', 1)
+      wmto.upload_entities('sample_set', sampleset)
+      for i, val in data['sample_set'].iterrows():
+        wmto.update_sample_set(i, val.samples)
