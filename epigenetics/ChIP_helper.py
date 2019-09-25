@@ -68,7 +68,7 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
     """
     # run the paired end pipeline
     """
-    for key, val in pairedend.iteritems():
+    for key, val in pairedend.items():
         out1 = folder + mappedFolder + val[0].split('.')[0] + ".mapped.sam"
         in1 = folder + val[0]
         in2 = folder + val[1]
@@ -100,7 +100,7 @@ def mergeBams(rep):
     """
     uses samtools to merge a set of replicates considered into one file
     """
-    for i, val in rep.iteritems():
+    for i, val in rep.items():
         out1 = i + '.merged.bam'
         for bam in val:
             in1 += ' ' + bam
@@ -115,16 +115,16 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
         if isMacs:
             if any(tf in folder for tf in CTFlist) or not CTFlist:
                 binding = pd.read_csv(peakfolder + folder + "/NA_peaks.narrowPeak", sep='\t', header=None)
-                binding['type'] = folder.replace('.narrowPeak', '')
+                binding['name'] = folder.replace('.narrowPeak', '')
                 bindings = bindings.append(binding)
         else:
             if folder[-11:] == ".narrowPeak" and (any(tf in folder for tf in CTFlist) or not CTFlist):
                 binding = pd.read_csv(peakfolder + folder, sep='\t', header=None, skiprows=skiprows)
-                binding['type'] = folder.replace('.narrowPeak', '')
+                binding['name'] = folder.replace('.narrowPeak', '')
                 bindings = bindings.append(binding)
     bindings = bindings.drop(5, 1)
     bindings = bindings.rename(columns={
-        0: "chromosome",
+        0: "chrom",
         1: 'start',
         2: 'end',
         3: 'peak_number',
@@ -133,7 +133,7 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
         7: "-log10pvalue",
         8: "-log10qvalue",
         9: 'relative_summit_pos'})
-    bindings = bindings.sort_values(by=["chromosome", "start", "end"], axis=0)
+    bindings = bindings.sort_values(by=["chrom", "start", "end"], axis=0)
     bindings.start = bindings.start.astype('int')
     bindings.end = bindings.end.astype('int')
     bindings.size = bindings.size.astype('int')
@@ -160,7 +160,7 @@ def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
         print(num / len(peaks), end='\r')
         for k, bam in loaded.items():
             center = int((val['start'] + val['end']) / 2)
-            for pileupcolumn in bam.pileup(contig=val['chromosome'], start=center - window,
+            for pileupcolumn in bam.pileup(contig=val['chrom'], start=center - window,
                                            stop=center + window - 1, truncate=True):
                 res[k][(center - window) - pileupcolumn.pos] = pileupcolumn.n
     return res
@@ -169,6 +169,100 @@ def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
 def computeCov(bamfolder, ref="data/reference/genome.fa"):
     for val in os.listdir(bamfolder):
         os.system("bedtools genomecov -ibam " + bamfolder + val)
+
+    """
+def substractPeaks(peaks1, to):
+    """
+    """
+    peaks1 = peaks1.sort_values(by=['chrom', 'start'])
+    peaks2 = to.sort_values(by=['chrom', 'start'])
+    j = 0
+    i = 0
+    newpeaks = pd.DataFrame(columns=peaks2.columns)
+    while i < len(peaks2):
+        if peaks1.iloc[j].chrom == peaks2.iloc[j].chrom:
+            else
+        intersection = helper.intersection([peaks2.iloc[i]['start'], peaks2.iloc[i]['end']],
+                                           [peaks1.iloc[j]['start'], peaks1.iloc[j]['start']])
+        if intersection:
+
+            j += 1
+        while peaks2.iloc[i]['end'] > peaks1.iloc[j]['start']:
+            if peaks2.iloc[i]['end'] > peaks1.iloc[j]['end']:
+                newpeaks.append(peaks2.iloc[i], ignore_index=True)
+            else:
+                newpeaks.append({'start': peaks2.iloc[i]['start'],
+                                 'end': peaks1.iloc[j]['start'],
+                                 'chromomsome': peaks1.iloc[j]['chrom']}, ignore_index=True)
+    """
+
+
+def simpleMergedPeaks(peaks, window=0, totpeaknumber=0):
+    peaks = peaks.sort_values(by=['chrom', 'start'])
+    tfs = list(set(peaks['name'].tolist()))
+    mergedpeaksdict = {}
+    remove = []
+    peaknumber = 0
+    merged_bed = {
+        "chrom": [peaks.iloc[0]['chrom']],
+        "start": [peaks.iloc[0]['start']],
+        "end": [],
+        "peak_number": [peaknumber + totpeaknumber],
+        "size": [],
+        "foldchange": [],
+        "log10pvalue": [],
+        "log10qvalue": [],
+        "relative_summit_pos": []
+    }
+    foldchange = [peaks.iloc[0].get('foldchange', 1)]
+    log10pvalue = [peaks.iloc[0].get('log10pvalue', 0)]
+    log10qvalue = [peaks.iloc[0].get('log10qvalue', 0)]
+    relative_summit_pos = peaks.iloc[1].get('relative_summit_pos', peaks.iloc[0]['start'])
+    # computes overlap by extending a bit the window (100bp?) should be ~readsize
+    prev_end = peaks.iloc[0]['end']
+    prevchrom = peaks.iloc[0]['chrom']
+    tfmerged = {a: [0] for a in tfs}
+    tfmerged[peaks.iloc[0]['name']][-1] = 1
+    for i, (pos, peak) in enumerate(peaks.iloc[1:].iterrows()):
+        print(i / len(peaks), end=" \r")
+        if prev_end + window > peak['start'] and prevchrom == peak['chrom']:
+            # can be merged
+            foldchange.append(peak.get('foldchange', 1))
+            log10pvalue.append(peak.get('log10pvalue', 0))
+            log10qvalue.append(peak.get('log10qvalue', 0))
+            if peak.get('foldchange', 1) > max(foldchange):
+                relative_summit_pos = peak.get('relative_summit_pos', peaks['start'])
+        else:
+            # newpeak
+            for k, val in tfmerged.items():
+                val.append(0)
+            peaknumber += 1
+            merged_bed['chrom'].append(peak['chrom'])
+            merged_bed['start'].append(peak['start'])
+            merged_bed['end'].append(prev_end)
+            merged_bed['peak_number'].append(peaknumber + totpeaknumber)
+            merged_bed['size'].append(prev_end - merged_bed['start'][-2])
+            merged_bed['foldchange'].append(np.mean(foldchange))
+            merged_bed['log10pvalue'].append(max(log10pvalue))
+            merged_bed['log10qvalue'].append(max(log10qvalue))
+            merged_bed['relative_summit_pos'].append(relative_summit_pos)
+            foldchange = [peak.get('foldchange', 1)]
+            log10pvalue = [peak.get('log10pvalue', 0)]
+            log10qvalue = [peak.get('log10qvalue', 0)]
+            relative_summit_pos = peak.get('relative_summit_pos', peak['start'])
+        prev_end = peak['end']
+        prev_chrom = peak['chrom']
+        tfmerged[peak['name']][-1] = 1
+    merged_bed['end'].append(prev_end)
+    merged_bed['size'].append(prev_end - merged_bed['start'][-2])
+    merged_bed['foldchange'].append(np.mean(foldchange))
+    merged_bed['log10pvalue'].append(max(log10pvalue))
+    merged_bed['log10qvalue'].append(max(log10qvalue))
+    merged_bed['relative_summit_pos'].append(relative_summit_pos)
+
+    merged_bed = pd.DataFrame(merged_bed)
+    tfmerged = pd.DataFrame(tfmerged)
+    return pd.concat([merged_bed, tfmerged], axis=1, sort=False)
 
 
 def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8):
@@ -208,7 +302,7 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
 
     args:
     ----
-    peaks: df[bed-like] all the peaks into the sameBam with a column containing the 'type'
+    peaks: df[bed-like] all the peaks into the sameBam with a column containing the 'name'
     being the filename of the tf replicate bam
 
     reps: dict(TFname:[file]) a dictionarry giving a list of bam filename for all replicates of the TF
@@ -225,15 +319,16 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
     """
     print("/!/ should only be passed peaks with at least one good replicate")
     # for a df containing a set of peaks in bed format and an additional column of different TF
-    tfs = list(set(peaks['type'].tolist()))
+    tfs = list(set(peaks['name'].tolist()))
     totpeaknumber = 0
     mergedpeaksdict = {}
     remove = []
-    for k, rep in reps:
+    for tf, rep in reps:
         print("doing peak " + k)
+        tfpeaks = peaks[peaks['name'] == tf]
         peaknumber = 0
         merged_bed = {
-            "chromosome": [tfpeaks.iloc[1]['chromosome']],
+            "chrom": [tfpeaks.iloc[1]['chrom']],
             "start": [tfpeaks.iloc[1]['start']],
             "end": [],
             "peak_number": [peaknumber + totpeaknumber],
@@ -248,14 +343,13 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
         log10qvalue = [tfpeaks.iloc[1]['log10qvalue']]
         relative_summit_pos = tfpeaks.iloc[1]['relative_summit_pos']
         # computes overlap by extending a bit the window (100bp?) should be ~readsize
-        tfpeaks = peaks[peaks['type'] == tf]
         prev_end = -101
         prevchrom = 1
-        tfmerged = {a: [0] for a in val}
-        for i, pos, peak in enumerate(tfpeaks.iloc[1:].iterrows()):
+        tfmerged = {a: [0] for a in tfs}
+        for i, (pos, peak) in enumerate(tfpeaks.iloc[1:].iterrows()):
             print(i / len(tfpeaks), end='\r')
-            if prev_end + window > peak['start'] and prevchrom == peak['chromosome']:
-                tfmerged[peak['type']] = 1
+            if prev_end + window > peak['start'] and prevchrom == peak['chrom']:
+                tfmerged[peak['name']] = 1
                 foldchange.append(peak['foldchange'])
                 log10pvalue.append(peak['log10pvalue'])
                 log10qvalue.append(peak['log10qvalue'])
@@ -263,15 +357,15 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
                     relative_summit_pos = peak['relative_summit_pos']
             else:
                 # newpeak
-                for k, val in tfmerged.iteritems():
-                    val.append(0)
+                for k, val in tfmerged.items():
+                    tfmerged[k].append(0)
                 peaknumber += 1
-                merged_bed['chromosome'].append(peak['chromosome'])
+                merged_bed['chrom'].append(peak['chrom'])
                 merged_bed['start'].append(peak['start'])
                 merged_bed['end'].append(prev_end)
                 merged_bed['peak_number'].append(peaknumber + totpeaknumber)
                 merged_bed['size'].append(prev_end - merged_bed['start'][-2])
-                merged_bed['foldchange'].append(mean(foldchange))
+                merged_bed['foldchange'].append(np.mean(foldchange))
                 merged_bed['log10pvalue'].append(max(log10pvalue))
                 merged_bed['log10qvalue'].append(max(log10qvalue))
                 merged_bed['relative_summit_pos'].append(relative_summit_pos)
@@ -375,7 +469,7 @@ def findAdditionalPeaks(peaks, tolookfor, filetofindin, folder, avgCov, window=2
             pos = peaks.iloc[i]
             center = int((pos['Start'] + pos['End']) / 2)
             zone = np.zeroes(window * 2)
-            for pileupcolumn in bam.pileup(contig=pos['chromosome'], start=center - window,
+            for pileupcolumn in bam.pileup(contig=pos['chrom'], start=center - window,
                                            stop=center + window - 1, truncate=True):
                 zone[(center - window) - pileupcolumn.pos] = pileupcolumn.n
             if max(zone) > 10 * avgCov:
@@ -402,9 +496,9 @@ def createCorrMatrix(peaks, bams, meanCov, folder='data/seqs', numthreads=False)
     """
     def findCoverageAt(bam, peaks=peaks, meanCov=meanCov):
         res = np.zeroes(len(peaks))
-        for val in peaks.iteritems():
+        for val in peaks.items():
             center = int((val['Start'] + val['End']) / 2)
-            for pileupcolumn in bam.pileup(contig=val['chromosome'], start=center - window,
+            for pileupcolumn in bam.pileup(contig=val['chrom'], start=center - window,
                                            stop=center + window - 1, truncate=True):
                 res[k] = sum(pileupcolumn.n) / meanCov
         return res
