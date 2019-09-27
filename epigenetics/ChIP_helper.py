@@ -4,6 +4,13 @@ import pysam
 import numpy as np
 import Helper
 import re
+from pybedtools import BedTool
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+size = {"GRCh37": '2864785220',
+        "GRCh38": '2913022398'}
 
 
 def extractPairedSingleEndFrom(folder, pattern='R1/R2', sep='-', namepos=2):
@@ -87,8 +94,6 @@ def bigWigFrom(bams, folder="data/seqs/", numthreads=8, genome='GRCh37'):
     """
     run the bigwig command line for a set of bam files in a folder
     """
-    size = {"GRCh37": '2864785220',
-            "GRCh38": '2913022398'}
     for i in bams:
         in1 = folder + i
         out1 = folder + "bigwig/" + i + split('.')[0] + '.bw'
@@ -152,23 +157,68 @@ def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
     # append to an array
     # return array, normalized
     loaded = {}
-    res = {i: np.zeros((len(peaks), window)) for i in bams}
+    res = {i: np.zeros((len(peaks), window * 2)) for i in bams}
+    peaks.chrom = peaks.chrom.astype(str)
     for val in bams:
         loaded.update({val: pysam.AlignmentFile(folder + val, 'rb', threads=numthreads)})
-
-    for num, (i, val) in enumerate(peaks.iterrows()):
-        print(num / len(peaks), end='\r')
-        for k, bam in loaded.items():
+    for k, bam in loaded.items():
+        for num, (i, val) in enumerate(peaks.iterrows()):
+            print(num / len(peaks), end='\r')
             center = int((val['start'] + val['end']) / 2)
-            for pileupcolumn in bam.pileup(contig=val['chrom'], start=center - window,
-                                           stop=center + window - 1, truncate=True):
-                res[k][(center - window) - pileupcolumn.pos] = pileupcolumn.n
+            for pileupcolumn in bam.pileup(val['chrom'], start=center - window,
+                                           stop=center + window, truncate=True):
+                res[k][num][pileupcolumn.pos - (center - window)] = pileupcolumn.n
+    fig, ax = plt.subplots(1, len(res))
+    for i, (k, val) in enumerate(res.items()):
+        sns.heatmap(val, ax=ax[i])
+        ax[i].set_title(k.split('.')[0])
+    fig.show()
     return res
 
 
-def computeCov(bamfolder, ref="data/reference/genome.fa"):
+def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
+    """
+    get pysam data
+    ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
+    for each counts, do a rolling average (or a convolving of the data) with numpy
+    append to an array
+    return array, normalized
+    """
+    loaded = {}
+    res = {i: np.zeros((len(peaks), window * 2)) for i in bams}
+    import pdb
+    pdb.set_trace()
+    for val in bams:
+        loaded.update({val: BedTool(folder + val).genome_coverage(bga=True, split=True)})
+
+    for k, bam in loaded.items():
+        i = 0
+        bam.chrom = bam.chrom.astype(str)
+        for num, (_, val) in enumerate(peaks.iterrows()):
+            print(num / len(peaks), end='\r')
+            center = int((val['start'] + val['end']) / 2)
+            while int(bam[i].chrom) < int(val['chrom'][3:]):
+                i += 1
+            while True:
+                overlap = helper.overlap([bam[i].start, bam[i].end],
+                                         [center - window, center + window - 1])
+                if overlap:
+                    res[k][overlap[0], overlap[1]] = int(bam[i].name)
+                elif center - window > bam[i].end:
+                    break
+                i += 1
+    return res
+
+
+def gettiles(): BedTool.makewindows()
+
+
+def computeMeanCov(bamfolder, meanOnly=True, ref="GRCh38", outputfolder='/data/coverage/'):
+    meancov = {i: 0 for i in os.listdir(bamfolder)}
     for val in os.listdir(bamfolder):
-        os.system("bedtools genomecov -ibam " + bamfolder + val)
+        if not meanOnly:
+            BedTool(bamfolder + val).genome_coverage().saveas(outputfolder + val)
+        meancov[val.split('.')[0]] = int(os.popen('samtools view -c -F 4 ' + bamfolder + val).read()[:-1]) / size[ref]
 
     """
 def substractPeaks(peaks1, to):
@@ -323,61 +373,13 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
     totpeaknumber = 0
     mergedpeaksdict = {}
     remove = []
+    import pdb
+    pdb.set_trace()
     for tf, rep in reps:
         print("doing peak " + k)
-        tfpeaks = peaks[peaks['name'] == tf]
-        peaknumber = 0
-        merged_bed = {
-            "chrom": [tfpeaks.iloc[1]['chrom']],
-            "start": [tfpeaks.iloc[1]['start']],
-            "end": [],
-            "peak_number": [peaknumber + totpeaknumber],
-            "size": [],
-            "foldchange": [],
-            "log10pvalue": [],
-            "log10qvalue": [],
-            "relative_summit_pos": [tfpeaks.iloc[1]['relative_summit_pos']]
-        }
-        foldchange = [tfpeaks.iloc[1]['foldchange']]
-        log10pvalue = [tfpeaks.iloc[1]['log10pvalue']]
-        log10qvalue = [tfpeaks.iloc[1]['log10qvalue']]
-        relative_summit_pos = tfpeaks.iloc[1]['relative_summit_pos']
-        # computes overlap by extending a bit the window (100bp?) should be ~readsize
-        prev_end = -101
-        prevchrom = 1
-        tfmerged = {a: [0] for a in tfs}
-        for i, (pos, peak) in enumerate(tfpeaks.iloc[1:].iterrows()):
-            print(i / len(tfpeaks), end='\r')
-            if prev_end + window > peak['start'] and prevchrom == peak['chrom']:
-                tfmerged[peak['name']] = 1
-                foldchange.append(peak['foldchange'])
-                log10pvalue.append(peak['log10pvalue'])
-                log10qvalue.append(peak['log10qvalue'])
-                if peak['foldchange'] > max(foldchange):
-                    relative_summit_pos = peak['relative_summit_pos']
-            else:
-                # newpeak
-                for k, val in tfmerged.items():
-                    tfmerged[k].append(0)
-                peaknumber += 1
-                merged_bed['chrom'].append(peak['chrom'])
-                merged_bed['start'].append(peak['start'])
-                merged_bed['end'].append(prev_end)
-                merged_bed['peak_number'].append(peaknumber + totpeaknumber)
-                merged_bed['size'].append(prev_end - merged_bed['start'][-2])
-                merged_bed['foldchange'].append(np.mean(foldchange))
-                merged_bed['log10pvalue'].append(max(log10pvalue))
-                merged_bed['log10qvalue'].append(max(log10qvalue))
-                merged_bed['relative_summit_pos'].append(relative_summit_pos)
-                foldchange = [peak['foldchange']]
-                log10pvalue = [peak['log10pvalue']]
-                log10qvalue = [peak['log10qvalue']]
-                relative_summit_pos = peak['relative_summit_pos']
-            prev_end = peak['end']
-            prev_chrom = peak['end']
-        totpeaknumber += peaknumber
-        merged_bed = pd.Dataframe(merged_bed)
-        finalpeaks = pd.Dataframe(tfmerged)
+        finalpeaks = simpleMergedPeaks(peaks[peaks['name'] == tf])
+        merged_bed = finalpeaks[finalpeaks.columns[9:]]
+        finalpeaks = finalpeaks[finalpeaks.columns[:9]]
         print('finish first overlaps lookup')
         # flag when biggest is <1000 peaks
         if len(finalpeaks) < 1000:
