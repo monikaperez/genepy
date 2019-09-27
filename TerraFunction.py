@@ -253,11 +253,13 @@ def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
 
 
-# ["gs://fc-ed07d172-7980-475e-81de-108a694a3532/",
+# ["gs://fc-35446f22-ea37-483a-bd6c-5e9fc56851ff/",
 #  "gs://fc-c23078b3-05b3-4158-ba8f-2b1eeb1bfa16/",
 #  "gs://fc-51050008-201e-4a40-8ec7-28b6fb2b1885/"]
 # "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
-def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None):
+def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None,
+                     flag_non_matching=False):
+  flaglist = []
   data = {}
   try:
     a = wmfrom.get_participants()
@@ -285,21 +287,29 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
   except:
     print('no sample_sets')
   # currently works only for sample, sample
-  for k, entity in data.iteritems():
-    for k, val in entity.iterrows():
-      for i, v in enumerate(val):
-        if type(v) is str:
-          for prev in prevgslist:
-            v = v.replace(prev, newgs)
-          val[i] = v
-        if type(v) is list:
+  for i, entity in data.items():
+    for j, val in entity.iterrows():
+      for k, prev in enumerate(val):
+        if type(prev) is str:
+          for prevgs in prevgslist:
+            new = prev.replace(prevgs, newgs)
+            if flag_non_matching:
+              if 'gs://' == prev[:5]:
+                if new == prev:
+                  flaglist.append(prev)
+          val[k] = prev
+        if type(prev) is list:
           ind = []
-          for j in v:
-            for prev in prevgslist:
-              j = j.replace(prev, newgs)
-            ind.append(j)
-          val[i] = ind
-        entity.loc[k] = val
+          for prevname in prev:
+            for prevgs in prevgslist:
+              newname = prevname.replace(prevgs, newgs)
+              if flag_non_matching:
+                if 'gs://' == prevname[:5]:
+                  if newname == prevname:
+                    flaglist.append(prevname)
+            ind.append(newname)
+          val[k] = ind
+        entity.loc[j] = val
     if wmto is None:
       wmto = wmfrom
     if "participants" in data:
@@ -318,6 +328,7 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
       wmto.upload_entities('sample_set', sampleset)
       for i, val in data['sample_set'].iterrows():
         wmto.update_sample_set(i, val.samples)
+  return flaglist
 
 
 def renametsvs(wmfrom, wmto=None, index_func=None):
@@ -348,17 +359,18 @@ def renametsvs(wmfrom, wmto=None, index_func=None):
   except:
     print('no sample_sets')
   # currently works only for sample, sample
-  for k, entity in data.iteritems():
+  for k, entity in data.items():
     ind = []
     for i in entity.index:
       pos = val.find('-SM')
       if pos != -1:
         val = val[pos + 1:]
-      pos = val.find('-SM')
-      if pos != -1:
-        val = val[:9] + val[pos + 1:]
+        pos = val.find('-SM')
+        if pos != -1:
+          val = val[:9] + val[pos + 1:]
       ind.append(val)
     entity.index = ind
+    # for all columns of the tsv
     for k, val in entity.iterrows():
       for i, v in enumerate(val):
         if type(v) is list or type(v) is str:
@@ -367,20 +379,20 @@ def renametsvs(wmfrom, wmto=None, index_func=None):
             pos = j.find('-SM')
             if pos != -1:
               j = j[pos + 1:]
-            pos = j.find('-SM')
-            if pos != -1:
-              j = j[:9] + j[pos + 1:]
+              pos = j.find('-SM')
+              if pos != -1:
+                j = j[:9] + j[pos + 1:]
             ind.append(j)
           val[i] = ind
         entity.loc[k] = val
     if wmto is None:
       wmto = wmfrom
     if "participants" in data:
-      wmto.upload_participants(data['participants'])
+      wmto.upload_participants(data['participants'].index.tolist())
     if "samples" in data:
       wmto.upload_samples(data['samples'])
     if "pairs" in data:
-      wmto.upload_pairs(data['pairs'])
+      wmto.upload_entities('pair', data['pairs'])
     if "pair_set" in data:
       pairset = data['pair_set'].drop('pairs', 1)
       wmto.upload_entities('pair_set', pairset)

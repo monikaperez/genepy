@@ -23,7 +23,7 @@ from PIL import Image
 
 def fileToList(filename):
   with open(filename) as f:
-    return f.readlines()
+    return [val[:-1] for val in f.readlines()]
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
@@ -335,7 +335,7 @@ def grouped(iterable, n):
   iterate over element of list 2 at a time python
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
-  return izip(*[iter(iterable)] * n)
+  return zip(*[iter(iterable)] * n)
 
 
 def mergeImages(images, outputpath):
