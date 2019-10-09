@@ -70,7 +70,7 @@ def getReport(workspace1="CCLF_TSCA_2_0_2", namespace1="nci-mimoun-bi-org",
           mut['condition'] = cond_name
           mutfile = mutfile.append(mut)
           cn = pd.read_csv(tempdir + 'copy_number.tsv', sep='\t')
-          cn['condition'] = cond_name
+          cn['condition'] = cond_JKBname
           cnfile = cnfile.append(cn)
       if found:
         cnfile.to_csv(tempdir + 'cn.tsv', sep='\t')
