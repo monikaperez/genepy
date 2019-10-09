@@ -6,8 +6,6 @@
 import time
 import pandas as pd
 from google.cloud import storage
-import pdb
-
 
 def waitForSubmission(wm, submissions, raise_errors=True):
   failed_submission = []
