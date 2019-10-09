@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 def fileToList(filename):
   with open(filename) as f:
-    return f.readlines()
+    return [val[:-1] for val in f.readlines()]
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
@@ -335,7 +335,7 @@ def grouped(iterable, n):
   iterate over element of list 2 at a time python
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
-  return izip(*[iter(iterable)] * n)
+  return zip(*[iter(iterable)] * n)
 
 
 def mergeImages(images, outputpath):
@@ -354,11 +354,43 @@ def mergeImages(images, outputpath):
 
   new_im.save(outputpath)
 
-def addTextToImage(imagedir, text, outputpath, xy = (0,0), color = (0,0,0), fontSize = 64):
-    # adds black text to the upper left by default, Arial size 64
-    img = Image.open(imagedir)
-    draw = ImageDraw.Draw(img)
-    # the below file path assumes you're operating macOS
-    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
-    draw.text(xy, text, color,font=font)
-    img.save(outputpath)
+
+def overlap(interval1, interval2):
+  """
+  Given [0, 4] and [1, 10] returns [1, 4]
+  Given [0, 4] and [8, 10] returns False
+  """
+  if interval2[0] <= interval1[0] <= interval2[1]:
+    start = interval1[0]
+  elif interval1[0] <= interval2[0] <= interval1[1]:
+    start = interval2[0]
+  else:
+    return False
+
+  if interval2[0] <= interval1[1] <= interval2[1]:
+    end = interval1[1]
+  elif interval1[0] <= interval2[1] <= interval1[1]:
+    end = interval2[1]
+  else:
+    return False
+
+  return (start, end)
+
+
+def union(interval1, interval2):
+  """
+  Given [0, 4] and [1, 10] returns [0, 10]
+  Given [0, 4] and [8, 10] returns False
+  """
+  if interval1[0] <= interval2[0] <= interval1[1]:
+    start = interval1[0]
+    end = interval1[1] if interval2[1] <= interval1[1] else interval2[1]
+  elif interval1[0] <= interval2[1] <= interval1[1]:
+    start = interval2[0] if interval2[0] <= interval1[0] else interval1[0]
+    end = interval1[1]
+  else:
+    return False
+  return (start, end)
+
+
+def nans(df): return df[df.isnull().any(axis=1)]
