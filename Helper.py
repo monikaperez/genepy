@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use('Agg')
 import venn
 import sys
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 
 def fileToList(filename):
@@ -350,7 +350,7 @@ def mergeImages(images, outputpath):
   y_offset = 0
   for im in images:
     new_im.paste(im, (0, y_offset))
-    y_offset += im.size[0]
+    y_offset += im.size[1]
 
   new_im.save(outputpath)
 
