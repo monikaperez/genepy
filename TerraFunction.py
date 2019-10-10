@@ -7,6 +7,12 @@ import time
 import pandas as pd
 from google.cloud import storage
 
+def createManySubmissions(wm, workflow, references, entity=None, expression=None):
+  # wrapper to create many submissions for a workflow
+  # references = list of samplesetnames, or samplenames, etc.
+  for i in range(len(references)):
+    wm.create_submission(workflow, references[i], entity, expression)
+
 def waitForSubmission(wm, submissions, raise_errors=True):
   failed_submission = []
   timing = 0
@@ -186,9 +192,10 @@ def addToSampleSet(wm, samplesetid, samples):
 
 
 def addToPairSet(wm, pairsetid, pairs):
+  ipdb.set_trace()
   prevpairs = wm.get_pair_sets()[pairsetid].pairs.tolist()
   pairs.extend(prevpairs)
-  wm.update_sample_set(pairsetid, list(set(pairs)))
+  wm.update_pair_set(pairsetid, list(set(pairs)))
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
