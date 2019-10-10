@@ -128,8 +128,10 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
           mut['external_id'] = external_id
           mutfile = mutfile.append(mut)
           cn = pd.read_csv(tempdir + 'copy_number.tsv', sep='\t')
+
           cn['condition'] = cond_name
           cn['external_id'] = external_id
+          # cn['condition'] = cond_JKBname
           cnfile = cnfile.append(cn)
       if found:
         cnfile.to_csv(tempdir + 'cn.tsv', sep='\t')

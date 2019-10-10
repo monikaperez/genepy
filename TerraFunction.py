@@ -262,52 +262,74 @@ def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
 #  "gs://fc-c23078b3-05b3-4158-ba8f-2b1eeb1bfa16/",
 #  "gs://fc-51050008-201e-4a40-8ec7-28b6fb2b1885/"]
 # "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
+#
+#
 def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False):
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True):
   flaglist = []
   data = {}
-  try:
-    a = wmfrom.get_participants()
-    data.update({'participants': a})
-  except:
-    print('no participants')
-  try:
-    a = wmfrom.get_samples()
-    data.update({'samples': a})
-  except:
-    print('no samples')
-  try:
-    a = wmfrom.get_pair_sets()
-    data.update({'pair_sets': a})
-  except:
-    print('no pair_sets')
-  try:
-    a = wmfrom.get_pairs()
-    data.update({'pairs': a})
-  except:
-    print('no pairs')
-  try:
-    a = wmfrom.get_sample_sets()
-    data.update({'sample_sets': a})
-  except:
-    print('no sample_sets')
-  # currently works only for sample, sample
+  if entity in ['', 'participants']:
+    try:
+      a = wmfrom.get_participants()
+      data.update({'participants': a})
+    except:
+      print('no participants')
+  if entity in ['', 'samples']:
+    try:
+      a = wmfrom.get_samples()
+      data.update({'samples': a})
+    except:
+      print('no samples')
+  if entity in ['', 'pair_sets']:
+    try:
+      a = wmfrom.get_pair_sets()
+      data.update({'pair_sets': a})
+    except:
+      print('no pair_sets')
+  if entity in ['', 'pairs']:
+    try:
+      a = wmfrom.get_pairs()
+      data.update({'pairs': a})
+    except:
+      print('no pairs')
+  if entity in ['', 'sample_sets']:
+    try:
+      a = wmfrom.get_sample_sets()
+      data.update({'sample_sets': a})
+    except:
+      print('no sample_sets')
+    # currently works only for sample, sample
   for i, entity in data.items():
+    if onlycol:
+      try:
+        entity = entity[onlycol]
+      except:
+        print("entity " + str(i) + " does not contain one of the columns")
+        continue
+    todrop = set()
     for j, val in entity.iterrows():
+      print(j)
       for k, prev in enumerate(val):
         if type(prev) is str:
-          for prevgs in prevgslist:
-            new = prev.replace(prevgs, newgs)
+          new = prev
+          if newgs not in new:
+            for prevgs in prevgslist:
+              new = new.replace(prevgs, newgs)
             if flag_non_matching:
               if 'gs://' == prev[:5]:
                 if new == prev:
                   flaglist.append(prev)
-          val[k] = prev
+          val[k] = new
         if type(prev) is list:
+          if droplists:
+            todrop.add(k)
+            continue
           ind = []
           for prevname in prev:
-            for prevgs in prevgslist:
-              newname = prevname.replace(prevgs, newgs)
+            newname = prevname
+            if newgs not in newname:
+              for prevgs in prevgslist:
+                newname = newname.replace(prevgs, newgs)
               if flag_non_matching:
                 if 'gs://' == prevname[:5]:
                   if newname == prevname:
@@ -315,24 +337,27 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
             ind.append(newname)
           val[k] = ind
         entity.loc[j] = val
-    if wmto is None:
-      wmto = wmfrom
-    if "participants" in data:
-      wmto.upload_participants(data['participants'])
-    if "samples" in data:
-      wmto.upload_samples(data['samples'])
-    if "pairs" in data:
-      wmto.upload_pairs(data['pairs'])
-    if "pair_set" in data:
-      pairset = data['pair_set'].drop('pairs', 1)
-      wmto.upload_entities('pair_set', pairset)
-      for i, val in data['pair_set'].iterrows():
-        wmto.update_pair_set(i, val.pairs)
-    if "sample_set" in data:
-      sampleset = data['sample_set'].drop('samples', 1)
-      wmto.upload_entities('sample_set', sampleset)
-      for i, val in data['sample_set'].iterrows():
-        wmto.update_sample_set(i, val.samples)
+    if onlycol:
+      data[i][onlycol] = entity
+    for drop in todrop:
+      data[i] = data[i].drop(drop, 1)
+  if wmto is None:
+    wmto = wmfrom
+  for key in data.keys():
+    for k in data[key].columns:
+      data[key][k] = data[key][k].astype(str)
+  if "participants" in data:
+    wmto.upload_entities('participant', data['participants'])
+  if "samples" in data:
+    wmto.upload_samples(data['samples'])
+  if "pairs" in data:
+    wmto.upload_pairs(data['pairs'])
+  if "pair_set" in data:
+    pairset = data['pair_set'].drop('pairs', 1)
+    wmto.upload_entities('pair_set', pairset)
+  if "sample_sets" in data:
+    sampleset = data['sample_sets'].drop('samples', 1)
+    wmto.upload_entities('sample_set', sampleset)
   return flaglist
 
 
@@ -408,3 +433,19 @@ def renametsvs(wmfrom, wmto=None, index_func=None):
       wmto.upload_entities('sample_set', sampleset)
       for i, val in data['sample_set'].iterrows():
         wmto.update_sample_set(i, val.samples)
+
+
+def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
+  """
+  only works with files that are listed on a terra workspace tsv but actually 
+  point to a regular google bucket and not a terra bucket.
+  """
+  if type(users) is str:
+    users = [users]
+  wm = dm.WorkspaceManager(workspace)
+  togiveaccess = np.ravel(wm.get_samples()[bamcols].loc[samples].values)
+  for user in users:
+    files = ''
+    for i in togiveaccess:
+      files += ' ' + i
+    os.system("gsutil acl ch -ru " + user + ":R" + files)
