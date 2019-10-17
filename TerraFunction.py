@@ -7,11 +7,13 @@ import time
 import pandas as pd
 from google.cloud import storage
 
-def createManySubmissions(wm, workflow, references, entity=None, expression=None):
+def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
   # wrapper to create many submissions for a workflow
   # references = list of samplesetnames, or samplenames, etc.
+  submission_ids = []
   for i in range(len(references)):
-    wm.create_submission(workflow, references[i], entity, expression)
+    submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]
+  return submission_ids
 
 def waitForSubmission(wm, submissions, raise_errors=True):
   failed_submission = []
@@ -188,13 +190,17 @@ def updateAllSampleSet(wm, newsample_setname, Allsample_setname='All_samples'):
 def addToSampleSet(wm, samplesetid, samples):
   prevsamples = wm.get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
-  wm.update_sample_set(samplesetid, samples)
+  wm.update_sample_set(samplesetid, list(set(samples)))
 
 
 def addToPairSet(wm, pairsetid, pairs):
-  ipdb.set_trace()
-  prevpairs = wm.get_pair_sets()[pairsetid].pairs.tolist()
-  pairs.extend(prevpairs)
+  pairsets = wm.get_pair_sets()
+  prevpairs = pairsets.loc[[pairsetid]].pairs.tolist() # is this always a list of list? I think so.
+  print(type(prevpairs[0]))
+  if isinstance(prevpairs[0], str) :
+    pairs.extend(prevpairs)
+  elif isinstance(prevpairs[0], list):
+    pairs.extend(prevpairs[0])
   wm.update_pair_set(pairsetid, list(set(pairs)))
 
 
@@ -437,7 +443,7 @@ def renametsvs(wmfrom, wmto=None, index_func=None):
 
 def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
-  only works with files that are listed on a terra workspace tsv but actually 
+  only works with files that are listed on a terra workspace tsv but actually
   point to a regular google bucket and not a terra bucket.
   """
   if type(users) is str:
