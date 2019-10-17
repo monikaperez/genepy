@@ -51,8 +51,8 @@ function gcpconnect(){
 function upload_urls_to_gcp(){ 
   echo "if you don't have paralllel run the following: \
   (wget -O - pi.dk/3 || curl pi.dk/3/ || fetch -o - http://pi.dk/3) | bash"
-  cat urls.txt | parallel -j 10 'curl -L -s {} | gsutil cp - \
-  $bucket$folder$(echo {} | cut -d \/ -f 7)'
+  echo $1,$2,$3,$4,$5
+  cat $1 | parallel -j $5 'curl -L -s {} | gsutil cp - '$2$3$'(echo {} | cut -d \/ -f '$4')'
 }
 
 

@@ -6,6 +6,10 @@
 import time
 import pandas as pd
 from google.cloud import storage
+import dalmatian as dm
+import numpy as np
+import os
+import signal
 
 def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
   # wrapper to create many submissions for a workflow
@@ -15,9 +19,11 @@ def createManySubmissions(wm, workflow, references, entity=None, expression=None
     submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]
   return submission_ids
 
-def waitForSubmission(wm, submissions, raise_errors=True):
+
+def waitForSubmission(workspace, submissions, raise_errors=True):
   failed_submission = []
   timing = 0
+  wm = dm.WorkspaceManager(workspace)
   assert submissions is not None
   if type(submissions) is type(""):
     submissions = [submissions]
@@ -52,7 +58,7 @@ def waitForSubmission(wm, submissions, raise_errors=True):
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -67,6 +73,7 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
   newsamples
   samplesetname
   """
+  wm = dm.WorkspaceManager(workspace)
   print('please be sure you gave access to your terra email account access to this bucket')
   if samplesetname is None:
     samplesetname = 'from:' + gcpfolder + prefix
@@ -175,33 +182,28 @@ def uploadFromFolder(gcpfolder, prefix, wm, sep='_', updating=False, fformat="fa
     wm.update_sample_set(samplesetname, df.index.values.tolist())
 
 
-def updateAllSampleSet(wm, newsample_setname, Allsample_setname='All_samples'):
+def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samples'):
   """
   update the previous All Sample sample_set with the new samples that have been added.
 
   It is especially useful for the aggregate task
   """
-  prevsamples = list(wm.get_sample_sets().loc[Allsample_setname]['samples'])
-  newsamples = list(wm.get_sample_sets().loc[newsample_setname]['samples'])
+  prevsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[Allsample_setname]['samples'])
+  newsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[newsample_setname]['samples'])
   prevsamples.extend(newsamples)
-  wm.update_sample_set(Allsample_setname, prevsamples)
+  dm.WorkspaceManager(workspace).update_sample_set(Allsample_setname, prevsamples)
 
 
-def addToSampleSet(wm, samplesetid, samples):
-  prevsamples = wm.get_sample_sets()['samples'][samplesetid]
+def addToSampleSet(workspace, samplesetid, samples):
+  prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
-  wm.update_sample_set(samplesetid, list(set(samples)))
+  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples) # do we not need to use list(set(samples))?
 
 
-def addToPairSet(wm, pairsetid, pairs):
-  pairsets = wm.get_pair_sets()
-  prevpairs = pairsets.loc[[pairsetid]].pairs.tolist() # is this always a list of list? I think so.
-  print(type(prevpairs[0]))
-  if isinstance(prevpairs[0], str) :
-    pairs.extend(prevpairs)
-  elif isinstance(prevpairs[0], list):
-    pairs.extend(prevpairs[0])
-  wm.update_pair_set(pairsetid, list(set(pairs)))
+def addToPairSet(workspace, pairsetid, pairs):
+  prevpairs = dm.WorkspaceManager(workspace).get_pair_sets()[pairsetid].pairs.tolist()
+  pairs.extend(prevpairs)
+  dm.WorkspaceManager(workspace).update_pair_set(pairsetid, list(set(pairs)))
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -235,7 +237,7 @@ def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
   return(ret)
 
 
-def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
+def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
                     pathto_stats='sample_statistics',
                     specific_cohorts=[],
                     speicifc_celllines=[],
@@ -245,10 +247,10 @@ def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
                     datadir='gs://cclf_results/targeted/kim_sept/',
                     specific_samples=[]):
   if specific_cohorts:
-    samples = wm.get_samples()
+    samples = dm.WorkspaceManager(workspace).get_samples()
     samples = samples[samples.index.isin(specificlist)]
   if is_from_pairs:
-    pairs = wm.get_pairs()
+    pairs = dm.WorkspaceManager(workspace).get_pairs()
     pairs = pairs[pairs['case_sample'].isin(specificlist)]
   for i, val in samples.iterrows():
     os.system('gsutil cp ' + val[pathto_seg] + ' ' + datadir + i + '/')
@@ -270,10 +272,15 @@ def saveOmicsOutput(wm, pathto_cnvpng='segmented_copy_ratio_img',
 # "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
 #
 #
-def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True):
+
+
+def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', index_func=None,
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True):
   flaglist = []
   data = {}
+  wmfrom = dm.WorkspaceManager(workspacefrom)
+  if not keeppath:
+    flag_non_matching = True
   if entity in ['', 'participants']:
     try:
       a = wmfrom.get_participants()
@@ -325,6 +332,8 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
               if 'gs://' == prev[:5]:
                 if new == prev:
                   flaglist.append(prev)
+                elif not keeppath:
+                  new = newgs + new.split('/')[-1]
           val[k] = new
         if type(prev) is list:
           if droplists:
@@ -340,6 +349,8 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
                 if 'gs://' == prevname[:5]:
                   if newname == prevname:
                     flaglist.append(prevname)
+                  elif not keeppath:
+                    new = newgs + new.split('/')[-1]
             ind.append(newname)
           val[k] = ind
         entity.loc[j] = val
@@ -349,6 +360,8 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
       data[i] = data[i].drop(drop, 1)
   if wmto is None:
     wmto = wmfrom
+  else:
+    wmto = dm.WorkspaceManager(workspaceto)
   for key in data.keys():
     for k in data[key].columns:
       data[key][k] = data[key][k].astype(str)
@@ -367,8 +380,9 @@ def changeGSlocation(wmfrom, wmto=None, prevgslist=[], newgs='', index_func=None
   return flaglist
 
 
-def renametsvs(wmfrom, wmto=None, index_func=None):
+def renametsvs(workspace, wmto=None, index_func=None):
   data = {}
+  wmfrom = dm.WorkspaceManager(workspace)
   try:
     a = wmfrom.get_participants()
     data.update({'participants': a})
@@ -441,6 +455,43 @@ def renametsvs(wmfrom, wmto=None, index_func=None):
         wmto.update_sample_set(i, val.samples)
 
 
+def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam", baicol="WES_bai"):
+
+    # get ls of all files folder
+  samples = os.popen('gsutil -m ls -al ' + folder + '**.bai').read().split('\n')
+  # compute size filepath
+
+  sizes = {'gs://' + val.split('gs://')[1].split('#')[0]: int(val.split("2019-")[0]) for val in samples[:-2]}
+  names = {}
+  for k, val in sizes.items():
+    if val in names:
+      names[val].append(k)
+    else:
+      names[val] = [k]
+  # get all bai in tsv
+  for k, val in dm.WorkspaceManager(workspace).get_samples().iterrows():
+    # if bai has duplicate size
+    code = os.system('gsutil ls ' + val[bamcol])
+    if code == 256:
+      print('no match values for ' + str(print(val[bamcol])))
+      for va in names[sizes[val[baicol]]]:
+        # for all duplicate size
+        # if ls bam of bai duplicate size work
+        # mv bam to bampath in folder
+        if '.bam' in va:
+          if os.system('gsutil ls ' + va.split('.bam.bai')[0] + ".bam") == 0:
+            print('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
+            os.system('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
+            break
+        elif os.system('gsutil ls ' + va.split('.bai')[0] + ".bam") == 0:
+          print('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
+          os.system('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
+          break
+    elif code == signal.SIGINT:
+      print('Awakened')
+      break
+
+
 def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
   only works with files that are listed on a terra workspace tsv but actually
@@ -454,4 +505,7 @@ def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    os.system("gsutil acl ch -ru " + user + ":R" + files)
+    code = os.system("gsutil acl ch -ru " + user + ":R" + files)
+    if code == signal.SIGINT:
+      print('Awakened')
+      break
