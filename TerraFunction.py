@@ -12,8 +12,11 @@ import os
 import signal
 
 def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
-  # wrapper to create many submissions for a workflow
-  # references = list of samplesetnames, or samplenames, etc.
+  """
+  wrapper to create many submissions for a workflow
+  
+  references = list of samplesetnames, or samplenames, etc.
+  """
   submission_ids = []
   for i in range(len(references)):
     submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]

@@ -7,7 +7,6 @@ from __future__ import print_function
 import pdb
 import pandas as pd
 from taigapy import TaigaClient
-tc = TaigaClient()
 from bokeh.palettes import viridis
 import bokeh
 from bokeh.resources import CDN
@@ -30,7 +29,8 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
   tokeep = []
   b = 0
-  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
+  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
+  gene_mapping = TaigaClient().get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
   for i, val in enumerate(listofgenes):
     val = val.split(".")[0]
     a = gene_mapping["locus_group"][gene_mapping[idtype] == val].values
@@ -45,7 +45,8 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
 
 def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol"):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
-  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
+  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
+  gene_mapping = TaigaClient().get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
   not_parsed = []
   renamed = []
   b = 0
