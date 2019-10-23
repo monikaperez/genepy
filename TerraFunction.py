@@ -11,6 +11,14 @@ import numpy as np
 import os
 import signal
 
+def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
+  # wrapper to create many submissions for a workflow
+  # references = list of samplesetnames, or samplenames, etc.
+  submission_ids = []
+  for i in range(len(references)):
+    submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]
+  return submission_ids
+
 
 def waitForSubmission(workspace, submissions, raise_errors=True):
   failed_submission = []
@@ -189,7 +197,7 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 def addToSampleSet(workspace, samplesetid, samples):
   prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
-  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples)
+  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples) # do we not need to use list(set(samples))?
 
 
 def addToPairSet(workspace, pairsetid, pairs):
@@ -491,7 +499,7 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
 
 def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
-  only works with files that are listed on a terra workspace tsv but actually 
+  only works with files that are listed on a terra workspace tsv but actually
   point to a regular google bucket and not a terra bucket.
   """
   if type(users) is str:
