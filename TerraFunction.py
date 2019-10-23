@@ -465,7 +465,12 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
     # if bai has duplicate size
     code = os.system('gsutil ls ' + val[bamcol])
     if code == 256:
-      print('no match values for ' + str(print(val[bamcol])))
+      if val[bamcol] is None:
+        print('we dont have bam value for ' + str(k))
+        continue
+      else:
+        print('no match values for ' + str(val[bamcol]))
+
       for va in names[sizes[val[baicol]]]:
         # for all duplicate size
         # if ls bam of bai duplicate size work
@@ -501,3 +506,4 @@ def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     if code == signal.SIGINT:
       print('Awakened')
       break
+  return togiveaccess
