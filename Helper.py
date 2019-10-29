@@ -354,6 +354,14 @@ def mergeImages(images, outputpath):
 
   new_im.save(outputpath)
 
+def addTextToImage(imagedir, text, outputpath, xy = (0,0), color = (0,0,0), fontSize = 64):
+    # adds black text to the upper left by default, Arial size 64
+    img = Image.open(imagedir)
+    draw = ImageDraw.Draw(img)
+    # the below file path assumes you're operating macOS
+    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
+    draw.text(xy, text, color,font=font)
+    img.save(outputpath)
 
 def overlap(interval1, interval2):
   """
