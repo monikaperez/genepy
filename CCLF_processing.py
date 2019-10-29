@@ -3,7 +3,6 @@ import pandas as pd
 import Helper
 import os
 import numpy as np
-import ipdb
 import TerraFunction as terra
 
 
@@ -58,7 +57,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
   """
   # specificlist = filename/filepath of file containing a list of participant IDs
   # if we get many condition: merge and display the one that has been selected
-  ## Neekesh wants all of them to be included, but to add additional mark to the one that has been selected
+  # Neekesh wants all of them to be included, but to add additional mark to the one that has been selected
 
   # if we get WES data: add on the side as additional data and merge CNplot
   # if we get primary: add on the side as additional data and merge CNplot
@@ -112,7 +111,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
           found_TSCA = True
           sample_ids += [k] # k is the sample_id
           ext_ids += [external_id]
-          cond_name = condition['media'] # problem w/ cond_name: can have multiple samples with the same participant_id and media.
+          cond_name = condition['media']  # problem w/ cond_name: can have multiple samples with the same participant_id and media.
           outputloc = datadir + condition['primary_disease'].replace(' ', '_') + '/' + val + '/'
           os.system('gsutil cp ' + condition[pathto_seg] + ' ' + tempdir + 'copy_number.tsv')
           os.system('gsutil cp ' + condition[pathto_cnvpng] + ' ' + tempdir + external_id + '_copy_number_map.png')
@@ -162,8 +161,8 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
       for normal_id in matched_normal_ids:
         if normal_id is not np.nan:
           # get the image
-          normal_sample = sample[sample.index == normal_id] # indexed by sample_id
-          if normal_sample[pathto_cnvpng][normal_id] not in ["NA",np.nan]:
+          normal_sample = sample[sample.index == normal_id]  # indexed by sample_id
+          if normal_sample[pathto_cnvpng][normal_id] not in ["NA", np.nan]:
             os.system('gsutil cp ' + normal_sample[pathto_cnvpng][normal_id] + ' ' + tempdir + normal_id + '_copy_number_map.png')
 
             # annotate matched normal CN image
@@ -195,13 +194,13 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
       wes_ext_ids = [] # will collect all the external_ids from the WES data
       wes_sample_ids = [] # will collect all the sample_ids from the WES data
       sample_subset_wes = sample_wes[sample_wes.participant == val]
-      samples_for_CN_heat_WES = [] # sample set to make CN heat map for; want list of sample_id
+      samples_for_CN_heat_WES = []  # sample set to make CN heat map for; want list of sample_id
       for k, wes in sample_subset_wes.iterrows():
         if wes['sample_type'] == "Tumor":
           found = True
-          samples_for_CN_heat_WES += [k] # k is the sample_id
+          samples_for_CN_heat_WES += [k]  # k is the sample_id
           # get primary disease information
-          if found_TSCA: # pull disease info from TSCA
+          if found_TSCA:  # pull disease info from TSCA
             primary = condition['primary_disease'].replace(' ', '_') if 'primary_disease' in condition else 'unknown'
           elif type(specificlist_disease) is str:
             # we consider it is a filename; file with info including primary_disease and participant_id
@@ -209,9 +208,9 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
             # grab all the disease information for the participant
             pri_disease_info = specificlist_disease_df.loc[val, "primary_disease"]
             if type(pri_disease_info) is not str:
-                primary = pri_disease_info.iloc[0].replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
+              primary = pri_disease_info.iloc[0].replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
             else:
-                primary = pri_disease_info.replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
+              primary = pri_disease_info.replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
           # if primary_disease info is added to CCLF_WES sometime, then just use the following:
           # primary = wes['primary_disease'].replace(' ', '_') if 'primary_disease' in wes else 'unknown'
 
@@ -222,19 +221,19 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
           wes_sample_ids += [wes_sample_id]
 
           # get copy number information and plot
-          ## have to check for np.nan; this means that we have data but haven't run the pipeline yet!!
+          # have to check for np.nan; this means that we have data but haven't run the pipeline yet!!
           # os.system('gsutil cp ' + wes[pathto_seg_wes] + ' ' + outputloc + 'wes_copy_number.tsv')
           # os.system('gsutil cp ' + wes[pathto_cnvpng_wes] + ' ' + tempdir + 'wes_copy_number_map.pdf')
 
-          if wes[pathto_seg_wes] is np.nan or wes[pathto_cnvpng_wes] is np.nan: # skip samples that don't have this information
-              continue
-          if wes[pathto_seg_wes] is not np.nan: # might be smarter to just skip samples without this info, taking note that we're skipping?
-              os.system('gsutil cp ' + wes[pathto_seg_wes] + ' ' + tempdir + 'wes_copy_number.tsv')
+          if wes[pathto_seg_wes] is np.nan or wes[pathto_cnvpng_wes] is np.nan:  # skip samples that don't have this information
+            continue
+          if wes[pathto_seg_wes] is not np.nan:  # might be smarter to just skip samples without this info, taking note that we're skipping?
+            os.system('gsutil cp ' + wes[pathto_seg_wes] + ' ' + tempdir + 'wes_copy_number.tsv')
           if wes[pathto_cnvpng_wes] is not np.nan:
-              os.system('gsutil cp ' + wes[pathto_cnvpng_wes] + ' ' + tempdir + external_id + '_wes_copy_number_map.pdf')
+            os.system('gsutil cp ' + wes[pathto_cnvpng_wes] + ' ' + tempdir + external_id + '_wes_copy_number_map.pdf')
           os.system('sips -s format png ' + tempdir + external_id + '_wes_copy_number_map.pdf --out ' + tempdir + external_id + '_wes_copy_number_map.png')
           # annotate image with sample information
-          imagedir = tempdir + external_id + '_wes_copy_number_map.png' # will this ever not exist? might want to check if filepath exists
+          imagedir = tempdir + external_id + '_wes_copy_number_map.png'  # will this ever not exist? might want to check if filepath exists
           text = wes["external_id_capture"].replace("_", " ") + " (WES)"
           Helper.addTextToImage(imagedir, text, outputpath=imagedir)
           images.append(tempdir + external_id + '_wes_copy_number_map.png')
@@ -278,7 +277,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
       for normal_id in matched_normal_ids:
         if normal_id is not np.nan:
           # get the image
-          normal_sample = sample_wes[sample_wes.index == normal_id] # indexed by sample id
+          normal_sample = sample_wes[sample_wes.index == normal_id]  # indexed by sample id
           if normal_sample[pathto_cnvpng_wes][normal_id] is not np.nan:
             os.system('gsutil cp ' + normal_sample[pathto_cnvpng_wes][normal_id] + ' ' + tempdir + normal_id + '_wes_copy_number_map.png')
 
@@ -323,7 +322,6 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
     # # upload all images stored in images to the google bucket
     # for img_path in images: <- or I could just do this as I add to the list 'images'. I think I already do this :)
     #   os.system('gsutil cp ' img_path + ' ' + outputloc + 'something_here.tsv')
-
 
     if not found:
       print("We did not find any targeted probe data or WES data for " + val)
