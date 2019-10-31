@@ -196,19 +196,49 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
   prevsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[Allsample_setname]['samples'])
   newsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[newsample_setname]['samples'])
   prevsamples.extend(newsamples)
-  dm.WorkspaceManager(workspace).update_sample_set(Allsample_setname, prevsamples)
+  dm.WorkspaceManager(workspace).update_sample_set(Allsample_setname, list(set(prevsamples)))
 
 
 def addToSampleSet(workspace, samplesetid, samples):
+
+
+<< << << < HEAD
   prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
   samples.extend(prevsamples)
   dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples)  # do we not need to use list(set(samples))?
 
+== == == =
+# will create new if doesn't already exist, else adds to existing
+  try:
+    prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
+    samples.extend(prevsamples)
+  except KeyError:
+    print('The sample set ' + str(samplesetid) + ' did not exist in the workspace. Will be created now...')
+  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, list(set(samples)))
+>>>>>> > 3d2d643068694ebf30843b55bf716cc6c84fe159
+
 
 def addToPairSet(workspace, pairsetid, pairs):
-  prevpairs = dm.WorkspaceManager(workspace).get_pair_sets()[pairsetid].pairs.tolist()
-  pairs.extend(prevpairs)
+  # will create new if doesn't already exist, else adds to existing
+  try:
+    prevpairs = dm.WorkspaceManager(workspace).get_pair_sets().loc[[pairsetid]].pairs[0]
+    pairs.extend(prevpairs)
+  except KeyError:
+    print('The pair set ' + str(pairsetid) + ' did not exist in the workspace. Will be created now...')
   dm.WorkspaceManager(workspace).update_pair_set(pairsetid, list(set(pairs)))
+
+# Gwen's old version - caught some niche conditions made by get_pair_sets()
+# that I think may raise errors in the current version.
+# yep. the niche condition has to do with the fact that a list isn't hashable
+# def addToPairSet(wm, pairsetid, pairs):
+#   pairsets = wm.get_pair_sets()
+#   prevpairs = pairsets.loc[[pairsetid]].pairs.tolist() # is this always a list of list? I think so.
+#   print(type(prevpairs[0]))
+#   if isinstance(prevpairs[0], str) :
+#     pairs.extend(prevpairs)
+#   elif isinstance(prevpairs[0], list):
+#     pairs.extend(prevpairs[0])
+#   wm.update_pair_set(pairsetid, list(set(pairs)))
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):

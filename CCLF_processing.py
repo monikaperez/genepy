@@ -6,30 +6,38 @@ import numpy as np
 import TerraFunction as terra
 
 
-def getCNHeatMap(workspace1="CCLF_TSCA_2_0_2", namespace1="nci-mimoun-bi-org",
-                 list_sample_ids=None,
-                 samplesetname=None,
-                 outputloc=None
+def getCNHeatMap(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",
+                 mergeCNworkflow = 'PlotSomaticCNVMaps_PANCAN',
+                 output_filename = 'copy_number_heatmap.png',
+                 list_sample_ids = None,
+                 samplesetname = None,
+                 outputloc= None
                  ):
   #####
   ### NEED TO COMPLETE / FIX ###
   #####
-  # produce a copy number heatmap for all the samples in list_sample_ids
+  # produce a merged copy number heatmap for all the samples in list_sample_ids
   wm1 = dm.WorkspaceManager(namespace1, workspace1)
-  wm1.update_sample_set(samplesetname, list_sample_ids)  # create new sample set containing the samples in the list
+  # wm1.update_sample_set(samplesetname, list_sample_ids) # (check: what if set already exists?) create new sample set containing the samples in the list
+  terra.addToSampleSet(namespace1+'/'+workspace1, samplesetname, list_sample_ids)
   pathto_cnvpng = "cnv_calls_tn_img"
-  # run the __ workflow to produce a merged, labeled copy number heat map
-  # need to get access permissions to run anything in TSCA workspace...
-  # submission_id = wm1.create_submission(CGAmutations['name'], samplesetname,'sample_set',expression='this.samples')
-  # terra.waitForSubmission(wm1, submission_id)
 
-  # copy the CN plot to the output directory
+  # run the PlotSomaticCNVMaps workflow to produce a merged, labeled copy number heat map
+  submission_id = wm1.create_submission(mergeCNworkflow, samplesetname)
+  # submission_id = wm1.create_submission(mergeCNworkflow, samplesetname,'sample_set',expression='this.samples')
+  print("Creating merged CN heat map...")
+  terra.waitForSubmission(namespace1+'/'+workspace1, submission_id)
+
+  # copy the merged CN heat map plot to the output directory
   sample_set = wml.get_sample_sets()
-  cnfile = sample_set["sample_set_id" == samplesetname][pathto_cnvpng]
-  os.system('gsutil cp ' + cnfile + ' ' + outputloc + 'copy_number_heatmap.png')
+  cnfile = sample_set["sample_set_id"==samplesetname][pathto_cnvpng]
+  os.system('gsutil cp ' + cnfile + ' ' + outputloc + output_filename)
+  print("Copied the merged CN heat map to the output location.")
 
 
-def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCLF_Targeted instead of CCLF_TSCA_2_0_2
+
+
+def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF_Targeted instead of CCLF_TSCA_2_0_3_HCMI or 2_0_2
               pathto_cnvpng='segmented_copy_ratio_img',
               pathto_stats='sample_statistics',
               pathto_snv='filtered_variants',
@@ -53,7 +61,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
 
   # if we get WES data: add on the side as additional data and merge CNplot
   # if we get primary: add on the side as additional data and merge CNplot
-  # if have paired data, include normal in CNplot
+  # if have paired data, include normal in CN plot
   print('you need to be on macOS for now')
   wm1 = dm.WorkspaceManager(namespace1, workspace1)
   wm_wes = dm.WorkspaceManager(namespacewes, workspacewes)
@@ -72,25 +80,36 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
   sample_part = sample.participant.tolist()
   samplewes_part = sample_wes.participant.tolist()
 
+  ###################
   # get data for each participant ID (e.g. PEDS182)
+  ###################
   for val in specificlist:
+    print('Getting data for %s...' % str(val))
     found = False
     found_TSCA = False
     mutfile = pd.DataFrame()
     cnfile = pd.DataFrame()
-    images = []  # store all the CN images for a participant
-    ext_ids = []  # will collect all the external_ids we have for a participant
+    images = [] # store all the CN images for a participant
+    all_ext_ids = [] # will collect all the external_ids we have for a participant; display in final CCLF report
+    all_failed_ext_ids = [] # will collect all the external_ids from the data that failed QC; currently, don't have this metric for WES data
 
-    # get data from targeted probes (TSCA, TWIST)
+    ###################
+    # get data from targeted probes (old version is TSCA, new version is TWIST)
+    ###################
     if val in sample_part:
+      print('Getting targeted probe data (TWIST/TSCA) for %s...' % str(val))
+      ext_ids = [] # will collect all the external_ids from the targeted data
       sample_subset = sample[sample.participant == val]
-      samples_for_CN_heat_TSCA = []  # sample set to make CN heat map for; want list of sample_id
+      sample_ids = [] # will collect all the sample_ids from the targeted data; sample set to make CN heat map for
       for k, condition in sample_subset.iterrows():
         if condition['sample_type'] == "Tumor":
+          external_id = condition['external_id_validation']
+          if condition['depth_of_cov_qc_result'] == 'fail': # didn't pass the depth of coverage QC
+              all_failed_ext_ids += [external_id] # add it to list
+              continue # don't grab any information for this condition
           found = True
           found_TSCA = True
-          samples_for_CN_heat_TSCA += [k]  # k is the sample_id
-          external_id = condition['external_id_validation']
+          sample_ids += [k] # k is the sample_id
           ext_ids += [external_id]
           cond_name = condition['media']  # problem w/ cond_name: can have multiple samples with the same participant_id and media.
           outputloc = datadir + condition['primary_disease'].replace(' ', '_') + '/' + val + '/'
@@ -105,7 +124,6 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
 
           os.system('gsutil cp ' + condition[pathto_stats] + ' ' + outputloc + external_id + '_sample_statistics.txt')
           if is_from_pairs:
-            ipdb.set_trace()
             pair_subset = pair[pair["case_sample"] == k]
             snvs = pair_subset[pathto_snv]
             for snv in snvs:
@@ -113,9 +131,10 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
                 os.system('gsutil cp ' + snv + ' ' + tempdir + 'mutations.tsv')
                 # add first matched normal to list if exists (aka add the normal's sample_id)
                 try:
-                  samples_for_CN_heat_TSCA += [next(id for id in pair_subset["control_sample"] if id not in ["NA", np.nan])]
-                except:  # only NA or nans; no real matched normal
-                  continue
+                    sample_ids += [next(id for id in pair_subset["control_sample"] if id not in ["NA",np.nan])]
+                    print('Getting pair data for %s...' % str(val))
+                except: # only NA or nans; no real matched normal
+                    continue
                 break
           else:
             os.system('gsutil cp ' + condition[pathto_snv_unpaired] + ' ' + tempdir + 'mutations.tsv')
@@ -136,8 +155,6 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
         mutfile.to_csv(tempdir + 'mut.tsv', sep='\t')
         os.system('gsutil cp ' + tempdir + 'cn.tsv ' + outputloc + 'copy_number.tsv')
         os.system('gsutil cp ' + tempdir + 'mut.tsv ' + outputloc + 'mutation.tsv')
-        # ext_ids.to_csv(tempdir + 'all_external_ids.tsv', sep='\t')
-        # os.system('gsutil cp ' + tempdir + 'all_external_ids.tsv ' + outputloc + 'all_external_ids.tsv')
 
       # get CN plot for matched normal if a matched normal exists for a given participant (assuming only 1 distinct matched normal exists)
       matched_normal_ids = pair[pair["case_sample"] == k]["control_sample"]
@@ -150,22 +167,32 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
 
             # annotate matched normal CN image
             imagedir = tempdir + normal_id + '_copy_number_map.png'
+            normal_external_id = normal_sample["external_id_validation"][normal_id]
+            ext_ids += [normal_external_id]
+            sample_ids += [normal_id]
             if os.path.exists(imagedir):
-              text = normal_sample["external_id_validation"][normal_id].replace("_", " ") + " (TSCA, matched normal)"
+              text = normal_external_id.replace("_", " ") + " (TSCA, matched normal)"
               Helper.addTextToImage(imagedir, text, outputpath=imagedir)
               images.append(tempdir + normal_id + '_copy_number_map.png')
               os.system('gsutil cp ' + imagedir + ' ' + outputloc + normal_id + '_copy_number_map.png')
             break
-      # # annotate matched normal CN image
-      # imagedir = tempdir + normal_id + '_copy_number_map.png'
-      # if os.path.exists(imagedir):
-      #   text = normal_sample["external_id_validation"][normal_id].replace("_", " ") + " (TSCA, matched normal)"
-      #   Helper.addTextToImage(imagedir, text, outputpath=imagedir)
-      #   images.append(tempdir + normal_id + '_copy_number_map.png')
-      #   os.system('gsutil cp ' + imagedir + ' ' + outputloc + normal_id + '_copy_number_map.png')
 
+      # we now have all the external_ids plus matched normal from the targeted data for this participant
+      # create a merged CN heat map
+      getCNHeatMap(workspace1, namespace1, mergeCNworkflow = 'PlotSomaticCNVMaps_PANCAN',
+                  list_sample_ids = sample_ids, # actually, want the sample IDs not the ext_ids for now... the workflow will grab the associated ext_ids
+                  output_filename = 'copy_number_heatmap.png',
+                  samplesetname = 'report_'+val,
+                  outputloc = outputloc
+                  ) # check whether I can use this as the samplesetname
+
+    ###################
     # get data from CCLF_WES
+    ###################
     if val in samplewes_part:
+      print('Getting WES data for %s...' % str(val))
+      wes_ext_ids = [] # will collect all the external_ids from the WES data
+      wes_sample_ids = [] # will collect all the sample_ids from the WES data
       sample_subset_wes = sample_wes[sample_wes.participant == val]
       samples_for_CN_heat_WES = []  # sample set to make CN heat map for; want list of sample_id
       for k, wes in sample_subset_wes.iterrows():
@@ -189,7 +216,9 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
 
           outputloc = datadir + primary + '/' + val + '/'
           external_id = wes['external_id_capture']
-          ext_ids += [external_id]
+          wes_sample_id = wes.index.tolist() ## index is the sample_id
+          wes_ext_ids += [external_id]
+          wes_sample_ids += [wes_sample_id]
 
           # get copy number information and plot
           # have to check for np.nan; this means that we have data but haven't run the pipeline yet!!
@@ -221,7 +250,8 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
                 os.system('gsutil cp ' + snv + ' ' + tempdir + 'wes_mutations.tsv')
                 # add first matched normal to list if exists (aka add the normal's sample_id)
                 try:
-                  samples_for_CN_heat_WES += [next(id for id in pair_subset["control_sample"] if id not in ["NA", np.nan])]
+                  samples_for_CN_heat_WES += [next(id for id in pair_subset["control_sample"] if id not in ["NA",np.nan])]
+                  print('Getting WES pair data for %s...' % str(val))
                 except:
                   continue
                 break
@@ -237,10 +267,10 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
       if found:
         wes_cnfile.to_csv(tempdir + 'wes_cn.tsv', sep='\t')
         wes_mutfile.to_csv(tempdir + 'wes_mut.tsv', sep='\t')
-        # wes_ext_ids.to_csv(tempdir + 'wes_all_external_ids.tsv', sep='\t')
         os.system('gsutil cp ' + tempdir + 'wes_cn.tsv ' + outputloc + 'wes_copy_number.tsv')
         os.system('gsutil cp ' + tempdir + 'wes_mut.tsv ' + outputloc + 'wes_mutations.tsv')
-        # os.system('gsutil cp ' + tempdir + 'all_external_ids.tsv ' + outputloc + 'wes_all_external_ids.tsv')
+        # wes_ext_ids.to_csv(tempdir + 'wes_external_ids.tsv', sep='\t') # I add this later on
+        # os.system('gsutil cp ' + tempdir + 'wes_external_ids.tsv ' + outputloc + 'wes_external_ids.tsv')
 
       # get CN plot for matched normal if a matched normal exists for a given participant (assuming only 1 distinct matched normal exists)
       matched_normal_ids = pair_wes[pair_wes["case_sample"] == k]["control_sample"]
@@ -253,32 +283,48 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",  # CCL
 
             # annotate matched normal CN image
             imagedir = tempdir + normal_id + '_wes_copy_number_map.png'
+            normal_external_id = normal_sample["external_id_validation"][normal_id]
+            wes_ext_ids += [normal_external_id]
             if os.path.exists(imagedir):
-              text = normal_sample["external_id_capture"][normal_id].replace("_", " ") + " (WES, matched normal)"
+              text = normal_external_id.replace("_", " ") + " (WES, matched normal)"
               Helper.addTextToImage(imagedir, text, outputpath=imagedir)
               images.append(tempdir + normal_id + '_wes_copy_number_map.png')
               os.system('gsutil cp ' + imagedir + ' ' + outputloc + normal_id + '_wes_copy_number_map.png')
-
             break
-      # # annotate matched normal CN image
-      # imagedir = tempdir + normal_id + '_wes_copy_number_map.png'
-      # if os.path.exists(imagedir):
-      #   text = normal_sample["external_id_capture"][normal_id].replace("_", " ") + " (WES, matched normal)"
-      #   Helper.addTextToImage(imagedir, text, outputpath=imagedir)
-      #   images.append(tempdir + normal_id + '_wes_copy_number_map.png')
-      #   os.system('gsutil cp ' + imagedir + ' ' + outputloc + normal_id + '_wes_copy_number_map.png')
+
+      # we now have all the external_ids plus matched normal from the WES data for this participant
+      # create a merged CN heat map
+      ## check: need to add this workflow in the CCLF_WES workspace.
+      # getCNHeatMap(workspace1, namespace1, mergeCNworkflow = 'PlotSomaticCNVMaps_PANCAN'
+      #             list_sample_ids = wes_sample_ids,
+      #             output_filename = 'wes_copy_number_heatmap.png',
+      #             samplesetname = val, # participant_id
+      #             outputloc = outputloc
+      #             )
 
     # add the final list of all samples/external_ids for the given participant
-    ext_ids = pd.DataFrame(ext_ids, columns=["external_id"])
-    ext_ids.to_csv(tempdir + 'all_external_ids.tsv', sep='\t', index=False)
+    wes_ext_ids_df = pd.DataFrame(wes_ext_ids, columns=["external_id"])
+    wes_ext_ids_df['dataset'] = 'WES'
+    targeted_ext_ids_df = pd.DataFrame(ext_ids, columns=["external_id"])
+    targeted_ext_ids_df['dataset'] = 'targeted'
+
+    # upload dataframe with two columns, one with the external IDs and another with the source dataset (WES vs. targeted)
+    # all_ext_ids = pd.DataFrame(ext_ids, columns=["external_id"])
+    all_ext_ids = targeted_ext_ids_df.append(wes_ext_ids_df)
+    all_ext_ids.to_csv(tempdir + 'all_external_ids.tsv', sep='\t', index=False)
     os.system('gsutil cp ' + tempdir + 'all_external_ids.tsv ' + outputloc + 'all_external_ids.tsv')
 
+    # upload dataframe with all failed external IDs (currently, just checking for targeted because don't have the same QC for WES.) CHECK:
+    all_failed_ext_ids = pd.DataFrame(all_failed_ext_ids, columns=["external_id"])
+    all_failed_ext_ids.to_csv(tempdir + 'all_failed_external_ids.tsv', sep='\t', index=False)
+    os.system('gsutil cp ' + tempdir + 'all_failed_external_ids.tsv ' + outputloc + 'all_failed_external_ids.tsv')
+
     # # upload all images stored in images to the google bucket
-    # for img_path in images:
+    # for img_path in images: <- or I could just do this as I add to the list 'images'. I think I already do this :)
     #   os.system('gsutil cp ' img_path + ' ' + outputloc + 'something_here.tsv')
 
     if not found:
-      print("we did not find any data for " + val)
+      print("We did not find any targeted probe data or WES data for " + val)
     else:
-      Helper.mergeImages(images, tempdir + 'merged.png')
+      Helper.mergeImages(images, tempdir + 'merged.png') # merge all the horizontal CNV plots; check: may not want this...
       os.system('gsutil cp ' + tempdir + 'merged.png ' + outputloc + 'merged_copy_number_map.png')
