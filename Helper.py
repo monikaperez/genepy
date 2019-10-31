@@ -19,18 +19,19 @@ import matplotlib
 matplotlib.use('Agg')
 import venn as pyvenn
 import sys
-from PIL import Image
-
+from PIL import Image, ImageDraw, ImageFont
+import os
 
 def fileToList(filename):
   with open(filename) as f:
-    return f.readlines()
+    return [val[:-1] for val in f.readlines()]
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
   tokeep = []
   b = 0
+  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   for i, val in enumerate(listofgenes):
     if idtype == "ensembl_gene_id":
@@ -49,6 +50,7 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
 
 def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol"):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
+  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   not_parsed = []
   renamed = []
@@ -356,7 +358,7 @@ def grouped(iterable, n):
   iterate over element of list 2 at a time python
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
-  return izip(*[iter(iterable)] * n)
+  return zip(*[iter(iterable)] * n)
 
 
 def mergeImages(images, outputpath):
@@ -371,10 +373,18 @@ def mergeImages(images, outputpath):
   y_offset = 0
   for im in images:
     new_im.paste(im, (0, y_offset))
-    y_offset += im.size[0]
+    y_offset += im.size[1]
 
   new_im.save(outputpath)
 
+def addTextToImage(imagedir, text, outputpath, xy = (0,0), color = (0,0,0), fontSize = 64):
+    # adds black text to the upper left by default, Arial size 64
+    img = Image.open(imagedir)
+    draw = ImageDraw.Draw(img)
+    # the below file path assumes you're operating macOS
+    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
+    draw.text(xy, text, color,font=font)
+    img.save(outputpath)
 
 def overlap(interval1, interval2):
   """
@@ -415,3 +425,11 @@ def union(interval1, interval2):
 
 
 def nans(df): return df[df.isnull().any(axis=1)]
+
+
+def createFoldersFor(filepath):
+  prevval=''
+  for val in filepath.split('/')[:-1]:
+    prevval+=val +'/'
+    if not os.path.exists(val):
+      os.mkdir(val)
