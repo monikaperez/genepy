@@ -200,22 +200,13 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 
 def addToSampleSet(workspace, samplesetid, samples):
-
-
-<< << << < HEAD
-  prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
-  samples.extend(prevsamples)
-  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples)  # do we not need to use list(set(samples))?
-
-== == == =
-# will create new if doesn't already exist, else adds to existing
+  # will create new if doesn't already exist, else adds to existing
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
     samples.extend(prevsamples)
   except KeyError:
     print('The sample set ' + str(samplesetid) + ' did not exist in the workspace. Will be created now...')
   dm.WorkspaceManager(workspace).update_sample_set(samplesetid, list(set(samples)))
->>>>>> > 3d2d643068694ebf30843b55bf716cc6c84fe159
 
 
 def addToPairSet(workspace, pairsetid, pairs):
