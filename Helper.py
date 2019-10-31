@@ -7,18 +7,20 @@ from __future__ import print_function
 import pdb
 import pandas as pd
 from taigapy import TaigaClient
-from bokeh.palettes import viridis
+tc = TaigaClient()
+from bokeh.palettes import *
 import bokeh
 from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
 from bokeh.models import HoverTool
+
 import matplotlib
 matplotlib.use('Agg')
-import venn
+import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
-
+import os
 
 def fileToList(filename):
   with open(filename) as f:
@@ -30,9 +32,12 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
   tokeep = []
   b = 0
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
-  gene_mapping = TaigaClient().get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
+  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   for i, val in enumerate(listofgenes):
-    val = val.split(".")[0]
+    if idtype == "ensembl_gene_id":
+      val = val.split(".")[0]
+    elif idtype == "hgnc_id":
+      val = "HGNC:" + str(val)
     a = gene_mapping["locus_group"][gene_mapping[idtype] == val].values
     if len(a) > 0:
       if a[0] == "protein-coding gene":
@@ -46,19 +51,25 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
 def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol"):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
-  gene_mapping = TaigaClient().get(name='hgnc-87ab', file='hgnc_complete_set-2018q3')
+  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   not_parsed = []
   renamed = []
   b = 0
+  to = {}
+  for i, val in gene_mapping.iterrows():
+    to[val[from_idtype]] = val[to_idtype]
   for i, val in enumerate(listofgenes):
     if from_idtype == "ensembl_gene_id":
       val = val.split(".")[0]
-      a = gene_mapping[to_idtype][gene_mapping[from_idtype] == val].values
-      if len(a) > 0:
-        renamed.append(a[0])
-      else:
-        b += 1
-        not_parsed.append(i)
+    elif from_idtype == "hgnc_id":
+      val = "HGNC:" + str(val)
+    try:
+      a = to[val]
+      renamed.append(a)
+    except KeyError:
+      b += 1
+      not_parsed.append(val)
+      renamed.append(val)
   print(str(b) + " could not be parsed... we don't have all genes already")
   return(renamed, not_parsed)
 
@@ -93,7 +104,7 @@ def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, 
            fill_alpha='fill_alpha',
            line_width=0,
            radius='radius', source=source)
-  show(p)
+  return(p)
 
 
 def bar():
@@ -255,7 +266,8 @@ def selector(df, valtoextract):
 # What pops up on hover?
 
 
-def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False):
+def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False,
+                          invert=False, size=40, interactive=False, rangeto=None):
   """
   data arrayLike of int / float/ bool of size(names*val)
   names list like string
@@ -263,71 +275,81 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
 
   """
   if not dataIsCorr:
-    corr = 1 - np.array(data).corrcoeff()
+    data = np.corrcoef(np.array(data))
   else:
-    corr = 1 - np.array(data)
+    data = np.array(data)
 
-  colormap = ["#444444", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
-              "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a"]
   TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save"
-
   xname = []
   yname = []
   color = []
   alpha = []
-  for i, name1 in enumerate(names):
-    for j, name2 in enumerate(names):
-      xname.append(name1)
-      yname.append(name2)
+  if interactive:
+    xname = []
+    yname = []
+    if rangeto is None:
+      rangeto = range(len(data))
+    color = []
+    for i, name1 in enumerate(names):
+      for j, name2 in enumerate(names):
+        xname.append(name1)
+        yname.append(name2)
+        alpha.append(min(abs(data[i, j]), 0.9))
+        if colors is not None:
+          if colors[i] == colors[j]:
+            color.append(Category10[10][colors[i]])
+          else:
+            color.append('lightgrey')
+        else:
+          color.append('grey' if data[i, j] > 0 else Category20[3][2])
+    data = dict(
+        xname=xname,
+        yname=yname,
+        colors=color,
+        alphas=alpha,
+        data=data
+    )
+    hover = HoverTool(tooltips=[('names: ', '@yname, @xname')])
+    p = figure(title=title if title is not None else "Correlation Matrix",
+               x_axis_location="above", tools=TOOLS,
+               x_range=list(reversed(names)), y_range=names,
+               tooltips=[('names', '@yname, @xname'), ('corr:', '@data')])
 
-      alpha.append(min(data[i, j], 0.9))
+    p.plot_width = 800
+    p.plot_height = 800
+    p.grid.grid_line_color = None
+    p.axis.axis_line_color = None
+    p.axis.major_tick_line_color = None
+    p.axis.major_label_text_font_size = "5pt"
+    p.axis.major_label_standoff = 0
+    p.xaxis.major_label_orientation = np.pi / 3
 
-      if colors[i] == colors[j]:
-        color.append(colormap[colors[i]])
-      else:
-        color.append('lightgrey')
+    p.rect('xname', 'yname', 0.9, 0.9, source=data,
+           color='colors', alpha='alphas', line_color=None,
+           hover_line_color='black', hover_color='colors')
 
-  data = dict(
-      xname=xname,
-      yname=yname,
-      colors=color,
-      alphas=alpha,
-      count=counts.flatten(),
-  )
-
-  p = figure(title=title if title is not None else "Correlation Matrix",
-             x_axis_location="above", tools=TOOLS,
-             x_range=list(reversed(names)), y_range=names,
-             tooltips=[('names', '@yname, @xname'), ('count', '@count')])
-
-  p.plot_width = 800
-  p.plot_height = 800
-  p.grid.grid_line_color = None
-  p.axis.axis_line_color = None
-  p.axis.major_tick_line_color = None
-  p.axis.major_label_text_font_size = "5pt"
-  p.axis.major_label_standoff = 0
-  p.xaxis.major_label_orientation = np.pi / 3
-
-  p.rect('xname', 'yname', 0.9, 0.9, source=data,
-         color='colors', alpha='alphas', line_color=None,
-         hover_line_color='black', hover_color='colors')
-
-  show(p)  # show the plot
+    save(p, 'temp/corrmat.html')
+    return p  # show the plot
+  else:
+    plt.figure(figsize=(size, 200))
+    plt.title('the correlation matrix')
+    plt.imshow(data.T if invert else data)
+    plt.savefig("temp/corrmat.pdf")
+    plt.show()
 
 
 def venn(inp, names):
-  labels = venn.get_labels(inp, fill=['number', 'logic'])
+  labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
   if len(inp) == 2:
-    fig, ax = venn.venn2(labels, names=names)
+    fig, ax = pyvenn.venn2(labels, names=names)
   if len(inp) == 3:
-    fig, ax = venn.venn3(labels, names=names)
+    fig, ax = pyvenn.venn3(labels, names=names)
   if len(inp) == 4:
-    fig, ax = venn.venn4(labels, names=names)
+    fig, ax = pyvenn.venn4(labels, names=names)
   if len(inp) == 5:
-    fig, ax = venn.venn5(labels, names=names)
+    fig, ax = pyvenn.venn5(labels, names=names)
   if len(inp) == 6:
-    fig, ax = venn.venn6(labels, names=names)
+    fig, ax = pyvenn.venn6(labels, names=names)
   fig.show()
 
 
@@ -403,3 +425,11 @@ def union(interval1, interval2):
 
 
 def nans(df): return df[df.isnull().any(axis=1)]
+
+
+def createFoldersFor(filepath):
+  prevval=''
+  for val in filepath.split('/')[:-1]:
+    prevval+=val +'/'
+    if not os.path.exists(val):
+      os.mkdir(val)

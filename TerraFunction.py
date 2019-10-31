@@ -10,7 +10,8 @@ import dalmatian as dm
 import numpy as np
 import os
 import signal
-import ipdb
+import Helper as h
+
 
 def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
   """
@@ -199,13 +200,23 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 
 def addToSampleSet(workspace, samplesetid, samples):
-  # will create new if doesn't already exist, else adds to existing
+
+
+<< << << < HEAD
+  prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
+  samples.extend(prevsamples)
+  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples)  # do we not need to use list(set(samples))?
+
+== == == =
+# will create new if doesn't already exist, else adds to existing
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
     samples.extend(prevsamples)
   except KeyError:
-      print('The sample set ' + str(samplesetid) + ' did not exist in the workspace. Will be created now...')
+    print('The sample set ' + str(samplesetid) + ' did not exist in the workspace. Will be created now...')
   dm.WorkspaceManager(workspace).update_sample_set(samplesetid, list(set(samples)))
+>>>>>> > 3d2d643068694ebf30843b55bf716cc6c84fe159
+
 
 def addToPairSet(workspace, pairsetid, pairs):
   # will create new if doesn't already exist, else adds to existing
@@ -213,12 +224,12 @@ def addToPairSet(workspace, pairsetid, pairs):
     prevpairs = dm.WorkspaceManager(workspace).get_pair_sets().loc[[pairsetid]].pairs[0]
     pairs.extend(prevpairs)
   except KeyError:
-      print('The pair set ' + str(pairsetid) + ' did not exist in the workspace. Will be created now...')
+    print('The pair set ' + str(pairsetid) + ' did not exist in the workspace. Will be created now...')
   dm.WorkspaceManager(workspace).update_pair_set(pairsetid, list(set(pairs)))
 
-## Gwen's old version - caught some niche conditions made by get_pair_sets()
-## that I think may raise errors in the current version.
-## yep. the niche condition has to do with the fact that a list isn't hashable
+# Gwen's old version - caught some niche conditions made by get_pair_sets()
+# that I think may raise errors in the current version.
+# yep. the niche condition has to do with the fact that a list isn't hashable
 # def addToPairSet(wm, pairsetid, pairs):
 #   pairsets = wm.get_pair_sets()
 #   prevpairs = pairsets.loc[[pairsetid]].pairs.tolist() # is this always a list of list? I think so.
@@ -228,6 +239,7 @@ def addToPairSet(workspace, pairsetid, pairs):
 #   elif isinstance(prevpairs[0], list):
 #     pairs.extend(prevpairs[0])
 #   wm.update_pair_set(pairsetid, list(set(pairs)))
+
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
   """Lists all the blobs in the bucket that begin with the prefix.
@@ -494,35 +506,39 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
     else:
       names[val] = [k]
   # get all bai in tsv
-  for k, val in dm.WorkspaceManager(workspace).get_samples().iterrows():
-    # if bai has duplicate size
-    code = os.system('gsutil ls ' + val[bamcol])
-    if code == 256:
-      if val[bamcol] is None:
-        print('we dont have bam value for ' + str(k))
-        continue
-      else:
-        print('no match values for ' + str(val[bamcol]))
+  samp = dm.WorkspaceManager(workspace).get_samples()
+  for k, val in samp.iterrows():
+    if val[bamcol] != 'NA' and val[baicol] != 'NA':
+      # if bai has duplicate size
+      code = os.system('gsutil ls ' + val[bamcol])
+      if code == 256:
+        if val[bamcol] is None:
+          print('we dont have bam value for ' + str(k))
+          continue
+        else:
+          print('no match values for ' + str(val[bamcol]))
 
-      for va in names[sizes[val[baicol]]]:
-        # for all duplicate size
-        # if ls bam of bai duplicate size work
-        # mv bam to bampath in folder
-        if '.bam' in va:
-          if os.system('gsutil ls ' + va.split('.bam.bai')[0] + ".bam") == 0:
-            print('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
-            os.system('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
+        for va in names[sizes[val[baicol]]]:
+          # for all duplicate size
+          # if ls bam of bai duplicate size work
+          # mv bam to bampath in folder
+          if '.bam' in va:
+            if os.system('gsutil ls ' + va.split('.bam.bai')[0] + ".bam") == 0:
+              print('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
+              os.system('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
+              break
+          elif os.system('gsutil ls ' + va.split('.bai')[0] + ".bam") == 0:
+            print('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
+            os.system('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
             break
-        elif os.system('gsutil ls ' + va.split('.bai')[0] + ".bam") == 0:
-          print('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
-          os.system('gsutil mv ' + va.split('.bai')[0] + ".bam " + val[bamcol])
-          break
-    elif code == signal.SIGINT:
-      print('Awakened')
-      break
+      elif code == signal.SIGINT:
+        print('Awakened')
+        break
+    else:
+      print("no data for " + str(k))
 
 
-def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
+def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
   only works with files that are listed on a terra workspace tsv but actually
   point to a regular google bucket and not a terra bucket.
@@ -540,3 +556,45 @@ def ShareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
       print('Awakened')
       break
   return togiveaccess
+
+
+def saveConfigs(workspace, filepath):
+  wm = dm.WorkspaceManager(workspace)
+  h.createFoldersFor(filepath)
+  wm.get_configs().to_csv(filepath)
+
+
+def mvFiles(files, location):
+  by = len(files) if len(files) < 50 else 50
+  for sfiles in grouped(files, by):
+    a = ''
+    for val in sfiles:
+      a += val + ' '
+    code = os.system("gsutil -m mv " + a + location)
+    if code == signal.SIGINT:
+      print('Awakened')
+      break
+
+
+def cpFiles(files, location):
+  by = len(files) if len(files) < 50 else 50
+  for sfiles in grouped(files, by):
+    a = ''
+    for val in sfiles:
+      a += val + ' '
+    code = os.system("gsutil -m cp " + a + location)
+    if code == signal.SIGINT:
+      print('Awakened')
+      break
+
+
+def rmFiles(files):
+  by = len(files) if len(files) < 50 else 50
+  for sfiles in h.grouped(files, by):
+    a = ''
+    for val in sfiles:
+      a += val + ' '
+    code = os.system("gsutil -m rm " + a)
+    if code == signal.SIGINT:
+      print('Awakened')
+      break
