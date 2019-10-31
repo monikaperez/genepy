@@ -6,11 +6,21 @@ import Helper
 import re
 from pybedtools import BedTool
 import seaborn as sns
+import pyBigWig
 import matplotlib.pyplot as plt
+import pdb
+from scipy.optimize import curve_fit
+from sklearn.preprocessing import normalize
+# from scipy.misc import factorial
+from scipy.stats import poisson
 
 
-size = {"GRCh37": '2864785220',
-        "GRCh38": '2913022398'}
+size = {"GRCh37": 2864785220,
+        "GRCh38": 2913022398}
+
+cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+         'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+         'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
 
 
 def extractPairedSingleEndFrom(folder, pattern='R1/R2', sep='-', namepos=2):
@@ -127,13 +137,12 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
                 binding = pd.read_csv(peakfolder + folder, sep='\t', header=None, skiprows=skiprows)
                 binding['name'] = folder.replace('.narrowPeak', '')
                 bindings = bindings.append(binding)
-    bindings = bindings.drop(5, 1)
+    bindings = bindings.drop(5, 1).drop(4, 1)
     bindings = bindings.rename(columns={
         0: "chrom",
         1: 'start',
         2: 'end',
         3: 'peak_number',
-        4: 'size',
         6: "foldchange",
         7: "-log10pvalue",
         8: "-log10qvalue",
@@ -149,7 +158,7 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
     return bindings
 
 
-def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
+def Pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
 
     # get pysam data
     # ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -158,6 +167,7 @@ def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
     # return array, normalized
     loaded = {}
     res = {i: np.zeros((len(peaks), window * 2)) for i in bams}
+    peaks = peaks.sort_values(by="foldchange", ascending=False).iloc[:numpeaks]
     peaks.chrom = peaks.chrom.astype(str)
     for val in bams:
         loaded.update({val: pysam.AlignmentFile(folder + val, 'rb', threads=numthreads)})
@@ -173,10 +183,10 @@ def computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
         sns.heatmap(val, ax=ax[i])
         ax[i].set_title(k.split('.')[0])
     fig.show()
-    return res
+    return res, fig
 
 
-def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numthreads=8):
+def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -185,45 +195,76 @@ def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numth
     return array, normalized
     """
     loaded = {}
-    res = {i: np.zeros((len(peaks), window * 2)) for i in bams}
-    import pdb
-    pdb.set_trace()
-    for val in bams:
-        loaded.update({val: BedTool(folder + val).genome_coverage(bga=True, split=True)})
+    center = [int((val['start'] + val['end']) / 2) for k, val in peaks.iterrows()]
+    peaks['start'] = [c - window for c in center]
+    peaks['end'] = [c + window - 1 for c in center]
+    peaks[peaks.columns[:3]].sort_values(by=['chrom', 'start']).to_csv('temp/peaks.bed', sep='\t', index=False, header=False)
+    bedpeaks = BedTool('temp/peaks.bed')
 
-    for k, bam in loaded.items():
-        i = 0
-        bam.chrom = bam.chrom.astype(str)
-        for num, (_, val) in enumerate(peaks.iterrows()):
-            print(num / len(peaks), end='\r')
-            center = int((val['start'] + val['end']) / 2)
-            while int(bam[i].chrom) < int(val['chrom'][3:]):
-                i += 1
-            while True:
-                overlap = helper.overlap([bam[i].start, bam[i].end],
-                                         [center - window, center + window - 1])
-                if overlap:
-                    res[k][overlap[0], overlap[1]] = int(bam[i].name)
-                elif center - window > bam[i].end:
-                    break
-                i += 1
-    return res
+    fig, ax = plt.subplots(1, len(bams))
+    peakset = peaks["foldchange"].values.argsort()[::-1][:numpeaks]
+    for i, val in enumerate(bams):
+        coverage = BedTool(folder + val).intersect(bedpeaks).genome_coverage(bga=True, split=True)\
+            .intersect(bedpeaks).to_dataframe(names=['chrom', 'start', 'end', 'coverage'])
+        cov = np.zeros((len(peaks), window * 2), dtype=int)
+        j = 0
+        pdb.set_trace()
+        for i, (k, val) in enumerate(peaks.iterrows()):
+            print(i / len(peaks), end='\r')
+            while coverage.iloc[j].start > val.start:
+                j -= 1
+            while coverage.iloc[j].start < val.end:
+                cov[i][coverage.iloc[j].start - val.start:coverage.iloc[j].end - val.start] =\
+                    coverage.iloc[j].coverage
+                j += 1
+        sns.heatmap(coverage, ax=ax[i])
+        ax[i].set_title(val.split('.')[0])
+    fig.show()
+    return None, fig
 
 
-def gettiles(): BedTool.makewindows()
-
-
-def computeMeanCov(bamfolder, meanOnly=True, ref="GRCh38", outputfolder='/data/coverage/'):
-    meancov = {i: 0 for i in os.listdir(bamfolder)}
-    for val in os.listdir(bamfolder):
-        if not meanOnly:
-            BedTool(bamfolder + val).genome_coverage().saveas(outputfolder + val)
-        meancov[val.split('.')[0]] = int(os.popen('samtools view -c -F 4 ' + bamfolder + val).read()[:-1]) / size[ref]
-
+def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=4000, numthreads=8,
+                   width=5, length=10, name='temp/peaksat.png'):
     """
+    get pysam data
+    ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
+    for each counts, do a rolling average (or a convolving of the data) with numpy
+    append to an array
+    return array, normalized
+    """
+    center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
+    pd.set_option('mode.chained_assignment', None)
+    peaks['start'] = [c - window for c in center]
+    peaks['end'] = [c + window for c in center]
+    fig, ax = plt.subplots(1, len(bigwigs), figsize=[width, length])
+    peaks = peaks.sort_values(by=["foldchange"], ascending=False)
+    if numpeaks > len(peaks):
+        numpeaks = len(peaks) - 1
+    for num, bigwig in enumerate(bigwigs):
+        bw = pyBigWig.open(folder + bigwig)
+        cov = np.zeros((numpeaks, window * 2), dtype=int)
+        for i, (k, val) in enumerate(peaks.iloc[:numpeaks].iterrows()):
+            cov[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
+        sns.heatmap(cov, ax=ax[num], yticklabels=[], cmap=cmaps[num],
+                    cbar=False)
+        ax[num].set_title(bigwig.split('.')[0])
+    fig.subplots_adjust(wspace=0.1)
+    fig.show()
+    fig.savefig(name)
+    return cov, fig
+
+
+"""
+def computeMeanCov(bigwigFolder, meanOnly=True, ref="GRCh38", averageFragSize=150, outputfolder='/data/coverage/'):
+    meancov = {}
+    for val in os.listdir(bigwigFolder):
+        bw = pyBigWig.open(folder + bigwig)
+        if bw:
+            meancov[val.split('.')[0]] = bw.
+    return meancov
+
+
 def substractPeaks(peaks1, to):
-    """
-    """
     peaks1 = peaks1.sort_values(by=['chrom', 'start'])
     peaks2 = to.sort_values(by=['chrom', 'start'])
     j = 0
@@ -244,7 +285,7 @@ def substractPeaks(peaks1, to):
                 newpeaks.append({'start': peaks2.iloc[i]['start'],
                                  'end': peaks1.iloc[j]['start'],
                                  'chromomsome': peaks1.iloc[j]['chrom']}, ignore_index=True)
-    """
+"""
 
 
 def simpleMergedPeaks(peaks, window=0, totpeaknumber=0):
@@ -258,28 +299,27 @@ def simpleMergedPeaks(peaks, window=0, totpeaknumber=0):
         "start": [peaks.iloc[0]['start']],
         "end": [],
         "peak_number": [peaknumber + totpeaknumber],
-        "size": [],
         "foldchange": [],
-        "log10pvalue": [],
-        "log10qvalue": [],
+        "-log10pvalue": [],
+        "-log10qvalue": [],
         "relative_summit_pos": []
     }
     foldchange = [peaks.iloc[0].get('foldchange', 1)]
-    log10pvalue = [peaks.iloc[0].get('log10pvalue', 0)]
-    log10qvalue = [peaks.iloc[0].get('log10qvalue', 0)]
+    log10pvalue = [peaks.iloc[0].get('-log10pvalue', 0)]
+    log10qvalue = [peaks.iloc[0].get('-log10qvalue', 0)]
     relative_summit_pos = peaks.iloc[1].get('relative_summit_pos', peaks.iloc[0]['start'])
     # computes overlap by extending a bit the window (100bp?) should be ~readsize
     prev_end = peaks.iloc[0]['end']
-    prevchrom = peaks.iloc[0]['chrom']
+    prev_chrom = peaks.iloc[0]['chrom']
     tfmerged = {a: [0] for a in tfs}
     tfmerged[peaks.iloc[0]['name']][-1] = 1
     for i, (pos, peak) in enumerate(peaks.iloc[1:].iterrows()):
-        print(i / len(peaks), end=" \r")
-        if prev_end + window > peak['start'] and prevchrom == peak['chrom']:
+        print(str(i / len(peaks)), end="\r")
+        if prev_end + window > peak['start'] and prev_chrom == peak['chrom']:
             # can be merged
             foldchange.append(peak.get('foldchange', 1))
-            log10pvalue.append(peak.get('log10pvalue', 0))
-            log10qvalue.append(peak.get('log10qvalue', 0))
+            log10pvalue.append(peak.get('-log10pvalue', 0))
+            log10qvalue.append(peak.get('-log10qvalue', 0))
             if peak.get('foldchange', 1) > max(foldchange):
                 relative_summit_pos = peak.get('relative_summit_pos', peaks['start'])
         else:
@@ -291,23 +331,21 @@ def simpleMergedPeaks(peaks, window=0, totpeaknumber=0):
             merged_bed['start'].append(peak['start'])
             merged_bed['end'].append(prev_end)
             merged_bed['peak_number'].append(peaknumber + totpeaknumber)
-            merged_bed['size'].append(prev_end - merged_bed['start'][-2])
             merged_bed['foldchange'].append(np.mean(foldchange))
-            merged_bed['log10pvalue'].append(max(log10pvalue))
-            merged_bed['log10qvalue'].append(max(log10qvalue))
+            merged_bed['-log10pvalue'].append(max(log10pvalue))
+            merged_bed['-log10qvalue'].append(max(log10qvalue))
             merged_bed['relative_summit_pos'].append(relative_summit_pos)
             foldchange = [peak.get('foldchange', 1)]
-            log10pvalue = [peak.get('log10pvalue', 0)]
-            log10qvalue = [peak.get('log10qvalue', 0)]
+            log10pvalue = [peak.get('-log10pvalue', 0)]
+            log10qvalue = [peak.get('-log10qvalue', 0)]
             relative_summit_pos = peak.get('relative_summit_pos', peak['start'])
         prev_end = peak['end']
         prev_chrom = peak['chrom']
         tfmerged[peak['name']][-1] = 1
     merged_bed['end'].append(prev_end)
-    merged_bed['size'].append(prev_end - merged_bed['start'][-2])
     merged_bed['foldchange'].append(np.mean(foldchange))
-    merged_bed['log10pvalue'].append(max(log10pvalue))
-    merged_bed['log10qvalue'].append(max(log10qvalue))
+    merged_bed['-log10pvalue'].append(max(log10pvalue))
+    merged_bed['-log10qvalue'].append(max(log10qvalue))
     merged_bed['relative_summit_pos'].append(relative_summit_pos)
 
     merged_bed = pd.DataFrame(merged_bed)
@@ -315,7 +353,16 @@ def simpleMergedPeaks(peaks, window=0, totpeaknumber=0):
     return pd.concat([merged_bed, tfmerged], axis=1, sort=False)
 
 
-def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8):
+def findpeakpath(folder, peakname):
+    for val in os.listdir(folder):
+        if peakname in val:
+            return val
+    raise ValueError('no peaks')
+
+
+def mergeReplicatePeaks(peaks, reps, bigwigfolder, markedasbad=None, window=200,
+                        sampling=10000, mincov=4, doPlot=True, cov={}, minKL=2, use='max',
+                        MINOVERLAP=0.5, SIZECUTOFF=0.7, mergewindow=50):
     """
     /!/ should only be passed peaks with at least one good replicate
     for each TFpeaksets,
@@ -373,85 +420,100 @@ def mergeReplicatePeaks(peaks, reps, bamfolder, avgCov, window=200, numthread=8)
     totpeaknumber = 0
     mergedpeaksdict = {}
     remove = []
-    import pdb
-    pdb.set_trace()
-    for tf, rep in reps:
-        print("doing peak " + k)
-        finalpeaks = simpleMergedPeaks(peaks[peaks['name'] == tf])
-        merged_bed = finalpeaks[finalpeaks.columns[9:]]
-        finalpeaks = finalpeaks[finalpeaks.columns[:9]]
+    tomergebam = []
+    for tf, rep in reps.items():
+        if len(rep) == 1:
+            print("we only have one replicate for " + tf + " .. pass")
+            mergedpeaksdict.update({tf: peaks[peaks['tf'] == tf]})
+            continue
+        print("merging " + str(len(rep)) + " " + tf + " peaks")
+        merged = simpleMergedPeaks(peaks[peaks['tf'] == tf], window=mergewindow)
+        merged_bed = merged[merged.columns[8:]]
+        finalpeaks = merged[merged.columns[:8]]
         print('finish first overlaps lookup')
-        # flag when biggest is <1000 peaks
+        # flag when  biggest is <1000 peaks
         if len(finalpeaks) < 1000:
             print('!TF has less than 1000 PEAKS!')
         # for each TF (replicates), compute number of peaks
-        peakmatrix = finalpeaks.values
+        peakmatrix = merged_bed.values
 
         # compute overlap matrix (venn?)
-        if len(peakmatrix) < 7 and doPlot:
-            inp = []
+        if peakmatrix.shape[1] < 7 and doPlot:
+            presence = []
             for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
-                inp.append([i for i, val in enumerate(peakpres)])
-            venn(inp, finalpeaks.columns)
+                presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
+            Helper.venn(presence, merged_bed.columns)
         else:
             print('too many replicates for Venn')
-
-        # compute smilarity matrix (plot?)
-        corrmat = np.corrcoef(peakmatrix)
-        if doPlot:
-            Helper.plotCorrelationMatrix(corrmat, names=finalpeaks.columns,
-                                         title="Correlation matrix of " + k + " replicates")
-        totpeaks = np.sum(peakmatrix)
-        biggest_ind = np.argsort(totpeaks)[0]
-        corr2big = corrmat[biggest_ind]
-        biggest = finalpeaks[biggest_ind]
-
+        bigwigs = os.listdir(bigwigfolder)
+        totpeak = np.sum(peakmatrix, 0)
+        sort = np.argsort(totpeak)[::-1]
+        biggest_ind = sort[0]
+        peakmatrix = peakmatrix.T
+        biggest = merged_bed.columns[biggest_ind]
         # starts with highest similarity and go descending
-        for i, val in enumerate(np.argsort(corr2big)):
+        for i, val in enumerate(sort[1:]):
             # if avg non overlap > 60%, and first, and none small flag TF as unreliable.
-            peakname = finalpeaks[val]
-            if corr2big[val] < 0.7:
-                if totpeak[val] > totpeak[biggest_ind] * 0.5:
+            overlap = len(presence[biggest_ind] & presence[val]) / len(presence[biggest_ind])
+            peakname = merged_bed.columns[val]
+            print('overlap: ' + str(overlap))
+            if overlap < MINOVERLAP:
+                smallsupport = len(presence[biggest_ind] & presence[val]) / len(presence[val])
+                print('not enough overlap')
+                if totpeak[val] > totpeak[biggest_ind] * SIZECUTOFF:
                     if i == 0:
                         print("Wrong TF")
-                        remove.append(k)
+                        remove.append(tf)
                         break
                     # if not first, throw the other replicate and continue
-                    finalpeaks.drop(peakname, 1)
-                # if small and small overlaps more than 80% do findAdditionalPeaks only
+                    peakmatrix = np.delete(peakmatrix, val)
+                # if small and small overlap more than 80% do findAdditionalPeaks only
                 # on for small else throw small
-                elif np.sum(np.logical_and(peakmatrix[biggest_ind], peakmatrix[val])) / np.sum(
-                        peakmatrix[biggest_ind]) > 0.8:
-                    tolookfor = np.logical_and(peakmatrix[biggest_ind], peakmatrix[val] == 0)
-                    additionalpeaks = findAdditionalPeaks(merged_bed, tolookfor, peakname, bamfolder,
-                                                          avgCov[peakname], window, numthread)
 
-                    # for new set of peaks >0.7 size of big, flag for merge bams
-                    if np.sum(np.logical_and(peakmatrix[biggest_ind], newpeakset)) / np.sum(
-                            peakmatrix[biggest_ind]) > 0.8:
+                elif smallsupport > MINOVERLAP:
+                    tolookfor = np.logical_and(peakmatrix[biggest_ind], peakmatrix[val] == 0)
+                    additionalpeaks = findAdditionalPeaks(finalpeaks, tolookfor,
+                                                          bigwigfolder + findpeakpath(bigwigfolder, peakname),
+                                                          sampling=sampling, mincov=mincov,
+                                                          window=window, minKL=minKL, use=use)
+                    peakmatrix[val] = np.logical_or(peakmatrix[val], additionalpeaks)
+                    # if new set of peaks >MINOVERLAP size of big, flag for merge bams
+                    recovered = np.sum(np.logical_and(peakmatrix[biggest_ind], peakmatrix[val])) / np.sum(
+                        peakmatrix[biggest_ind])
+                    print("we have recovered " + str(recovered))
+                    if recovered > MINOVERLAP:
                         tomergebam.append([biggest, peakname])
                 else:
-                    finalpeaks.drop(peakname, 1)
-
-            # else findAdditionalPeaks:
+                    print('not enough support: ' + str(smallsupport))
             else:
+                print('enough overlap')
                 tolookfor = np.logical_and(peakmatrix[biggest_ind], peakmatrix[val] == 0)
-                additionalpeaks = findAdditionalPeaks(merged_bed, tolookfor, peakname, bamfolder,
-                                                      avgCov[peakname], window, numthread)
+                additionalpeaks = findAdditionalPeaks(finalpeaks, tolookfor,
+                                                      bigwigfolder + findpeakpath(bigwigfolder, peakname),
+                                                      sampling=sampling, mincov=mincov,
+                                                      window=window, minKL=minKL, use=use)
                 peakmatrix[val] = np.logical_or(peakmatrix[val], additionalpeaks)
                 tolookfor = np.logical_and(peakmatrix[val], peakmatrix[biggest_ind] == 0)
-                additionalpeaks = findAdditionalPeaks(merged_bed, tolookfor, biggest, bamfolder,
-                                                      avgCov[biggest], window, numthread)
+                additionalpeaks = findAdditionalPeaks(finalpeaks, tolookfor,
+                                                      bigwigfolder + findpeakpath(bigwigfolder, biggest),
+                                                      sampling=sampling, mincov=mincov,
+                                                      window=window, minKL=minKL, use=use)
                 peakmatrix[biggest_ind] = np.logical_or(peakmatrix[biggest_ind], additionalpeaks)
-                tomergebam.append([biggest, peakname])  # flag for merge bams
+                recovered = np.sum(np.logical_and(peakmatrix[biggest_ind], peakmatrix[val])) / np.sum(
+                    peakmatrix[biggest_ind])
+                print('we have recovered ' + str(recovered))
+                tomergebam.append([biggest, peakname])
                 # take the intersection of both peaksets
                 peakmatrix[biggest_ind] = np.logical_and(peakmatrix[biggest_ind], peakmatrix[val])
-                peakmatrix.drop(val, 1)
+        if tf not in remove:
+            finalpeaks = finalpeaks[peakmatrix[biggest_ind].astype(bool)]
+            finalpeaks['name'] = tf
+            mergedpeaksdict.update({tf: finalpeaks})
+    return mergedpeaksdict, tomergebam, remove
 
-        mergedpeaksdict.update({k: finalpeaks})
 
-
-def findAdditionalPeaks(peaks, tolookfor, filetofindin, folder, avgCov, window=200, numthreads=8,):
+def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=10000, mincov=4,
+                        window=200, cov={}, minKL=2, use='max'):
     """
     findAdditionalPeaks: for all peaks in A and/or B find in coverage file if zone has relative cov
     of more than thresh then add to peak
@@ -464,18 +526,40 @@ def findAdditionalPeaks(peaks, tolookfor, filetofindin, folder, avgCov, window=2
     -------
     peaks: np.array(bool) for each peaks in peakset, returns a binary
     """
-    bam = pysam.AlignmentFile(folder + filetofindin, 'rb', threads=numthreads)
-    res = np.zeroes(len(peaks))
-    for i, val in enumerate(tolookfor):
-        if val:
-            pos = peaks.iloc[i]
-            center = int((pos['Start'] + pos['End']) / 2)
-            zone = np.zeroes(window * 2)
-            for pileupcolumn in bam.pileup(contig=pos['chrom'], start=center - window,
-                                           stop=center + window - 1, truncate=True):
-                zone[(center - window) - pileupcolumn.pos] = pileupcolumn.n
-            if max(zone) > 10 * avgCov:
-                res[i] = 1
+    # def poisson(k, lamb, scale): return scale * (lamb**k / factorial(k)) * np.exp(-lamb)
+
+    def KLpoisson(lamb1, lamb2): return lamb1 * np.log(lamb1 / lamb2) + lamb2 - lamb1
+    bw = pyBigWig.open(filepath)
+    res = np.zeros(len(peaks))
+    prevchrom = ''
+    lamb = {}
+    for i, has in enumerate(tolookfor):
+        if has:
+            val = peaks.iloc[i]
+            if val.chrom != prevchrom:
+                if val.chrom not in cov:
+                    cov[val.chrom] = bw.stats(str(val.chrom))[0]
+                    prevchrom = val.chrom
+                if use == 'poisson':
+                    samples = np.zeroes(10 * sampling)
+                    sampling = np.rand([sampling])
+                    sampling = sampling * bw.chroms(str(val.chrom))
+                    for j, sample in enumerate(sampling):
+                        samples[j:j + 10] = np.nan_to_num(bw.values(str(val.chrom), sample, sample + 10), 0)
+                    samples = np.bincount(samples)
+                    # curve_fit(poisson,range(len(bins)))
+                    lamb[val.chrom] = poisson.fit(samples, range(len(samples) - 1))
+
+            start = max([val.start - window, 0])
+            end = min(val.end + window, bw.chroms(str(val.chrom)))
+            zone = np.nan_to_num(bw.values(str(val.chrom), start, end), 0)
+            if use == 'max':
+                if max(zone) / cov[val.chrom] > mincov or sum(zone) / (cov[val.chrom] * (end - start)) > mincov:
+                    res[i] = 1
+            elif use == 'poisson':
+                lamb = poisson.fit(zone,)
+                if KLpoisson(lamb, lamb[val.chrom]) > minKL:
+                    res[i] = 1
 
     return res
     # BETTER WAY
@@ -487,7 +571,7 @@ def findAdditionalPeaks(peaks, tolookfor, filetofindin, folder, avgCov, window=2
     # if above a p-value of .1, mark as found, return the new marks with their p-value
 
 
-def createCorrMatrix(peaks, bams, meanCov, folder='data/seqs', numthreads=False):
+def createCorrMatrix(peaks, bigwigs, window=100):
     """
     somewhat similar concept to computePeaksAt
 
@@ -496,18 +580,16 @@ def createCorrMatrix(peaks, bams, meanCov, folder='data/seqs', numthreads=False)
     # append to an array
     # return array, normalized
     """
-    def findCoverageAt(bam, peaks=peaks, meanCov=meanCov):
-        res = np.zeroes(len(peaks))
-        for val in peaks.items():
-            center = int((val['Start'] + val['End']) / 2)
-            for pileupcolumn in bam.pileup(contig=val['chrom'], start=center - window,
-                                           stop=center + window - 1, truncate=True):
-                res[k] = sum(pileupcolumn.n) / meanCov
-        return res
-    numthreads = mp.cpu_count() if not numthreads else numthreads
-    pool = mp.Pool(numthreads)
-    results = pool.map(findCoverageAt, [pysam.AlignmentFile(bam, 'rb', threads=numthreads) for bam in bams])
-    pool.close()
+    res = np.zeros((len(bigwigs), len(peaks)), dtype=float)
+    for i, bw in enumerate(bigwigs):
+        print('doing file ' + str(bw))
+        bw = pyBigWig.open(bw)
+        for k, val in peaks.iterrows():
+            start = max([val.start - window, 0])
+            end = min(val.end + window, bw.chroms(str(val.chrom)))
+            res[i][k] = bw.stats(str(val.chrom), start, end)[0]
+    res = np.nan_to_num(res, 0)
+    return (res.T / res.max(1)).T
 
 
 def annotatePeaks():
@@ -528,6 +610,14 @@ def annotatePeaks():
     TAD points where most contacts on one side happened on this side.
     specific distance. zone of most concentration of contacts for a peak region.
     """
+    # if way == 'Closest':
+
+    # elif way == 'ClosestExpressed':
+
+    # elif way == 'ActivityByContact':
+
+    # else:
+    #     raise ValueError('needs to be oneof Closest ClosestExpressed ActivityByContact')
 
 
 # os.system()
