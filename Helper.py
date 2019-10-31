@@ -18,7 +18,7 @@ matplotlib.use('Agg')
 import venn
 import sys
 from PIL import Image, ImageDraw, ImageFont
-
+import os
 
 def fileToList(filename):
   with open(filename) as f:
@@ -395,3 +395,11 @@ def union(interval1, interval2):
 
 
 def nans(df): return df[df.isnull().any(axis=1)]
+
+
+def createFoldersFor(filepath):
+  prevval=''
+  for val in filepath.split('/')[:-1]:
+    prevval+=val +'/'
+    if not os.path.exists(val):
+      os.mkdir(val)
