@@ -22,6 +22,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 import os
 
+
 def fileToList(filename):
   with open(filename) as f:
     return [val[:-1] for val in f.readlines()]
@@ -377,14 +378,16 @@ def mergeImages(images, outputpath):
 
   new_im.save(outputpath)
 
-def addTextToImage(imagedir, text, outputpath, xy = (0,0), color = (0,0,0), fontSize = 64):
+
+def addTextToImage(imagedir, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize=64):
     # adds black text to the upper left by default, Arial size 64
-    img = Image.open(imagedir)
-    draw = ImageDraw.Draw(img)
-    # the below file path assumes you're operating macOS
-    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
-    draw.text(xy, text, color,font=font)
-    img.save(outputpath)
+  img = Image.open(imagedir)
+  draw = ImageDraw.Draw(img)
+  # the below file path assumes you're operating macOS
+  font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
+  draw.text(xy, text, color, font=font)
+  img.save(outputpath)
+
 
 def overlap(interval1, interval2):
   """
@@ -428,8 +431,33 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
-  prevval=''
+  prevval = ''
   for val in filepath.split('/')[:-1]:
-    prevval+=val +'/'
+    prevval += val + '/'
     if not os.path.exists(val):
       os.mkdir(prevval)
+
+
+def pdDo(df, op="mean", of="value1", over="value2"):
+  df = df.sort_values(by=over)
+  index = []
+  data = df.iloc[0, of]
+  ret = []
+  prev = df.iloc[0, over]
+  j = 0
+  for k, val in df.iloc[1:].iterrows():
+    if val[over] == prev:
+      data.append(val[of])
+    else:
+      if of == "mean":
+        ret[j] = np.mean(data)
+      elif of == "sum":
+        ret[j] = np.sum(data)
+      elif of == "max":
+        ret[j] = np.max(data)
+      elif of == "min":
+        ret[j] = np.min(data)
+      index.append(k)
+      j += 1
+      data = [val[of]]
+  return index, ret
