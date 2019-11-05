@@ -200,22 +200,13 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 
 def addToSampleSet(workspace, samplesetid, samples):
-
-
-<< << << < HEAD
-  prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
-  samples.extend(prevsamples)
-  dm.WorkspaceManager(workspace).update_sample_set(samplesetid, samples)  # do we not need to use list(set(samples))?
-
-== == == =
-# will create new if doesn't already exist, else adds to existing
+  # will create new if doesn't already exist, else adds to existing
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
     samples.extend(prevsamples)
   except KeyError:
     print('The sample set ' + str(samplesetid) + ' did not exist in the workspace. Will be created now...')
   dm.WorkspaceManager(workspace).update_sample_set(samplesetid, list(set(samples)))
->>>>>> > 3d2d643068694ebf30843b55bf716cc6c84fe159
 
 
 def addToPairSet(workspace, pairsetid, pairs):
@@ -310,7 +301,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
 
 
 def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True):
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run = False):
   flaglist = []
   data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
@@ -356,7 +347,7 @@ def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', i
         continue
     todrop = set()
     for j, val in entity.iterrows():
-      print(j)
+      # print(j)
       for k, prev in enumerate(val):
         if type(prev) is str:
           new = prev
@@ -393,25 +384,27 @@ def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', i
       data[i][onlycol] = entity
     for drop in todrop:
       data[i] = data[i].drop(drop, 1)
-  if wmto is None:
+  if workspaceto is None:
     wmto = wmfrom
   else:
     wmto = dm.WorkspaceManager(workspaceto)
   for key in data.keys():
     for k in data[key].columns:
       data[key][k] = data[key][k].astype(str)
-  if "participants" in data:
-    wmto.upload_entities('participant', data['participants'])
-  if "samples" in data:
-    wmto.upload_samples(data['samples'])
-  if "pairs" in data:
-    wmto.upload_pairs(data['pairs'])
-  if "pair_set" in data:
-    pairset = data['pair_set'].drop('pairs', 1)
-    wmto.upload_entities('pair_set', pairset)
-  if "sample_sets" in data:
-    sampleset = data['sample_sets'].drop('samples', 1)
-    wmto.upload_entities('sample_set', sampleset)
+  if not dry_run:
+    ipdb.set_trace()
+    if "participants" in data:
+      wmto.upload_entities('participant', data['participants'])
+    if "samples" in data:
+      wmto.upload_samples(data['samples'])
+    if "pairs" in data:
+      wmto.upload_pairs(data['pairs'])
+    if "pair_set" in data:
+      pairset = data['pair_set'].drop('pairs', 1)
+      wmto.upload_entities('pair_set', pairset)
+    if "sample_sets" in data:
+      sampleset = data['sample_sets'].drop('samples', 1)
+      wmto.upload_entities('sample_set', sampleset)
   return flaglist
 
 
