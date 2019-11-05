@@ -432,4 +432,4 @@ def createFoldersFor(filepath):
   for val in filepath.split('/')[:-1]:
     prevval+=val +'/'
     if not os.path.exists(val):
-      os.mkdir(val)
+      os.mkdir(prevval)
