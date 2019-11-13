@@ -7,6 +7,7 @@
 from __future__ import print_function
 import pandas as pd
 import pdb
+import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, Formula, numpy2ri
 pandas2ri.activate()
@@ -63,13 +64,12 @@ class pyDESeq2:
                                             colData=self.design_matrix,
                                             design=self.design_formula)
 
-  def estimate_size_factors(self, data, **kwargs):  # OPTIONAL
+  def run_estimate_size_factors(self, **kwargs):  # OPTIONAL
     """
     args:
-      data: cond*gene matrix
+      geoMeans: cond*gene matrix
     """
-    self.geoMeans = np.exp(np.mean(np.log(data)), 1)
-    self.dds = deseq.estimateSizeFactors(self.dds, geoMeans=self.geoMeans)
+    self.dds = deseq.estimateSizeFactors_DESeqDataSet(self.dds, **kwargs)
 
   def run_deseq(self, **kwargs):
     self.dds = deseq.DESeq(self.dds, **kwargs)
