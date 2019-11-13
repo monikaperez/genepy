@@ -19,10 +19,29 @@ import venn
 import sys
 from PIL import Image, ImageDraw, ImageFont
 import os
+import json
+
 
 def fileToList(filename):
   with open(filename) as f:
     return [val[:-1] for val in f.readlines()]
+
+
+def listToFile(l, filename):
+  with open(filename, 'w') as f:
+    for item in l:
+      f.write("%s\n" % item)
+
+
+def dictToFile(d, filename):
+  with open(filename, 'w') as json_file:
+    json.dump(d, json_file)
+
+
+def fileToDict(filename):
+  with open(filename) as f:
+    data = json.load(f)
+  return data
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
@@ -52,11 +71,11 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   b = 0
   for i, val in enumerate(listofgenes):
     if from_idtype == "ensembl_gene_id":
-      val = val.split(".")[0]
-      a = gene_mapping[to_idtype][gene_mapping[from_idtype] == val].values
+      a = gene_mapping[to_idtype][gene_mapping[from_idtype] == val.split(".")[0]].values
       if len(a) > 0:
         renamed.append(a[0])
       else:
+        renamed.append(val)
         b += 1
         not_parsed.append(i)
   print(str(b) + " could not be parsed... we don't have all genes already")
@@ -355,14 +374,16 @@ def mergeImages(images, outputpath):
 
   new_im.save(outputpath)
 
-def addTextToImage(imagedir, text, outputpath, xy = (0,0), color = (0,0,0), fontSize = 64):
+
+def addTextToImage(imagedir, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize=64):
     # adds black text to the upper left by default, Arial size 64
-    img = Image.open(imagedir)
-    draw = ImageDraw.Draw(img)
-    # the below file path assumes you're operating macOS
-    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
-    draw.text(xy, text, color,font=font)
-    img.save(outputpath)
+  img = Image.open(imagedir)
+  draw = ImageDraw.Draw(img)
+  # the below file path assumes you're operating macOS
+  font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
+  draw.text(xy, text, color, font=font)
+  img.save(outputpath)
+
 
 def overlap(interval1, interval2):
   """
@@ -406,8 +427,8 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
-  prevval=''
+  prevval = ''
   for val in filepath.split('/')[:-1]:
-    prevval+=val +'/'
+    prevval += val + '/'
     if not os.path.exists(val):
       os.mkdir(val)
