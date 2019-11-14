@@ -21,11 +21,29 @@ import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
 import os
+import json
 
 
 def fileToList(filename):
   with open(filename) as f:
     return [val[:-1] for val in f.readlines()]
+
+
+def listToFile(l, filename):
+  with open(filename, 'w') as f:
+    for item in l:
+      f.write("%s\n" % item)
+
+
+def dictToFile(d, filename):
+  with open(filename, 'w') as json_file:
+    json.dump(d, json_file)
+
+
+def fileToDict(filename):
+  with open(filename) as f:
+    data = json.load(f)
+  return data
 
 
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):

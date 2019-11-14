@@ -21,6 +21,14 @@ function convert2gif() {
   rm frames;
 }
 
+
+function launchandco(){
+  gcloud compute instances start broadproject2 --zone us-east1-b &&\
+  gcloud compute instances list &&\
+  gcloud compute config-ssh &&\
+  gcpconnect broadproject2.us-east1-b.jkobject
+}
+
 function retrieve_remote_file_size(){
   $ch = curl_init($url);
 
@@ -51,8 +59,8 @@ function gcpconnect(){
 function upload_urls_to_gcp(){ 
   echo "if you don't have paralllel run the following: \
   (wget -O - pi.dk/3 || curl pi.dk/3/ || fetch -o - http://pi.dk/3) | bash"
-  echo $1,$2,$3,$4,$5
-  cat $1 | parallel -j $5 'curl -L -s {} | gsutil cp - '$2$3$'(echo {} | cut -d \/ -f '$4')'
+  echo $1,$2,$3,$4,$5,$6
+  cat $1 | parallel -j $5 "/usr/local/opt/curl-openssl/bin/curl -L "$6" {} | gsutil cp - "$2$3'$(echo {} | cut -d \/ -f '$4')'
 }
 
 
