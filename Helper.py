@@ -449,13 +449,10 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
-  # I think this function might need some work. It wasn't working correctly.
   breakpoint()
   prevval = ''
   for val in filepath.split('/')[:-1]:
     prevval += val + '/'
-    # if not os.path.exists(val):
-    #   os.mkdir(prevval)
     if not os.path.exists(prevval):
       os.mkdir(prevval)
 
