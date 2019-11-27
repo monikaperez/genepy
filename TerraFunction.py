@@ -82,21 +82,10 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   # print and return well formated data
 
 
-<< << << < HEAD
-
-
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', fformat="fastq12",
-  newsamples=None, samplesetname=None):
-
-
-== == == =
-
-
 def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
                      fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
 
 
->>>>>> > 11f04c1f58114e4ef0e60b7de6795344dc90c033
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
