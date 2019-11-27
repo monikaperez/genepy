@@ -548,13 +548,23 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     if code == signal.SIGINT:
       print('Awakened')
       break
+  print('the files are stored here:\n\n')
+  print(togiveaccess)
+  print('\n\njust install and use gsutil to copy them')
+  print('https://cloud.google.com/storage/docs/gsutil_install')
+  print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
   return togiveaccess
 
 
 def saveConfigs(workspace, filepath):
   wm = dm.WorkspaceManager(workspace)
   h.createFoldersFor(filepath)
-  wm.get_configs().to_csv(filepath)
+  conf = wm.get_configs()
+  conf.to_csv(filepath + '.csv')
+  params = {}
+  for k, val in conf.iterrows():
+    params[k] = wm.get_config(val.name)
+  h.dictToFile(params, filepath + '.json')
 
 
 def mvFiles(files, location):
