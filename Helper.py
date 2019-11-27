@@ -16,7 +16,6 @@ from bokeh.plotting import *
 from bokeh.models import HoverTool
 
 import matplotlib
-matplotlib.use('Agg')
 import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
@@ -84,7 +83,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
       val = "HGNC:" + str(val)
     try:
       a = to[val]
-      renamed.append(a)
+      renamed.append(int(a) if from_idtype == 'entrez_id' else a)
     except KeyError:
       b += 1
       not_parsed.append(val)
@@ -109,7 +108,7 @@ def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, 
   source = ColumnDataSource(data=dict(
       x=data[:, 0],
       y=data[:, 1],
-      labels=labels,
+      labels=labels if labels is not None else [''] * len(radii),
       fill_color=cols,
       fill_alpha=fill_alpha,
       radius=radii
@@ -223,7 +222,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
 
 def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
-            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)'):
+            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250):
   """A function to plot the bokeh single mutant comparisons."""
   # Make the hover tool
   # data should be df gene*samples + genenames
@@ -242,19 +241,20 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
 
   # Add the hover tool
   p.add_tools(hover)
-  p = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641')
-  p = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True)
+  p = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641', maxvalue=maxvalue)
+  p = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
   return p
 
 
-def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False):
+def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxvalue=100):
   # Define colors in a dictionary to access them with
   # the key from the pandas groupby funciton.
   df = df1.copy()
-  transformed_q = -df[y].apply(np.log10)
+  transformed_q = -df[y].apply(np.log10).values
+  transformed_q[transformed_q == np.inf] = maxvalue
   df['transformed_q'] = transformed_q
-
   source1 = bokeh.models.ColumnDataSource(df)
+  source2 = bokeh.models.ColumnDataSource(df)
 
   # Specify data source
   p.circle(x=x, y='transformed_q', size=7,
@@ -263,7 +263,7 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False):
   if outline:
     p.circle(x=x, y='transformed_q', size=7,
              alpha=1,
-             source=source1, color='black',
+             source=source2, color='black',
              fill_color=None, name='outlines')
 
   # prettify
@@ -275,7 +275,7 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False):
 
 def selector(df, valtoextract):
   """A function to separate tfs from everything else"""
-  sig = (df.pvalue < 0.1)  # & (dfBetaA.b.abs() > 0.5)
+  sig = (df.pvalue < 0.1) & (abs(df.log2FoldChange) > 0.15)
   not_tf = (~df.gene_id.isin(valtoextract))
   is_tf = (df.gene_id.isin(valtoextract))
   to_plot_not = df[sig & not_tf]
@@ -449,12 +449,12 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
+  breakpoint()
   prevval = ''
   for val in filepath.split('/')[:-1]:
     prevval += val + '/'
-    if not os.path.exists(val):
-      os.mkdir(val)
-
+    if not os.path.exists(prevval):
+      os.mkdir(prevval)
 
 def pdDo(df, op="mean", of="value1", over="value2"):
   df = df.sort_values(by=over)
