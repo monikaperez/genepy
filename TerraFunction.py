@@ -63,7 +63,8 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
+                     fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -145,7 +146,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, ffor
     # print and return well formated data
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
-        name = file.split('/')[-1].split('.')[0].split(sep)[0][:-2]
+        name = file.split('/')[-1].split('.')[0].split(sep)[0]
         if name in data['sample_id']:
           pos = data['sample_id'].index(name)
           if fformat == "fastqR1R2":
@@ -181,8 +182,9 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, ffor
       else:
         print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
+    df["source"] = source
+    df["participant"] = data['sample_id']
     df = df.set_index("sample_id")
-    df["participant"] = pd.Series(data['sample_id'], index=data['sample_id'])
     wm.upload_samples(df)
     wm.update_sample_set(samplesetname, df.index.values.tolist())
 
@@ -301,7 +303,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
 
 
 def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run = False):
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run=False):
   flaglist = []
   data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
