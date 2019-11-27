@@ -58,8 +58,12 @@ class pyDESeq2:
     self.gene_id = count_matrix[self.gene_column]
     with localconverter(ro.default_converter + pandas2ri.converter):
       self.count_matrix = pandas2ri.py2rpy(count_matrix.drop(gene_column, axis=1).astype(int))
-      self.design_matrix = pandas2ri.py2rpy(design_matrix.astype(int))
+      self.design_matrix = pandas2ri.py2rpy(design_matrix.astype(bool))
     self.design_formula = Formula(design_formula)
+    for val in self.design_matrix.columns:
+      val_index = list(self.design_matrix.colnames).index(val)
+      val = robjects.vectors.FactorVector(self.design_matrix.rx2(val))
+      self.design_matrix[assessor_col_index] = val
     self.dds = deseq.DESeqDataSetFromMatrix(countData=self.count_matrix,
                                             colData=self.design_matrix,
                                             design=self.design_formula)

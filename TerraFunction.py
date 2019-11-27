@@ -13,19 +13,38 @@ import signal
 import Helper as h
 
 
-def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
+def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
   """
   wrapper to create many submissions for a workflow
 
-  references = list of samplesetnames, or samplenames, etc.
+  Args:
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    references: list(str) a list of name of the row in this entity
+    entity: str terra csv type (sample_id...)
+    expresson: str to use if want to compute on the direct value of the entity or on values of values
+                e.g. this.samples
+    use_callcache: Bool to false if want to recompute everything even if same input
   """
+  wm = dm.WorkspaceManager(workspace)
   submission_ids = []
-  for i in range(len(references)):
-    submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]
+  for ref in references:
+    submission_ids += [wm.create_submission(workflow, ref, entity, expression, use_callcache)]
   return submission_ids
 
 
 def waitForSubmission(workspace, submissions, raise_errors=True):
+  """
+  wrapper to create many submissions for a workflow
+
+  Args:
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    submissions: list[str] of submission ids
+    raise_errors: to true if errors should stop your code
+  """
   failed_submission = []
   timing = 0
   wm = dm.WorkspaceManager(workspace)
@@ -63,20 +82,23 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', fformat="fastq12",
+  newsamples=None, samplesetname=None):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
-  it also creates a sample set.
+  it can create a sample set.
 
   gcpfolder
-  prefix: the folder path
-  wm: the workspace terra
-  sep: the separator (only takes the first part of the name before the sep character)
-  updating: if needs
-  fformat bambai, fastq12, fastqR1R2
-  newsamples
-  samplesetname
+  prefix: str the folder path
+  workspace: str namespace/workspace from url typically
+    namespace (str): project to which workspace belongs
+    workspace (str): Workspace name
+  sep: str the separator (only takes the first part of the name before the sep character)
+  fformat bambai, fastq12, fastqR1R2 given the set of files in the folder (they need to be in this naming format)
+          e.g. name.bam name.bai / name1.fastq name2.fastq / name_R1.fastq name_R2.fastq
+  newsamples: DONT USE
+  samplesetname: str all uploaded samples should be part of a sampleset with name..
   """
   wm = dm.WorkspaceManager(workspace)
   print('please be sure you gave access to your terra email account access to this bucket')
@@ -192,6 +214,12 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
   update the previous All Sample sample_set with the new samples that have been added.
 
   It is especially useful for the aggregate task
+
+  Args:
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    newsample_setname: str name of sampleset to add to All_samples
   """
   prevsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[Allsample_setname]['samples'])
   newsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[newsample_setname]['samples'])
@@ -292,16 +320,11 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
 
 
-# ["gs://fc-35446f22-ea37-483a-bd6c-5e9fc56851ff/",
-#  "gs://fc-c23078b3-05b3-4158-ba8f-2b1eeb1bfa16/",
-#  "gs://fc-51050008-201e-4a40-8ec7-28b6fb2b1885/"]
-# "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
-#
-#
-
-
 def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run = False):
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run=False):
+  """
+
+  """
   flaglist = []
   data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
@@ -409,6 +432,10 @@ def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', i
 
 
 def renametsvs(workspace, wmto=None, index_func=None):
+  """
+  ################## WIP ############
+  only works for one use case
+  """
   data = {}
   wmfrom = dm.WorkspaceManager(workspace)
   try:
@@ -483,10 +510,21 @@ def renametsvs(workspace, wmto=None, index_func=None):
         wmto.update_sample_set(i, val.samples)
 
 
-def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam", baicol="WES_bai"):
+def findBackErasedDuplicaBamteFromTerraBucket(workspace, gsfolder, bamcol="WES_bam", baicol="WES_bai"):
+  """
+  If you have erased bam files in gcp with bai files still present and the bam files are stored elsewhere
+  and their location is in a terra workspace.
 
-    # get ls of all files folder
-  samples = os.popen('gsutil -m ls -al ' + folder + '**.bai').read().split('\n')
+  Will find them back by matching bai sizes and copy them back to their original locations
+
+  Args:
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    gsfolder: str the gsfolder where the bam files are
+  """
+  # get ls of all files folder
+  samples = os.popen('gsutil -m ls -al ' + gsfolder + '**.bai').read().split('\n')
   # compute size filepath
 
   sizes = {'gs://' + val.split('gs://')[1].split('#')[0]: int(val.split("2019-")[0]) for val in samples[:-2]}
@@ -512,7 +550,7 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
         for va in names[sizes[val[baicol]]]:
           # for all duplicate size
           # if ls bam of bai duplicate size work
-          # mv bam to bampath in folder
+          # mv bam to bampath in gsfolder
           if '.bam' in va:
             if os.system('gsutil ls ' + va.split('.bam.bai')[0] + ".bam") == 0:
               print('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
@@ -531,8 +569,18 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
 
 def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
+  will share some files from gcp with a set of users using terra as metadata repo.
+
   only works with files that are listed on a terra workspace tsv but actually
   point to a regular google bucket and not a terra bucket.
+
+  Args:
+    users: list[str] of users' google accounts
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    samples list[str] of samples_id for which you want to share data
+    bamcols: list[str] list of column names
   """
   if type(users) is str:
     users = [users]
@@ -555,17 +603,31 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
 
 
 def saveConfigs(workspace, filepath):
+  """
+  will save everything about a workspace into a csv and json file
+
+  Args:
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    filepath to save files
+  """
   wm = dm.WorkspaceManager(workspace)
   h.createFoldersFor(filepath)
+
   conf = wm.get_configs()
   conf.to_csv(filepath + '.csv')
   params = {}
+  params['GENERAL'] = wm.get_workspace_metadata()
   for k, val in conf.iterrows():
     params[k] = wm.get_config(val.name)
   h.dictToFile(params, filepath + '.json')
 
 
 def mvFiles(files, location):
+  """
+  move a set of files in parallel (when the set is huge)
+  """
   by = len(files) if len(files) < 50 else 50
   for sfiles in grouped(files, by):
     a = ''
@@ -578,6 +640,9 @@ def mvFiles(files, location):
 
 
 def cpFiles(files, location):
+  """
+  copy a set of files in parallel (when the set is huge)
+  """
   by = len(files) if len(files) < 50 else 50
   for sfiles in grouped(files, by):
     a = ''
@@ -590,6 +655,9 @@ def cpFiles(files, location):
 
 
 def rmFiles(files):
+    """
+  remove a set of files in parallel (when the set is huge)
+  """
   by = len(files) if len(files) < 50 else 50
   for sfiles in h.grouped(files, by):
     a = ''
