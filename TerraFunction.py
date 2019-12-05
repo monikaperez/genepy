@@ -84,8 +84,6 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
 
 def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
                      fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
-
-
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -623,7 +621,7 @@ def saveConfigs(workspace, filepath):
   params = {}
   params['GENERAL'] = wm.get_workspace_metadata()
   for k, val in conf.iterrows():
-    params[k] = wm.get_config(val.name)
+    params[k] = wm.get_config(val['name'])
   h.dictToFile(params, filepath + '.json')
 
 
@@ -632,7 +630,7 @@ def mvFiles(files, location):
   move a set of files in parallel (when the set is huge)
   """
   by = len(files) if len(files) < 50 else 50
-  for sfiles in grouped(files, by):
+  for sfiles in h.grouped(files, by):
     a = ''
     for val in sfiles:
       a += val + ' '
@@ -642,12 +640,29 @@ def mvFiles(files, location):
       break
 
 
+def lsFiles(files, add=''):
+  """
+  move a set of files in parallel (when the set is huge)
+  """
+  by = len(files) if len(files) < 50 else 50
+  for sfiles in h.grouped(files, by):
+    a = ''
+    for val in sfiles:
+      a += val + ' '
+    data = os.popen("gsutil -m ls " + add + " " + a)
+    if data == signal.SIGINT:
+      print('Awakened')
+      break
+    else:
+      return data.read().split('\n')
+
+
 def cpFiles(files, location):
   """
   copy a set of files in parallel (when the set is huge)
   """
   by = len(files) if len(files) < 50 else 50
-  for sfiles in grouped(files, by):
+  for sfiles in h.grouped(files, by):
     a = ''
     for val in sfiles:
       a += val + ' '
@@ -658,7 +673,7 @@ def cpFiles(files, location):
 
 
 def rmFiles(files):
-    """
+  """
   remove a set of files in parallel (when the set is huge)
   """
   by = len(files) if len(files) < 50 else 50
@@ -670,3 +685,20 @@ def rmFiles(files):
     if code == signal.SIGINT:
       print('Awakened')
       break
+
+
+def get_all_sizes(folder, suffix):
+  # get ls of all files in the folder with the specified suffix
+  samples = os.popen('gsutil -m ls -al ' + folder + '**.' + suffix).read().split('\n')
+  # compute size filepath
+  sizes = {'gs://' + val.split('gs://')[1].split('#')[0]: int(re.split("\d{4}-\d{2}-\d{2}", val)[0]) for val in samples[:-2]}
+  names = {}
+  for k, val in sizes.items():
+    if val in names:
+      names[val].append(k)
+    else:
+      names[val] = [k]
+  if names == {}:
+    # we didn't find any valid file paths
+    print("We didn't find any valid file paths in folder: " + str(folder))
+  return names

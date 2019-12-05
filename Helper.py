@@ -243,6 +243,16 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
   p.add_tools(hover)
   p = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641', maxvalue=maxvalue)
   p = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
+  text = TextInput(title="text", value_input='\n', value="gene", callback=CustomJS(args=dict(source=to_plot_not), code="""
+    var data = source.get('data')
+    var value = cb_obj.get('value')
+    var gene_id = data['gene_id']
+    for (i=0; i < gene_id.length; i++) {
+        if ( gene_id[i]==value ) { data.color[i]='yellow' }
+    }
+    source.trigger('change')
+    """))
+  p = vform(text, p)
   return p
 
 
@@ -269,7 +279,6 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   # prettify
   p.background_fill_color = "#DFDFE5"
   p.background_fill_alpha = 0.5
-
   return p
 
 
@@ -449,12 +458,12 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
-  breakpoint()
   prevval = ''
   for val in filepath.split('/')[:-1]:
     prevval += val + '/'
     if not os.path.exists(prevval):
       os.mkdir(prevval)
+
 
 def pdDo(df, op="mean", of="value1", over="value2"):
   df = df.sort_values(by=over)
