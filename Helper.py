@@ -83,7 +83,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
       val = "HGNC:" + str(val)
     try:
       a = to[val]
-      renamed.append(int(a) if from_idtype == 'entrez_id' else a)
+      renamed.append(int(a) if to_idtype == 'entrez_id' else a)
     except KeyError:
       b += 1
       not_parsed.append(val)
@@ -455,6 +455,7 @@ def createFoldersFor(filepath):
     prevval += val + '/'
     if not os.path.exists(prevval):
       os.mkdir(prevval)
+
 
 def pdDo(df, op="mean", of="value1", over="value2"):
   df = df.sort_values(by=over)
