@@ -88,9 +88,9 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
   it can create a sample set.
-
-  gcpfolder
-  prefix: str the folder path
+  for a set of files: gs://bucket/path/to/files
+  gcpfolder: str (bucket)
+  prefix: str the folder path (path/to/)
   workspace: str namespace/workspace from url typically
     namespace (str): project to which workspace belongs
     workspace (str): Workspace name
@@ -165,6 +165,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
   if fformat in {"fastq12", "fastqR1R2"}:
     data = {'sample_id': [], 'fastq1': [], 'fastq2': []}
     # print and return well formated data
+    print(files)
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
         name = file.split('/')[-1].split('.')[0].split(sep)[0]
@@ -181,7 +182,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
             if file.split('.')[-3][-1] == '1':
               data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file.split('.')[-3][-1] == '2':
-              data['falsstq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq 1/2 error", file)
         else:
@@ -203,7 +204,8 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
       else:
         print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
-    df["source"] = source
+    print(df)
+    df["Source"] = source
     df["participant"] = data['sample_id']
     df = df.set_index("sample_id")
     wm.upload_samples(df)
@@ -642,7 +644,7 @@ def mvFiles(files, location):
 
 def lsFiles(files, add=''):
   """
-  move a set of files in parallel (when the set is huge)
+  list a set of files in parallel (when the set is huge)
   """
   by = len(files) if len(files) < 50 else 50
   for sfiles in h.grouped(files, by):
