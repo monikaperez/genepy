@@ -125,7 +125,7 @@ function continue_upload(){
   cut=${2:-7}
   for i in $(cat $1); do
     file=$(echo ${i} | awk '{ print $1}');
-    size=$(echo ${i} | awk '{ print $2 }');
+    size=$(echo ${i} | awk '{ print $2}');
     echo "downloading $file of size: $size";
     name=$(echo $file | cut -d \/ -f $cut);
     curl -C $size -L -s $file | gsutil cp - $3'retry_'$name;

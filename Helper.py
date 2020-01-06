@@ -13,8 +13,10 @@ import bokeh
 from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
-from bokeh.models import HoverTool
-
+from bokeh.models import HoverTool, CustomJS
+from bokeh.models.widgets import TextInput
+from bokeh.layouts import layout, widgetbox, column, row
+import itertools
 import matplotlib
 import venn as pyvenn
 import sys
@@ -83,7 +85,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
       val = "HGNC:" + str(val)
     try:
       a = to[val]
-      renamed.append(int(a) if from_idtype == 'entrez_id' else a)
+      renamed.append(int(a) if to_idtype == 'entrez_id' else a)
     except KeyError:
       b += 1
       not_parsed.append(val)
@@ -222,7 +224,8 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
 
 def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
-            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250):
+            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
+            searchbox=False):
   """A function to plot the bokeh single mutant comparisons."""
   # Make the hover tool
   # data should be df gene*samples + genenames
@@ -241,18 +244,27 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
 
   # Add the hover tool
   p.add_tools(hover)
-  p = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641', maxvalue=maxvalue)
-  p = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
-  text = TextInput(title="text", value_input='\n', value="gene", callback=CustomJS(args=dict(source=to_plot_not), code="""
-    var data = source.get('data')
-    var value = cb_obj.get('value')
-    var gene_id = data['gene_id']
-    for (i=0; i < gene_id.length; i++) {
-        if ( gene_id[i]==value ) { data.color[i]='yellow' }
-    }
-    source.trigger('change')
-    """))
-  p = vform(text, p)
+  p, source1 = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641', maxvalue=maxvalue)
+  p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
+  if searchbox:
+    text = TextInput(title="text", value="gene")
+    text.js_on_change('value', CustomJS(
+        args=dict(source=source1), code="""
+      var data = source.data
+      var value = cb_obj.value
+      var gene_id = data.gene_id
+      var a = -1
+      for (i=0; i < gene_id.length; i++) {
+          if ( gene_id[i]===value ) { a=i; console.log(i); data.size[i]=7; data.alpha[i]=1; data.color[i]='#fc8d59' }
+      }
+      source.data = data
+      console.log(source)
+      console.log(cb_obj)
+      source.select.emit(a)
+      source.change.emit()
+      console.log(source)
+      """))
+    p = column(text, p)
   return p
 
 
@@ -263,13 +275,16 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   transformed_q = -df[y].apply(np.log10).values
   transformed_q[transformed_q == np.inf] = maxvalue
   df['transformed_q'] = transformed_q
+  df['color'] = color
+  df['alpha'] = alpha
+  df['size'] = 7
   source1 = bokeh.models.ColumnDataSource(df)
   source2 = bokeh.models.ColumnDataSource(df)
 
   # Specify data source
-  p.circle(x=x, y='transformed_q', size=7,
-           alpha=alpha, source=source1,
-           color=color, name='circles')
+  p.circle(x=x, y='transformed_q', size='size',
+           alpha='alpha', source=source1,
+           color='color', name='circles')
   if outline:
     p.circle(x=x, y='transformed_q', size=7,
              alpha=1,
@@ -279,7 +294,7 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   # prettify
   p.background_fill_color = "#DFDFE5"
   p.background_fill_alpha = 0.5
-  return p
+  return p, source1
 
 
 def selector(df, valtoextract):
@@ -386,7 +401,12 @@ def grouped(iterable, n):
   iterate over element of list 2 at a time python
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
-  return zip(*[iter(iterable)] * n)
+  it = iter(iterable)
+  while True:
+    chunk = tuple(itertools.islice(it, n))
+    if not chunk:
+      return
+    yield chunk
 
 
 def mergeImages(images, outputpath):
