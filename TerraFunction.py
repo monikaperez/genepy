@@ -91,6 +91,9 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
 
   A very practical function when you have uploaded a folder of samples (RNA/WES/...) in google storage
   with some naming convention, and want to have them all well listed in Terra for futher processing
+  it can create a sample set.
+  for a set of files: gs://bucket/path/to/files
+
 
   Args:
   -----
@@ -170,6 +173,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
   if fformat in {"fastq12", "fastqR1R2"}:
     data = {'sample_id': [], 'fastq1': [], 'fastq2': []}
     # print and return well formated data
+    print(files)
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
         name = file.split('/')[-1].split('.')[0].split(sep)[0]
@@ -186,7 +190,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
             if file.split('.')[-3][-1] == '1':
               data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file.split('.')[-3][-1] == '2':
-              data['falsstq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq 1/2 error", file)
         else:
@@ -208,7 +212,8 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
       else:
         print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
-    df["source"] = source
+    print(df)
+    df["Source"] = source
     df["participant"] = data['sample_id']
     df = df.set_index("sample_id")
     wm.upload_samples(df)
@@ -236,7 +241,7 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 def addToSampleSet(workspace, samplesetid, samples):
   """
-  
+
   will create new if doesn't already exist, else adds to existing
 
   Args:
