@@ -4,7 +4,7 @@ import pysam
 import sys
 sys.path.append('..')
 import numpy as np
-import Helper
+import helper
 import re
 from pybedtools import BedTool
 import seaborn as sns
