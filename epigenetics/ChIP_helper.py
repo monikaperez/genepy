@@ -750,6 +750,8 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
 
 
 def diffPeak(name1,name2,res_directory,directory,scaling1,scaling2):
-    os.system("macs2 bdgdiff --t1 "+directory+"/" + name1 + "_treat_pileup.bdg --c1 "+directory+"/" + name1 + "_control_lambda.bdg\
+    res = os.system("macs2 bdgdiff --t1 "+directory+"/" + name1 + "_treat_pileup.bdg --c1 "+directory+"/" + name1 + "_control_lambda.bdg\
   --t2 "+directory+"/" + name2 + "_treat_pileup.bdg --c2 "+directory+"/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
   " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2+" --outdir "+res_directory)
+    if res != 0:
+        raise Exception("Leave command pressed or command failed")
