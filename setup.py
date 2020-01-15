@@ -24,6 +24,8 @@ setup(
         'rpy2-bioconductor-extensions',
         'pysam',
         'jupyter',
+        'pyBigWig'
+        'pybedtools'
         'taigapy'
         'gseapy',
         'bokeh',
