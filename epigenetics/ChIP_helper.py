@@ -100,15 +100,18 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
         # it can take many TB so better delete
 
 
-def bigWigFrom(bams, folder="data/seqs/", numthreads=8, genome='GRCh37'):
+def bigWigFrom(bams, folder="data/seqs/", numthreads=8, genome='GRCh37', scaling=None):
     """
     run the bigwig command line for a set of bam files in a folder
     """
-    for i in bams:
-        in1 = folder + i
-        out1 = folder + "bigwig/" + i + split('.')[0] + '.bw'
-        os.system("bamCoverage --effectiveGenomeSize " + size[genome] + " -p " + str(numthreads) +
-                  " -b " + in1 + "-of bigwig -o " + out1)
+    for i, bam in enumerate(bams):
+        in1 = folder +bam
+        out1 = folder + "bigwig/" +bam.split('.')[0] + '.bw'
+        cmd = "bamCoverage --effectiveGenomeSize " + size[genome] + " -p " + str(numthreads) +
+                  " -b " + in1 + "-of bigwig -o " + out1
+        if scaling is not None:
+            cmd += ' --scaleFactor '+scaling[i] 
+        os.system(cmd)
 
 
 def mergeBams(rep):
@@ -224,7 +227,7 @@ def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpe
 
 
 def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=4000, numthreads=8,
-                   width=5, length=10, name='temp/peaksat.png'):
+                   width=5, length=10, name='temp/peaksat.png', scale=None):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -237,15 +240,16 @@ def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=40
     peaks['start'] = [c - window for c in center]
     peaks['end'] = [c + window for c in center]
     fig, ax = plt.subplots(1, len(bigwigs), figsize=[width, length])
-    peaks = peaks.sort_values(by=["foldchange"], ascending=False)
+    peaks = peaks.sortValues(by=["foldchange"], ascending=False)
     if numpeaks > len(peaks):
         numpeaks = len(peaks) - 1
     for num, bigwig in enumerate(bigwigs):
         bw = pyBigWig.open(folder + bigwig)
         cov = np.zeros((numpeaks, window * 2), dtype=int)
+        scale = scale[bigwig] if scale is dict else scale
         for i, (k, val) in enumerate(peaks.iloc[:numpeaks].iterrows()):
             cov[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
-        sns.heatmap(cov, ax=ax[num], yticklabels=[], cmap=cmaps[num],
+        sns.heatmap(cov * scale, ax=ax[num], yticklabels=[], cmap=cmaps[num],
                     cbar=False)
         ax[num].set_title(bigwig.split('.')[0])
     fig.subplots_adjust(wspace=0.1)
@@ -651,3 +655,93 @@ def getPeaksOverlap(peaks, isMerged=False, correlationMatrix=None, countMatrix=N
 
 
 # def assignGene(peaks, bedFolder):
+
+
+def GetSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1):
+    """
+    Will do spike in control to allow for unormalizing sequence data 
+
+    Count based sequencing data is not absolute and will be normalized as each sample will be sequenced at a specific depth. To figure out what was the actual sample concentration, we use Spike In control
+
+    You should have FastQfolder/[NAME].fastq & BigWigFolder/[NAME].bw with NAME being the same for the same samples
+
+    If 
+
+    @
+
+    Args:
+    -----
+    refgenome: str the file path to the indexed reference genome
+    FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
+    BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
+    mapper: str flag to 'bwa', ...
+    pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
+
+    Returns:
+    --------
+    dict(file,float) the scaling factor dict
+
+    """
+    fastqs = os.listdir(FastQfolder)
+    if pairedEnd:
+        fastqs = helper.grouped(fastqs, 2)
+    count = 0
+    for i, file in enumerate(fastqs):
+        count += 1
+        exe = 'bwa mem ' + refgenome + ' ' + file[0] + ' ' + file[1] + ' > ' + file[0] + '.mapped.sam'
+        if count < cores and i < len(fastqs) - 1:
+            exe += ' &'
+        else:
+            count = 0
+            os.system(exe)
+    count = 0
+    mapped = {}
+    umappedreads = {}
+    umappedreads_norm = {}
+    for file in fastqs:
+        mapped[file[0]] =  os.popen('bamtools stats -in' + file[0] + '.mapped.sam').read().split('\n')
+    umappedreads[file[0]] = re.findall("singleton: (\d+)", mapped[file[0]])[0]
+    nbmapped = np.array(umappedreads.values())
+    nbmapped = nbmapped.astype(float) / np.sort(nbmapped)[0]
+    for i, val in enumerate(umappedreads.keys()):
+        umappedreads_norm[val] = nbmapped[i]
+    return mappedreads, umappedreads_norm, mapped
+
+
+
+
+def DiffPeak(bam1, bam2, control1, control2=None, scaling=None):
+    """
+    will use macs2 to call differential peak binding
+
+    Args:
+    -----
+    bam1
+    bam2()
+    control1
+    control2
+    scaling
+    """
+    print("doing diff from " + bam1 + " and " + bam2)
+    name1 = bam1.split('.')[0].split('/')[-1]
+    name2 = bam2.split('.')[0].split('/')[-1]
+    if control2 is None:
+        control2 = control1
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2
+    if scaling is None:
+        ret = os.popen(cmd1).read()
+        scaling1 = re.findall("tags after filtering in control: (\d+)", ret)[0]
+        ret = os.popen(cmd2).read()
+        scaling2 = re.findall("tags after filtering in control: (\d+)", ret)[0]
+    else:
+        res = os.system(cmd1)
+        scaling1 = scaling[0]
+        res += os.system(cmd2)
+        scaling2 = scaling[1]
+    if res != 0:
+        raise Exception("Leave command pressed or command failed")
+
+    os.system("macs2 bdgdiff --t1 " + name1 + "_treat_pileup.bdg --c1 " + name1 + "_control_lambda.bdg\
+  --t2 " + name2 + "_treat_pileup.bdg --c2 " + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
+  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2)
