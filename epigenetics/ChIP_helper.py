@@ -2,9 +2,8 @@ import os
 import pandas as pd
 import pysam
 import sys
-sys.path.insert(0,'../')
 import numpy as np
-import Helper
+from .. import Helper
 import re
 from pybedtools import BedTool
 import seaborn as sns
