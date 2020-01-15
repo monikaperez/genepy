@@ -100,14 +100,14 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
         # it can take many TB so better delete
 
 
-def bigWigFrom(bams, folder="data/seqs/", numthreads=8, genome='GRCh37', scaling=None):
+def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
     """
     run the bigwig command line for a set of bam files in a folder
     """
     for i, bam in enumerate(bams):
         in1 = folder +bam
         out1 = folder + "bigwig/" +bam.split('.')[0] + '.bw'
-        cmd = "bamCoverage --effectiveGenomeSize " + size[genome] + " -p " + str(numthreads) +
+        cmd = "bamCoverage --effectiveGenomeSize " + size[genome] + " -p " + str(numthreads) +\
                   " -b " + in1 + "-of bigwig -o " + out1
         if scaling is not None:
             cmd += ' --scaleFactor '+scaling[i] 
