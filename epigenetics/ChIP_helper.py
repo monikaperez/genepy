@@ -109,7 +109,7 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
         in1 = folder +bam
         out1 = folder + "bigwig/" +bam.split('.')[0].split('/')[-1] + '.bw'
         cmd = "bamCoverage --effectiveGenomeSize " + str(size[genome]) + " -p " + str(numthreads) +\
-                  " -b " + in1 + "-of bigwig -o " + out1
+                  " -b " + in1 + " -o " + out1
         if scaling is not None:
             cmd += ' --scaleFactor '+str(scaling[i]) 
         os.system(cmd)
