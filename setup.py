@@ -10,7 +10,7 @@ setup(
     author='Jeremie Kalfon',
     author_email='jkobject@gmail.com',
     url="https://github.com/jkobject/JKBio",
-    packages=['cell_line_mapping-master/python'],  # same as name
+    packages=['cell_line_mapping-master/python','epigenetics/rose'],  # same as name
     python_requires='>=3.5',
     install_requires=[
             'pysam',
@@ -24,14 +24,15 @@ setup(
         'rpy2-bioconductor-extensions',
         'pysam',
         'jupyter',
-        'pyBigWig'
-        'pybedtools'
-        'taigapy'
+        'pyBigWig',
+        'pybedtools',
+        'taigapy',
+        'PIL',
         'gseapy',
         'bokeh',
         'igv'],  # external packages as dependencies
 )
 
 ## installing R if not there
-## installing taigr
-## installing R dependencies
+## installing DESEq2 in R
+## installing bash (bowtie2, macs2, samtools, deeptools, bwa)
