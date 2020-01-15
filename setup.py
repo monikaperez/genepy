@@ -24,7 +24,12 @@ setup(
         'rpy2-bioconductor-extensions',
         'pysam',
         'jupyter',
+        'taigapy'
         'gseapy',
         'bokeh',
         'igv'],  # external packages as dependencies
 )
+
+## installing R if not there
+## installing taigr
+## installing R dependencies

@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import pysam
+import sys
+sys.path.append('..')
 import numpy as np
 import Helper
 import re
