@@ -101,7 +101,7 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
         # it can take many TB so better delete
 
 
-def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
+def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, verbose=0):
     """
     run the bigwig command line for a set of bam files in a folder
     """
@@ -112,6 +112,8 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
                   " -b " + in1 + " -o " + out1
         if scaling is not None:
             cmd += ' --scaleFactor '+str(scaling[i]) 
+        if verbose==0:
+            cmd+= ' 2> >(tee err) 1> >(tee out) | tee >all'
         res = os.system(cmd)
         if res != 0:
             raise Exception("Leave command pressed or command failed")
@@ -660,7 +662,7 @@ def getPeaksOverlap(peaks, isMerged=False, correlationMatrix=None, countMatrix=N
 # def assignGene(peaks, bedFolder):
 
 
-def GetSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1):
+def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1):
     """
     Will do spike in control to allow for unormalizing sequence data 
 
@@ -713,7 +715,7 @@ def GetSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
 
 
 
-def DiffPeak(bam1, bam2, control1, control2=None, scaling=None):
+def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData', res_directory="diffPeaks"):
     """
     will use macs2 to call differential peak binding
 
@@ -730,8 +732,8 @@ def DiffPeak(bam1, bam2, control1, control2=None, scaling=None):
     name2 = bam2.split('.')[0].split('/')[-1]
     if control2 is None:
         control2 = control1
-    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1
-    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 +" --outdir "+directory
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2 +" --outdir "+directory
     if scaling is None:
         ret = os.popen(cmd1).read()
         scaling1 = re.findall("tags after filtering in control: (\d+)", ret)[0]
@@ -744,7 +746,10 @@ def DiffPeak(bam1, bam2, control1, control2=None, scaling=None):
         scaling2 = scaling[1]
     if res != 0:
         raise Exception("Leave command pressed or command failed")
+    diffPeak(name1, name2, res_directory, directory, scaling1, scaling2)
 
-    os.system("macs2 bdgdiff --t1 " + name1 + "_treat_pileup.bdg --c1 " + name1 + "_control_lambda.bdg\
-  --t2 " + name2 + "_treat_pileup.bdg --c2 " + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
-  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2)
+
+def diffPeak(name1,name2,res_directory,directory,scaling1,scaling2):
+    os.system("macs2 bdgdiff --t1 "+directory+"/" + name1 + "_treat_pileup.bdg --c1 "+directory+"/" + name1 + "_control_lambda.bdg\
+  --t2 "+directory+"/" + name2 + "_treat_pileup.bdg --c2 "+directory+"/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
+  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2+" --outdir "+res_directory)
