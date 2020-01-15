@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import pysam
 import sys
-sys.path.append('..')
+sys.path.insert(0,'../')
 import numpy as np
 import helper
 import re
