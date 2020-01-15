@@ -113,7 +113,7 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
         if scaling is not None:
             cmd += ' --scaleFactor '+str(scaling[i]) 
         res = os.system(cmd)
-        if res =! 0:
+        if res != 0:
             raise Exception("Leave command pressed or command failed")
 
 
