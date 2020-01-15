@@ -112,7 +112,9 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None):
                   " -b " + in1 + " -o " + out1
         if scaling is not None:
             cmd += ' --scaleFactor '+str(scaling[i]) 
-        os.system(cmd)
+        res = os.system(cmd)
+        if res =! 0:
+            raise Exception("Leave command pressed or command failed")
 
 
 def mergeBams(rep):
