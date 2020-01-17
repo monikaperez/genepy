@@ -512,6 +512,7 @@ def pdDo(df, op="mean", of="value1", over="value2"):
 
 def parrun(cmds, cores):
   count = 0
+  exe=''
   for cmd in cmds:
     count += 1
     exe += cmd
