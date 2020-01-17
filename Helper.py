@@ -510,12 +510,13 @@ def pdDo(df, op="mean", of="value1", over="value2"):
   return index, ret
 
 
-def parrun(exe, cores, fastqs):
+def parrun(cmds, cores):
   count = 0
-  for i, file in enumerate(fastqs):
+  for cmd in cmds:
     count += 1
-    if count < cores and i < len(fastqs) - 1:
-      exe += ' &'
+    exe += cmd
+    if count < cores and i < len(cmds) - 1:
+      exe += ' & '
     else:
       count = 0
       res = os.system(exe)

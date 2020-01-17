@@ -690,20 +690,17 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
     fastqs = os.listdir(FastQfolder)
     if pairedEnd:
         fastqs = h.grouped(fastqs, 2)
-    count = 0
     if totrim:
         print("trimming\n\n")
-        h.parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs],
-                 cores, fastqs)
+        h.parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs], cores)
     print("mapping\n\n")
     h.parrun(['bwa mem ' + refgenome + ' ' + file[0].split('.')[0] + '_val_1.fq.gz ' +
-              file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs],
-             cores, fastqs)
+              file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
     print("filtering\n\n")
-    h.parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores, fastqs)
-    h.parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores, fastqs)
-    h.parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores, fastqs)
-    h.parrun(['samtools idxstats ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.idxstat' for file in fastqs], cores, fastqs)
+    h.parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores)
+    h.parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+    h.parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores)
+    h.parrun(['samtools idxstats ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.idxstat' for file in fastqs], cores)
     mapped = {}
     norm = {}
     unique_mapped = {}
