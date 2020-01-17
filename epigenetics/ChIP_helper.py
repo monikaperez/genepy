@@ -688,20 +688,23 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
     dict(file,float) the scaling factor dict
 
     """
+    print("if paired_end, need to be name_*1, name_*2")
     fastqs = os.listdir(FastQfolder)
+    fastqs.sort()
     if pairedEnd:
         fastqs = h.grouped(fastqs, 2)
+    print(fastqs)
     if totrim:
         print("trimming\n\n")
-        h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + FastQfolder + file[0] + ' ' + FastQfolder + file[1]+" -o res" for file in fastqs], cores)
+        h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + FastQfolder + file[0] + ' ' + FastQfolder + file[1] + " -o res" for file in fastqs], cores)
     print("mapping\n\n")
     h.parrun([pathtobwa + ' mem ' + refgenome + ' res/' + file[0].split('.')[0] + '_val_1.fq.gz res/' +
               file[1].split('.')[0] + '_val_2.fq.gz > res/' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
     print("filtering\n\n")
-    h.parrun([pathtosam + ' sort res/' + file[0].split('.')[0] + '.mapped.sam -o res/'+file[0].split('.')[0]+'.sorted.bam' for file in fastqs], cores)
+    h.parrun([pathtosam + ' sort res/' + file[0].split('.')[0] + '.mapped.sam -o res/' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores)
     h.parrun([pathtosam + ' index res/' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores)
-    h.parrun([pathtosam + ' flagstat res/' + file[0].split('.')[0] + '.sorted.bam > res/'+file[0].split('.')[0]+'.sorted.bam.flagstat' for file in fastqs], cores)
-    h.parrun([pathtosam + ' idxstats res/' + file[0].split('.')[0] + '.sorted.bam > res/'+file[0].split('.')[0]+'.sorted.bam.idxstat' for file in fastqs], cores)
+    h.parrun([pathtosam + ' flagstat res/' + file[0].split('.')[0] + '.sorted.bam > res/' + file[0].split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
+    h.parrun([pathtosam + ' idxstats res/' + file[0].split('.')[0] + '.sorted.bam > res/' + file[0].split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
     mapped = {}
     norm = {}
     unique_mapped = {}
