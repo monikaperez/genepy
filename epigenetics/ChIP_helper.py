@@ -106,14 +106,14 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, ver
     run the bigwig command line for a set of bam files in a folder
     """
     for i, bam in enumerate(bams):
-        in1 = folder +bam
-        out1 = folder + "bigwig/" +bam.split('.')[0].split('/')[-1] + '.bw'
+        in1 = folder + bam
+        out1 = folder + "bigwig/" + bam.split('.')[0].split('/')[-1] + '.bw'
         cmd = "bamCoverage --effectiveGenomeSize " + str(size[genome]) + " -p " + str(numthreads) +\
-                  " -b " + in1 + " -o " + out1
+            " -b " + in1 + " -o " + out1
         if scaling is not None:
-            cmd += ' --scaleFactor '+str(scaling[i]) 
-        if verbose==0:
-            cmd+= ' 2> >(tee err) 1> >(tee out) | tee >all'
+            cmd += ' --scaleFactor ' + str(scaling[i])
+        if verbose == 0:
+            cmd += ' 2> >(tee err) 1> >('
         res = os.system(cmd)
         if res != 0:
             raise Exception("Leave command pressed or command failed")
@@ -691,28 +691,29 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
     if pairedEnd:
         fastqs = helper.grouped(fastqs, 2)
     count = 0
-    for i, file in enumerate(fastqs):
-        count += 1
-        exe = 'bwa mem ' + refgenome + ' ' + file[0] + ' ' + file[1] + ' > ' + file[0] + '.mapped.sam'
-        if count < cores and i < len(fastqs) - 1:
-            exe += ' &'
-        else:
-            count = 0
-            os.system(exe)
-    count = 0
+    if totrim:
+        parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs],
+               cores, fastqs)
+    parrun(['bwa mem ' + refgenome + ' ' + file[0].split('.')[0] + '_val_1.fq.gz ' +
+            file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs],
+           cores, fastqs)
+    parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores, fastqs)
+    parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores, fastqs)
+    parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores, fastqs)
+    parrun(['samtools idxstats ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.idxstat' for file in fastqs], cores, fastqs)
     mapped = {}
-    umappedreads = {}
-    umappedreads_norm = {}
+    norm = {}
+    unique_mapped = {}
     for file in fastqs:
-        mapped[file[0]] =  os.popen('bamtools stats -in' + file[0] + '.mapped.sam').read().split('\n')
-    umappedreads[file[0]] = re.findall("singleton: (\d+)", mapped[file[0]])[0]
-    nbmapped = np.array(umappedreads.values())
+        mapped[file[0].split('.')[0]] = int(os.popen('samtools view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 ' +
+                                                     file[0].split('.')[0]).read().split('\n')[0])
+        unique_mapped[file[0]] = int(re.findall("Mapped reads: (\d+)", os.popen('bamtools stats -in' +
+                                                                                file[0] + '.mapped.sam').read())[0])
+    nbmapped = np.array(mapped.values())
     nbmapped = nbmapped.astype(float) / np.sort(nbmapped)[0]
     for i, val in enumerate(umappedreads.keys()):
-        umappedreads_norm[val] = nbmapped[i]
-    return mappedreads, umappedreads_norm, mapped
-
-
+        norm[val] = nbmapped[i]
+    return norm, mapped, unique_mapped
 
 
 def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData', res_directory="diffPeaks"):
@@ -732,8 +733,8 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
     name2 = bam2.split('.')[0].split('/')[-1]
     if control2 is None:
         control2 = control1
-    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 +" --outdir "+directory
-    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2 +" --outdir "+directory
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 + " --outdir " + directory
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2 + " --outdir " + directory
     if scaling is None:
         ret = os.popen(cmd1).read()
         scaling1 = re.findall("tags after filtering in control: (\d+)", ret)[0]
@@ -749,9 +750,9 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
     diffPeak(name1, name2, res_directory, directory, scaling1, scaling2)
 
 
-def diffPeak(name1,name2,res_directory,directory,scaling1,scaling2):
-    res = os.system("macs2 bdgdiff --t1 "+directory+"/" + name1 + "_treat_pileup.bdg --c1 "+directory+"/" + name1 + "_control_lambda.bdg\
-  --t2 "+directory+"/" + name2 + "_treat_pileup.bdg --c2 "+directory+"/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
-  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2+" --outdir "+res_directory)
+def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2):
+    res = os.system("macs2 bdgdiff --t1 " + directory + "/" + name1 + "_treat_pileup.bdg --c1 " + directory + "/" + name1 + "_control_lambda.bdg\
+  --t2 " + directory + "/" + name2 + "_treat_pileup.bdg --c2 " + directory + "/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
+  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory)
     if res != 0:
         raise Exception("Leave command pressed or command failed")

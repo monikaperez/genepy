@@ -508,3 +508,16 @@ def pdDo(df, op="mean", of="value1", over="value2"):
       j += 1
       data = [val[of]]
   return index, ret
+
+
+def parrun(exe, cores, fastqs):
+  count = 0
+  for i, file in enumerate(fastqs):
+    count += 1
+    if count < cores and i < len(fastqs) - 1:
+      exe += ' &'
+    else:
+      count = 0
+      res = os.system(exe)
+      if res != 0:
+        raise Exception("Leave command pressed or command failed")
