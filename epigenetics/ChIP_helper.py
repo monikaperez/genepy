@@ -3,7 +3,7 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-from .. import Helper
+from .. import Helper as h
 import re
 from pybedtools import BedTool
 import seaborn as sns
@@ -451,7 +451,7 @@ def mergeReplicatePeaks(peaks, reps, bigwigfolder, markedasbad=None, window=200,
             presence = []
             for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
                 presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-            Helper.venn(presence, merged_bed.columns)
+            h.venn(presence, merged_bed.columns)
         else:
             print('too many replicates for Venn')
         bigwigs = os.listdir(bigwigfolder)
@@ -689,18 +689,18 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
     """
     fastqs = os.listdir(FastQfolder)
     if pairedEnd:
-        fastqs = helper.grouped(fastqs, 2)
+        fastqs = h.grouped(fastqs, 2)
     count = 0
     if totrim:
-        parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs],
-               cores, fastqs)
-    parrun(['bwa mem ' + refgenome + ' ' + file[0].split('.')[0] + '_val_1.fq.gz ' +
-            file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs],
-           cores, fastqs)
-    parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores, fastqs)
-    parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores, fastqs)
-    parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores, fastqs)
-    parrun(['samtools idxstats ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.idxstat' for file in fastqs], cores, fastqs)
+        h.parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs],
+                 cores, fastqs)
+    h.parrun(['bwa mem ' + refgenome + ' ' + file[0].split('.')[0] + '_val_1.fq.gz ' +
+              file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs],
+             cores, fastqs)
+    h.parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores, fastqs)
+    h.parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores, fastqs)
+    h.parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores, fastqs)
+    h.parrun(['samtools idxstats ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.idxstat' for file in fastqs], cores, fastqs)
     mapped = {}
     norm = {}
     unique_mapped = {}
