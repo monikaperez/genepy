@@ -662,7 +662,7 @@ def getPeaksOverlap(peaks, isMerged=False, correlationMatrix=None, countMatrix=N
 # def assignGene(peaks, bedFolder):
 
 
-def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1):
+def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1, totrim=True):
     """
     Will do spike in control to allow for unormalizing sequence data 
 
