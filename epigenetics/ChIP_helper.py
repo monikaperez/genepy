@@ -692,11 +692,14 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
         fastqs = h.grouped(fastqs, 2)
     count = 0
     if totrim:
+        print("trimming\n\n")
         h.parrun(['trim_galore --paired --fastqc --gzip ' + file[0] + ' ' + file[1] for file in fastqs],
                  cores, fastqs)
+    print("mapping\n\n")
     h.parrun(['bwa mem ' + refgenome + ' ' + file[0].split('.')[0] + '_val_1.fq.gz ' +
               file[1].split('.')[0] + '_val_2.fq.gz > ' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs],
              cores, fastqs)
+    print("filtering\n\n")
     h.parrun(['samtools sort ' + file[0].split('.')[0] + '.mapped.sam -o .sorted.bam' for file in fastqs], cores, fastqs)
     h.parrun(['samtools index ' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores, fastqs)
     h.parrun(['samtools flagstat ' + file[0].split('.')[0] + '.sorted.bam > .sorted.bam.flagstat' for file in fastqs], cores, fastqs)
@@ -704,6 +707,7 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
     mapped = {}
     norm = {}
     unique_mapped = {}
+    print("counting\n\n")
     for file in fastqs:
         mapped[file[0].split('.')[0]] = int(os.popen('samtools view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 ' +
                                                      file[0].split('.')[0]).read().split('\n')[0])
