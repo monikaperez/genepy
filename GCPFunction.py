@@ -58,8 +58,8 @@ def mvFiles(files, location):
         for val in sfiles:
             a += val + ' '
         code = os.system("gsutil -m mv " + a + location)
-        if code == signal.SIGINT:
-            print('Awakened')
+        if code != 0:
+            print('pressed ctrl+c or command failed')
             break
 
 
@@ -106,8 +106,8 @@ def cpFiles(files, location):
         for val in sfiles:
             a += val + ' '
         code = os.system("gsutil -m cp " + a + location)
-        if code == signal.SIGINT:
-            print('Awakened')
+        if code != 0:
+            print('pressed ctrl+c or command failed')
             break
 
 
@@ -125,8 +125,8 @@ def rmFiles(files):
         for val in sfiles:
             a += val + ' '
         code = os.system("gsutil -m rm " + a)
-        if code == signal.SIGINT:
-            print('Awakened')
+        if code != 0:
+            print('pressed ctrl+c or command failed')
             break
 
 
