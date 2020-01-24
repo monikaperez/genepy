@@ -82,7 +82,7 @@ def computeSingleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="p
         # it can take many TB so better delete
 
 
-def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
+def computePairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
                      ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     # run the paired end pipeline
@@ -102,7 +102,7 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
         # it can take many TB so better delete
 
 
-def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, verbose=0):
+def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, verbose=1):
     """
     run the bigwig command line for a set of bam files in a folder
     """
@@ -114,7 +114,7 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, ver
         if scaling is not None:
             cmd += ' --scaleFactor ' + str(scaling[i])
         if verbose == 0:
-            cmd += ' 2> >(tee err) 1> >('
+            cmd += ' 2> ' + bam + '.error.log'
         res = os.system(cmd)
         if res != 0:
             raise Exception("Leave command pressed or command failed")
@@ -663,8 +663,9 @@ def getPeaksOverlap(peaks, isMerged=False, correlationMatrix=None, countMatrix=N
 # def assignGene(peaks, bedFolder):
 
 
-def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=False, cores=1, totrim=True,
-                            pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa'):
+def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
+                            pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
+                            totrim=True, tomap=True, tofilter=True):
     """
     Will do spike in control to allow for unormalizing sequence data 
 
@@ -690,38 +691,59 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
 
     """
     print("if paired_end, need to be name_*1, name_*2")
-    fastqs = os.listdir(FastQfolder)
-    fastqs.sort()
-    if pairedEnd:
-        fastqs = h.grouped(fastqs, 2)
+    if len(fastQfolder) > 0:
+        print('using all files from folder')
+        fastqs = os.listdir(fastQfolder)
+        fastqs.sort()
+        if pairedEnd and (tomap or totrim):
+            fastqs = [i for i in h.grouped(fastqs, 2)]
+    elif fastq is None:
+        raise Error('you need input files')
+    else:
+        if type(fastq) is list:
+            fastQfolder = '/'.join(fastq[0].split('/')[:-1]) + '/'
+            fastqs = [[f.split('/')[-1] for f in fastq]]
+        else:
+            fastQfolder = '/'.join(fastq.split('/')[:-1]) + '/'
+            fastqs = [fastq.split('/')[-1]]
     print(fastqs)
-    if totrim:
-        print("trimming\n\n")
-        h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + FastQfolder + file[0] + ' ' + FastQfolder + file[1] + " -o res" for file in fastqs], cores)
-        fastqs = [[file[0].split('.')[0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
-    print("mapping\n\n")
-    print(fastqs)
-    h.parrun([pathtobwa + ' mem ' + refgenome + ' res/' + file[0] + ' res/' +
-              file[1] + ' > res/' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
-    print("filtering\n\n")
-    h.parrun([pathtosam + ' sort res/' + file[0].split('.')[0] + '.mapped.sam -o res/' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores)
-    h.parrun([pathtosam + ' index res/' + file[0].split('.')[0] + '.sorted.bam' for file in fastqs], cores)
-    h.parrun([pathtosam + ' flagstat res/' + file[0].split('.')[0] + '.sorted.bam > res/' + file[0].split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
-    h.parrun([pathtosam + ' idxstats res/' + file[0].split('.')[0] + '.sorted.bam > res/' + file[0].split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
+    if not totrim:
+        print("you need to have your files in a 'res/' folder")
+    if totrim and tomap:
+        print("\n\ntrimming\n\n")
+        if pairedEnd:
+            h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + fastQfolder + file[0] + ' ' + fastQfolder + file[1] + " -o res" for file in fastqs], cores)
+            fastqs = [[file[0].split('.')[0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
+    if tomap:
+        print("\n\nmapping\n\n")
+        if pairedEnd:
+            h.parrun([pathtobwa + ' mem ' + refgenome + ' res/' + file[0] + ' res/' +
+                      file[1] + ' > res/' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
+            fastqs = [file[0].split('.')[0] + '.mapped.sam' for file in fastqs]
+    if tofilter:
+        print("\n\nfiltering\n\n")
+        h.parrun([pathtosam + ' sort res/' + file + ' -o res/' + file.split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+        h.parrun([pathtosam + ' index res/' + file.split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+        h.parrun([pathtosam + ' flagstat res/' + file.split('.')[0] + '.sorted.bam > res/' + file.split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
+        h.parrun([pathtosam + ' idxstats res/' + file.split('.')[0] + '.sorted.bam > res/' + file.split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
+        fastqs = [file.split('.')[0] + '.sorted.bam' for file in fastqs]
+    else:
+        print("files need to be named: NAME.sorted.bam")
+        fastqs = [file for file in fastqs if '.sorted.bam' == file[-11:]]
     mapped = {}
     norm = {}
     unique_mapped = {}
-    print("counting\n\n")
+    print("\n\ncounting\n\n")
     for file in fastqs:
-        mapped[file[0].split('.')[0]] = int(os.popen(pathtosam + ' view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 ' +
-                                                     file[0].split('.')[0]).read().split('\n')[0])
-        unique_mapped[file[0]] = int(re.findall("Mapped reads: (\d+)", os.popen('bamtools stats -in' +
-                                                                                file[0] + '.mapped.sam').read())[0])
-    nbmapped = np.array(mapped.values())
-    nbmapped = nbmapped.astype(float) / np.sort(nbmapped)[0]
-    for i, val in enumerate(umappedreads.keys()):
+        mapped[file.split('.')[0]] = int(os.popen(pathtosam + ' view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 res/' +
+                                                  file + ' -@ ' + str(cores)).read().split('\n')[0])
+       # unique_mapped[file.split('.')[0]] = int(re.findall("Mapped reads: (\d+)", os.popen('bamtools stats -in res/' +
+        #                                             file + '.sorted.bam').read())[0])
+    nbmapped = np.array([i for i in mapped.values()])
+    nbmapped = np.sort(nbmapped)[0] / nbmapped.astype(float)
+    for i, val in enumerate(mapped.keys()):
         norm[val] = nbmapped[i]
-    return norm, mapped, unique_mapped
+    return norm, mapped,  # unique_mapped
 
 
 def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData', res_directory="diffPeaks"):
