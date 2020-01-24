@@ -3,7 +3,8 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-from .. import Helper as h
+sys.path.insert(0, '../../JKBio/')
+import Helper as h
 import re
 from pybedtools import BedTool
 import seaborn as sns

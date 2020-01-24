@@ -246,8 +246,6 @@ def addToSampleSet(workspace, samplesetid, samples):
 
   Args:
   ----
-
-
   """
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
@@ -587,7 +585,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil acl ch -ru " + user + ":R" + files)
+    code = os.system("gsutil -m acl ch -ru " + user + ":R" + files)
     if code == signal.SIGINT:
       print('Awakened')
       break
