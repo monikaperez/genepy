@@ -8,7 +8,8 @@ import dalmatian as dm
 import numpy as np
 import os
 import signal
-import Helper as h
+import re
+from . import Helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):

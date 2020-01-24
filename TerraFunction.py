@@ -9,8 +9,8 @@ import dalmatian as dm
 import numpy as np
 import os
 import signal
-import Helper as h
-import GCPFunction as gcp
+from . import Helper as h
+from . import GCPFunction as gcp
 
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
@@ -246,8 +246,6 @@ def addToSampleSet(workspace, samplesetid, samples):
 
   Args:
   ----
-
-
   """
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
@@ -587,7 +585,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil acl ch -ru " + user + ":R" + files)
+    code = os.system("gsutil -m acl ch -ru " + user + ":R" + files)
     if code == signal.SIGINT:
       print('Awakened')
       break

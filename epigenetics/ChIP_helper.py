@@ -3,7 +3,8 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-from .. import Helper as h
+sys.path.insert(0, '../../JKBio/')
+import Helper as h
 import re
 from pybedtools import BedTool
 import seaborn as sns
@@ -699,6 +700,7 @@ def getSpikeInControlScales(refgenome, FastQfolder, mapper='bwa', pairedEnd=Fals
         h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + FastQfolder + file[0] + ' ' + FastQfolder + file[1] + " -o res" for file in fastqs], cores)
         fastqs = [[file[0].split('.')[0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
     print("mapping\n\n")
+    print(fastqs)
     h.parrun([pathtobwa + ' mem ' + refgenome + ' res/' + file[0] + ' res/' +
               file[1] + ' > res/' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
     print("filtering\n\n")
