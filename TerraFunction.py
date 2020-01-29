@@ -9,8 +9,8 @@ import dalmatian as dm
 import numpy as np
 import os
 import signal
-from . import Helper as h
-from . import GCPFunction as gcp
+from JKBio import Helper as h
+from JKBio import GCPFunction as gcp
 
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
