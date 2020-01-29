@@ -504,7 +504,23 @@ def pdDo(df, op="mean", of="value1", over="value2"):
         ret[j] = np.max(data)
       elif of == "min":
         ret[j] = np.min(data)
-      index.append(k)
+      index.appesnd(k)
       j += 1
       data = [val[of]]
   return index, ret
+
+
+def parrun(cmds, cores):
+  count = 0
+  exe = ''
+  for i, cmd in enumerate(cmds):
+    count += 1
+    exe += cmd
+    if count < cores and i < len(cmds) - 1:
+      exe += ' & '
+    else:
+      count = 0
+      res = os.system(exe)
+      exe = ''
+      if res != 0:
+        raise Exception("Leave command pressed or command failed")

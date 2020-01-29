@@ -20,6 +20,22 @@ function update_my_playlists() {
   rm *.jpg
 }
 
+
+cpp-run() {
+    echo "Compiling file..."
+    g++ -o "$1" "$1.cpp"
+    echo "Compiled! Enter input :D"
+    ./"$1"
+}
+# cpp-run filename
+
+c-run() {
+    echo "Compiling file..."
+    gcc -o "$1" "$1.c"
+    echo "Compiled! Enter input :D"
+    ./"$1"
+}
+
 # convert all the set of images in the current folder
 # into a gif names $1
 function convert2gif() {
@@ -57,6 +73,10 @@ function retrieve_remote_file_size(){
 
   curl_close($ch);
   return $size;
+}
+
+function removeFirstLineOf(){
+  echo "$(tail -n +2 $file)" > $file
 }
 
 function create_dx_urls_from(){

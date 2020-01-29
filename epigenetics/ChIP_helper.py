@@ -1,8 +1,9 @@
 import os
 import pandas as pd
 import pysam
+import sys
 import numpy as np
-import Helper
+from JKBio import Helper as h
 import re
 from pybedtools import BedTool
 import seaborn as sns
@@ -80,7 +81,7 @@ def computeSingleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="p
         # it can take many TB so better delete
 
 
-def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
+def computePairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
                      ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     # run the paired end pipeline
@@ -100,15 +101,22 @@ def computePairedEnd(pairedend, folder="data/seqs/", numthreads=8, peaksFolder="
         # it can take many TB so better delete
 
 
-def bigWigFrom(bams, folder="data/seqs/", numthreads=8, genome='GRCh37'):
+def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, verbose=1):
     """
     run the bigwig command line for a set of bam files in a folder
     """
-    for i in bams:
-        in1 = folder + i
-        out1 = folder + "bigwig/" + i + split('.')[0] + '.bw'
-        os.system("bamCoverage --effectiveGenomeSize " + size[genome] + " -p " + str(numthreads) +
-                  " -b " + in1 + "-of bigwig -o " + out1)
+    for i, bam in enumerate(bams):
+        in1 = folder + bam
+        out1 = folder + "bigwig/" + bam.split('.')[0].split('/')[-1] + '.bw'
+        cmd = "bamCoverage --effectiveGenomeSize " + str(size[genome]) + " -p " + str(numthreads) +\
+            " -b " + in1 + " -o " + out1
+        if scaling is not None:
+            cmd += ' --scaleFactor ' + str(scaling[i])
+        if verbose == 0:
+            cmd += ' 2> ' + bam + '.error.log'
+        res = os.system(cmd)
+        if res != 0:
+            raise Exception("Leave command pressed or command failed")
 
 
 def mergeBams(rep):
@@ -173,7 +181,7 @@ def Pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks
         loaded.update({val: pysam.AlignmentFile(folder + val, 'rb', threads=numthreads)})
     for k, bam in loaded.items():
         for num, (i, val) in enumerate(peaks.iterrows()):
-            print(num / len(peaks), end='\r')
+            print(int(num / len(peaks)), end='\r')
             center = int((val['start'] + val['end']) / 2)
             for pileupcolumn in bam.pileup(val['chrom'], start=center - window,
                                            stop=center + window, truncate=True):
@@ -223,8 +231,8 @@ def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpe
     return None, fig
 
 
-def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=4000, numthreads=8,
-                   width=5, length=10, name='temp/peaksat.png'):
+def computePeaksAt(peaks, bigwigs, folder='', window=1000, numpeaks=4000, numthreads=8,
+                   width=5, length=10, name='temp/peaksat.png', scale=None, sort=False):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -232,21 +240,35 @@ def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=40
     append to an array
     return array, normalized
     """
-    center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
+    if 'relative_summit_pos' in peaks.columns:
+        center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
+    else:
+        center = [int((val['start'] + val['end']) / 2) for k, val in peaks.iterrows()]
     pd.set_option('mode.chained_assignment', None)
     peaks['start'] = [c - window for c in center]
     peaks['end'] = [c + window for c in center]
     fig, ax = plt.subplots(1, len(bigwigs), figsize=[width, length])
-    peaks = peaks.sort_values(by=["foldchange"], ascending=False)
+    if sort:
+        peaks = peaks.sort_values(by=["foldchange"], ascending=False)
     if numpeaks > len(peaks):
         numpeaks = len(peaks) - 1
+    cov = {}
+    maxs = []
     for num, bigwig in enumerate(bigwigs):
         bw = pyBigWig.open(folder + bigwig)
-        cov = np.zeros((numpeaks, window * 2), dtype=int)
+        co = np.zeros((numpeaks, window * 2), dtype=int)
+        scale = scale[bigwig] if scale is dict else 1
         for i, (k, val) in enumerate(peaks.iloc[:numpeaks].iterrows()):
-            cov[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
-        sns.heatmap(cov, ax=ax[num], yticklabels=[], cmap=cmaps[num],
-                    cbar=False)
+            try:
+                co[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
+            except RuntimeError as e:
+                print(str(val.chrom), val.start, val.end)
+                pass
+        cov[bigwig] = co
+        maxs.append(co.max())
+    for num, bigwig in enumerate(bigwigs):
+        sns.heatmap(cov[bigwig] * scale, ax=ax[num], vmax=max(maxs), yticklabels=[], cmap=cmaps[num],
+                    cbar=True)
         ax[num].set_title(bigwig.split('.')[0])
     fig.subplots_adjust(wspace=0.1)
     fig.show()
@@ -442,7 +464,7 @@ def mergeReplicatePeaks(peaks, reps, bigwigfolder, markedasbad=None, window=200,
             presence = []
             for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
                 presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-            Helper.venn(presence, merged_bed.columns)
+            h.venn(presence, merged_bed.columns)
         else:
             print('too many replicates for Venn')
         bigwigs = os.listdir(bigwigfolder)
@@ -651,3 +673,128 @@ def getPeaksOverlap(peaks, isMerged=False, correlationMatrix=None, countMatrix=N
 
 
 # def assignGene(peaks, bedFolder):
+
+
+def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
+                            pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
+                            totrim=True, tomap=True, tofilter=True):
+    """
+    Will do spike in control to allow for unormalizing sequence data 
+
+    Count based sequencing data is not absolute and will be normalized as each sample will be sequenced at a specific depth. To figure out what was the actual sample concentration, we use Spike In control
+
+    You should have FastQfolder/[NAME].fastq & BigWigFolder/[NAME].bw with NAME being the same for the same samples
+
+    If 
+
+    @
+
+    Args:
+    -----
+    refgenome: str the file path to the indexed reference genome
+    FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
+    BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
+    mapper: str flag to 'bwa', ...
+    pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
+
+    Returns:
+    --------
+    dict(file,float) the scaling factor dict
+
+    """
+    print("if paired_end, need to be name_*1, name_*2")
+    if len(fastQfolder) > 0:
+        print('using all files from folder')
+        fastqs = os.listdir(fastQfolder)
+        fastqs.sort()
+        if pairedEnd and (tomap or totrim):
+            fastqs = [i for i in h.grouped(fastqs, 2)]
+    elif fastq is None:
+        raise Error('you need input files')
+    else:
+        if type(fastq) is list:
+            fastQfolder = '/'.join(fastq[0].split('/')[:-1]) + '/'
+            fastqs = [[f.split('/')[-1] for f in fastq]]
+        else:
+            fastQfolder = '/'.join(fastq.split('/')[:-1]) + '/'
+            fastqs = [fastq.split('/')[-1]]
+    print(fastqs)
+    if not totrim:
+        print("you need to have your files in a 'res/' folder")
+    if totrim and tomap:
+        print("\n\ntrimming\n\n")
+        if pairedEnd:
+            h.parrun([pathtotrim_galore + ' --paired --fastqc --gzip ' + fastQfolder + file[0] + ' ' + fastQfolder + file[1] + " -o res" for file in fastqs], cores)
+            fastqs = [[file[0].split('.')[0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
+    if tomap:
+        print("\n\nmapping\n\n")
+        if pairedEnd:
+            h.parrun([pathtobwa + ' mem ' + refgenome + ' res/' + file[0] + ' res/' +
+                      file[1] + ' > res/' + file[0].split('.')[0] + '.mapped.sam' for file in fastqs], cores)
+            fastqs = [file[0].split('.')[0] + '.mapped.sam' for file in fastqs]
+    if tofilter:
+        print("\n\nfiltering\n\n")
+        h.parrun([pathtosam + ' sort res/' + file + ' -o res/' + file.split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+        h.parrun([pathtosam + ' index res/' + file.split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+        h.parrun([pathtosam + ' flagstat res/' + file.split('.')[0] + '.sorted.bam > res/' + file.split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
+        h.parrun([pathtosam + ' idxstats res/' + file.split('.')[0] + '.sorted.bam > res/' + file.split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
+        fastqs = [file.split('.')[0] + '.sorted.bam' for file in fastqs]
+    else:
+        print("files need to be named: NAME.sorted.bam")
+        fastqs = [file for file in fastqs if '.sorted.bam' == file[-11:]]
+    mapped = {}
+    norm = {}
+    unique_mapped = {}
+    print("\n\ncounting\n\n")
+    for file in fastqs:
+        mapped[file.split('.')[0]] = int(os.popen(pathtosam + ' view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 res/' +
+                                                  file + ' -@ ' + str(cores)).read().split('\n')[0])
+       # unique_mapped[file.split('.')[0]] = int(re.findall("Mapped reads: (\d+)", os.popen('bamtools stats -in res/' +
+        #                                             file + '.sorted.bam').read())[0])
+    nbmapped = np.array([i for i in mapped.values()])
+    nbmapped = np.sort(nbmapped)[0] / nbmapped.astype(float)
+    for i, val in enumerate(mapped.keys()):
+        norm[val] = nbmapped[i]
+    return norm, mapped,  # unique_mapped
+
+
+def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData', res_directory="diffPeaks"):
+    """
+    will use macs2 to call differential peak binding
+
+    Args:
+    -----
+    bam1
+    bam2()
+    control1
+    control2
+    scaling
+    """
+    print("doing diff from " + bam1 + " and " + bam2)
+    name1 = bam1.split('.')[0].split('/')[-1]
+    name2 = bam2.split('.')[0].split('/')[-1]
+    if control2 is None:
+        control2 = control1
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 + " --outdir " + directory
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2 + " --outdir " + directory
+    if scaling is None:
+        ret = os.popen(cmd1).read()
+        scaling1 = re.findall("tags after filtering in control: (\d+)", ret)[0]
+        ret = os.popen(cmd2).read()
+        scaling2 = re.findall("tags after filtering in control: (\d+)", ret)[0]
+    else:
+        res = os.system(cmd1)
+        scaling1 = scaling[0]
+        res += os.system(cmd2)
+        scaling2 = scaling[1]
+    if res != 0:
+        raise Exception("Leave command pressed or command failed")
+    diffPeak(name1, name2, res_directory, directory, scaling1, scaling2)
+
+
+def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2):
+    res = os.system("macs2 bdgdiff --t1 " + directory + "/" + name1 + "_treat_pileup.bdg --c1 " + directory + "/" + name1 + "_control_lambda.bdg\
+  --t2 " + directory + "/" + name2 + "_treat_pileup.bdg --c2 " + directory + "/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
+  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory)
+    if res != 0:
+        raise Exception("Leave command pressed or command failed")
