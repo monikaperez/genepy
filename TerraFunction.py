@@ -8,9 +8,11 @@ import pandas as pd
 import dalmatian as dm
 import numpy as np
 import os
+import re
 import signal
 import Helper as h
 import GCPFunction as gcp
+import ipdb
 
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):

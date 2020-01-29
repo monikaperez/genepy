@@ -8,6 +8,7 @@ import dalmatian as dm
 import numpy as np
 import os
 import signal
+import re  # for re.split
 import Helper as h
 
 
@@ -74,7 +75,6 @@ def lsFiles(files, add='', group=50):
     by = len(files) if len(files) < group else group
     res = []
     for sfiles in h.grouped(files, by):
-        print(len(sfiles))
         a = ''
         for val in sfiles:
             a += val + ' '
@@ -84,7 +84,6 @@ def lsFiles(files, add='', group=50):
             break
         else:
             res += data.read().split('\n')[:-1]
-            console.log(res)
             if "TOTAL:" in res[-1]:
                 res = res[:-1]
     return res
@@ -158,3 +157,24 @@ def get_all_sizes(folder, suffix='*'):
         # we didn't find any valid file paths
         print("We didn't find any valid file paths in folder: " + str(folder))
     return names
+
+
+def exists(val):
+    """
+    tells if a gcp path exists
+    """
+    return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
+
+
+def extractSize(val):
+    """
+    extract the size from the string returned by an ls -l|a command
+    """
+    return int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
+
+
+def extractPath(val):
+    """
+    extract the path from the string returned by an ls -l|a command
+    """
+    return 'gs://' + val.split('gs://')[1].split('#')[0]
