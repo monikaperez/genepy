@@ -47,6 +47,40 @@ def fileToDict(filename):
   return data
 
 
+def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
+  for val in l:
+    cmd = 'mv '
+    if add:
+      cmd += add + ' '
+    cmd += folder
+    if '*.' in pattern:
+      cmd += '*'
+    cmd += k
+    if '.*' in pattern:
+      cmd += '*'
+    res = os.system(cmd)
+    if res != 0:
+      raise Exception("Leave command pressed or command failed")
+
+
+def batchRename(dt, folder='', add=''):
+  files = os.popen('ls ' + folder).read().split('\n')
+  for k, val in dt.items():
+    for f in files:
+      if k in f:
+        cmd = 'mv '
+        if add:
+          cmd += add + ' '
+        cmd += folder
+        cmd += f
+        cmd += ' '
+        cmd += folder
+        cmd += f.replace(k, val)
+        res = os.system(cmd)
+        if res != 0:
+          raise Exception("Leave command pressed or command failed")
+
+
 def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
   # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
   tokeep = []
@@ -175,10 +209,19 @@ def bar():
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
             width=900, height=400, standoff=10, ylabel='', marks=[]):
   """
+  GENERAL DESCRIPT
+
+  de
+  dede
+  
   args:
   ----
-    df: df[Sample Start End Segment_Mean size]
+    df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] explain
     sampleorder: list[Sample] <- for all samples present in the df
+
+  Returns:
+  --------
+    a:
   """
   colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
   mapper = LinearColorMapper(palette=colors, low=df.Segment_Mean.min(), high=df.Segment_Mean.max())

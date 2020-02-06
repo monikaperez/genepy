@@ -158,7 +158,6 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
     bindings = bindings.sort_values(by=["chrom", "start", "end"], axis=0)
     bindings.start = bindings.start.astype('int')
     bindings.end = bindings.end.astype('int')
-    bindings.size = bindings.size.astype('int')
     bindings.relative_summit_pos = bindings.relative_summit_pos.astype('int')
     bindings.foldchange = bindings.foldchange.astype('float')
     bindings["-log10pvalue"] = bindings["-log10pvalue"].astype('float')
