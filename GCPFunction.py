@@ -9,7 +9,7 @@ import numpy as np
 import os
 import signal
 import re
-from . import Helper as h
+from JKBio import Helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -75,7 +75,6 @@ def lsFiles(files, add='', group=50):
     by = len(files) if len(files) < group else group
     res = []
     for sfiles in h.grouped(files, by):
-        print(len(sfiles))
         a = ''
         for val in sfiles:
             a += val + ' '
@@ -85,7 +84,6 @@ def lsFiles(files, add='', group=50):
             break
         else:
             res += data.read().split('\n')[:-1]
-            console.log(res)
             if "TOTAL:" in res[-1]:
                 res = res[:-1]
     return res
@@ -130,6 +128,28 @@ def rmFiles(files):
             break
 
 
+def patternRN(rename_dict, location, wildcards=['**', '.*', '*.'], types=[], test=False, cores=1):
+    """
+    """
+    r = 0
+    for k, v in rename_dict.items():
+        loc = location
+        if '**' in wildcards:
+            loc += '**/'
+        if '*.' in wildcards:
+            loc += '*'
+        loc += k
+        if '.*' in wildcards:
+            loc += '*'
+        res = os.popen('gsutil -m ls ' + loc).read().split('\n')[:-1]
+        print('found ' + str(len(res)) + ' files to rename')
+        if test:
+            for val in res:
+                print("gsutil mv " + val + " " + val.replace(k, v))
+        else:
+            h.parrun(["gsutil mv " + val + " " + val.replace(k, v) for val in res], cores=cores)
+
+
 def get_all_sizes(folder, suffix='*'):
     """
 
@@ -159,3 +179,24 @@ def get_all_sizes(folder, suffix='*'):
         # we didn't find any valid file paths
         print("We didn't find any valid file paths in folder: " + str(folder))
     return names
+
+
+def exists(val):
+    """
+    tells if a gcp path exists
+    """
+    return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
+
+
+def extractSize(val):
+    """
+    extract the size from the string returned by an ls -l|a command
+    """
+    return int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
+
+
+def extractPath(val):
+    """
+    extract the path from the string returned by an ls -l|a command
+    """
+    return 'gs://' + val.split('gs://')[1].split('#')[0]
