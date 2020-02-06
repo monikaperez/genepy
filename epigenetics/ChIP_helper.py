@@ -3,8 +3,7 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-sys.path.insert(0, '../../JKBio/')
-import Helper as h
+from JKBio import Helper as h
 import re
 from pybedtools import BedTool
 import seaborn as sns
@@ -182,7 +181,7 @@ def Pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks
         loaded.update({val: pysam.AlignmentFile(folder + val, 'rb', threads=numthreads)})
     for k, bam in loaded.items():
         for num, (i, val) in enumerate(peaks.iterrows()):
-            print(num / len(peaks), end='\r')
+            print(int(num / len(peaks)), end='\r')
             center = int((val['start'] + val['end']) / 2)
             for pileupcolumn in bam.pileup(val['chrom'], start=center - window,
                                            stop=center + window, truncate=True):
@@ -232,8 +231,8 @@ def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpe
     return None, fig
 
 
-def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=4000, numthreads=8,
-                   width=5, length=10, name='temp/peaksat.png', scale=None):
+def computePeaksAt(peaks, bigwigs, folder='', window=1000, numpeaks=4000, numthreads=8,
+                   width=5, length=10, name='temp/peaksat.png', scale=None, sort=False):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -241,22 +240,35 @@ def computePeaksAt(peaks, bigwigs, folder='data/seqs/', window=1000, numpeaks=40
     append to an array
     return array, normalized
     """
-    center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
+    if 'relative_summit_pos' in peaks.columns:
+        center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
+    else:
+        center = [int((val['start'] + val['end']) / 2) for k, val in peaks.iterrows()]
     pd.set_option('mode.chained_assignment', None)
     peaks['start'] = [c - window for c in center]
     peaks['end'] = [c + window for c in center]
     fig, ax = plt.subplots(1, len(bigwigs), figsize=[width, length])
-    peaks = peaks.sortValues(by=["foldchange"], ascending=False)
+    if sort:
+        peaks = peaks.sort_values(by=["foldchange"], ascending=False)
     if numpeaks > len(peaks):
         numpeaks = len(peaks) - 1
+    cov = {}
+    maxs = []
     for num, bigwig in enumerate(bigwigs):
         bw = pyBigWig.open(folder + bigwig)
-        cov = np.zeros((numpeaks, window * 2), dtype=int)
-        scale = scale[bigwig] if scale is dict else scale
+        co = np.zeros((numpeaks, window * 2), dtype=int)
+        scale = scale[bigwig] if scale is dict else 1
         for i, (k, val) in enumerate(peaks.iloc[:numpeaks].iterrows()):
-            cov[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
-        sns.heatmap(cov * scale, ax=ax[num], yticklabels=[], cmap=cmaps[num],
-                    cbar=False)
+            try:
+                co[i] = np.nan_to_num(bw.values(str(val.chrom), val.start, val.end), 0)
+            except RuntimeError as e:
+                print(str(val.chrom), val.start, val.end)
+                pass
+        cov[bigwig] = co
+        maxs.append(co.max())
+    for num, bigwig in enumerate(bigwigs):
+        sns.heatmap(cov[bigwig] * scale, ax=ax[num], vmax=max(maxs), yticklabels=[], cmap=cmaps[num],
+                    cbar=True)
         ax[num].set_title(bigwig.split('.')[0])
     fig.subplots_adjust(wspace=0.1)
     fig.show()
