@@ -9,7 +9,7 @@ import numpy as np
 import os
 import signal
 import re
-from . import Helper as h
+from JKBio import Helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -85,7 +85,6 @@ def lsFiles(files, add='', group=50):
             break
         else:
             res += data.read().split('\n')[:-1]
-            console.log(res)
             if "TOTAL:" in res[-1]:
                 res = res[:-1]
     return res
@@ -128,6 +127,28 @@ def rmFiles(files):
         if code != 0:
             print('pressed ctrl+c or command failed')
             break
+
+
+def patternRN(rename_dict, location, wildcards=['**', '.*', '*.'], types=[], test=False, cores=1):
+    """
+    """
+    r = 0
+    for k, v in rename_dict.items():
+        loc = location
+        if '**' in wildcards:
+            loc += '**/'
+        if '*.' in wildcards:
+            loc += '*'
+        loc += k
+        if '.*' in wildcards:
+            loc += '*'
+        res = os.popen('gsutil -m ls ' + loc).read().split('\n')[:-1]
+        print('found ' + str(len(res)) + ' files to rename')
+        if test:
+            for val in res:
+                print("gsutil mv " + val + " " + val.replace(k, v))
+        else:
+            h.parrun(["gsutil mv " + val + " " + val.replace(k, v) for val in res], cores=cores)
 
 
 def get_all_sizes(folder, suffix='*'):
