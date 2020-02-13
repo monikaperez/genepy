@@ -303,7 +303,6 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
       source.data = data
       console.log(source)
       console.log(cb_obj)
-      source.select.emit(a)
       source.change.emit()
       console.log(source)
       """))

@@ -128,26 +128,45 @@ def rmFiles(files):
             break
 
 
-def patternRN(rename_dict, location, wildcards=['**', '.*', '*.'], types=[], test=False, cores=1):
+def recoverFiles(files):
     """
+    move a set of files in parallel (when the set is huge)
+
+    Args:
+    ----
+            files: gs paths
+            location: to move the files to
+    """
+    cmd = ['gsutil mv ' + f + ' ' + f.split('#')[0] for f in files]
+    h.parrun(cmd, cores=cores)
+
+
+def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
+    """
+
+    Args:
+        wildcards: list[str] can be one of  ['**', '.*', '*.','-.*']
     """
     r = 0
     for k, v in rename_dict.items():
         loc = location
         if '**' in wildcards:
             loc += '**/'
-        if '*.' in wildcards:
+        if '*.' in wildcards or '-.*' in wildcards:
             loc += '*'
         loc += k
-        if '.*' in wildcards:
+        if '.*' in wildcards or '-.*' in wildcards:
             loc += '*'
         res = os.popen('gsutil -m ls ' + loc).read().split('\n')[:-1]
         print('found ' + str(len(res)) + ' files to rename')
-        if test:
-            for val in res:
-                print("gsutil mv " + val + " " + val.replace(k, v))
+        if '-.*' in wildcards:
+            cmd = ["gsutil mv " + val + " " + '/'.join(val.split('/')[:-1]) + '/' + v + '.' + '.'.join(val.split('/')[-1].split('.')[1:]) for val in res]
         else:
-            h.parrun(["gsutil mv " + val + " " + val.replace(k, v) for val in res], cores=cores)
+            cmd = ["gsutil mv " + val + " " + val.replace(k, v) for val in res]
+        if test:
+            print(cmd)
+        else:
+            h.parrun(cmd, cores=cores)
 
 
 def get_all_sizes(folder, suffix='*'):
