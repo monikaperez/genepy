@@ -10,8 +10,8 @@ import numpy as np
 import os
 import re
 import signal
-import Helper as h
-import GCPFunction as gcp
+from JKBio import Helper as h
+from JKBio import GCPFunction as gcp
 import ipdb
 
 
