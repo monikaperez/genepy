@@ -131,6 +131,11 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
 # do deseq data on different comparison
 # do volcano plot
 def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, **kargs):
+  """
+  Args:
+  -----
+  data:
+  """
   TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
 
   col = viridis(len(set(colors))) if colors is not None else ['#29788E']  # (viridis1)
@@ -158,6 +163,7 @@ def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, 
            fill_alpha='fill_alpha',
            line_width=0,
            radius='radius', source=source)
+  show(p)
   return(p)
 
 
@@ -213,7 +219,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
   de
   dede
-  
+
   args:
   ----
     df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] explain

@@ -165,7 +165,7 @@ def loadNarrowPeaks(peakfolder="data/peaks/", isMacs=True, CTFlist=[], skiprows=
     return bindings
 
 
-def Pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
+def pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
 
     # get pysam data
     # ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -193,7 +193,7 @@ def Pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks
     return res, fig
 
 
-def Bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
+def bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -757,7 +757,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
     return norm, mapped,  # unique_mapped
 
 
-def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData', res_directory="diffPeaks"):
+def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData/', res_directory="diffPeaks/"):
     """
     will use macs2 to call differential peak binding
 
@@ -792,8 +792,8 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
 
 
 def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2):
-    res = os.system("macs2 bdgdiff --t1 " + directory + "/" + name1 + "_treat_pileup.bdg --c1 " + directory + "/" + name1 + "_control_lambda.bdg\
-  --t2 " + directory + "/" + name2 + "_treat_pileup.bdg --c2 " + directory + "/" + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
+    res = os.system("macs2 bdgdiff --t1 " + directory + name1 + "_treat_pileup.bdg --c1 " + directory + name1 + "_control_lambda.bdg\
+  --t2 " + directory + name2 + "_treat_pileup.bdg --c2 " + directory + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
   " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory)
     if res != 0:
         raise Exception("Leave command pressed or command failed")
