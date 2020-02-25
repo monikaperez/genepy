@@ -770,8 +770,8 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
     scaling
     """
     print("doing diff from " + bam1 + " and " + bam2)
-    name1 = bam1.split('.')[0].split('/')[-1]
-    name2 = bam2.split('.')[0].split('/')[-1]
+    name1 = bam1.split('/')[-1].split('.')[0]
+    name2 = bam2.split('/')[-1].split('.')[0]
     if control2 is None:
         control2 = control1
     cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 + " --outdir " + directory
