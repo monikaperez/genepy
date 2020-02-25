@@ -274,11 +274,11 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
 def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
-            searchbox=False):
+            searchbox=False, minlogfold=0.15, minpval=0.1):
   """A function to plot the bokeh single mutant comparisons."""
   # Make the hover tool
   # data should be df gene*samples + genenames
-  to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [])
+  to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [], minlogfold, minpval)
   hover = bokeh.models.HoverTool(tooltips=tooltips,
                                  names=['circles'])
 
@@ -321,6 +321,7 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   # the key from the pandas groupby funciton.
   df = df1.copy()
   transformed_q = -df[y].apply(np.log10).values
+  print(transformed_q.min(), df[y].max())
   transformed_q[transformed_q == np.inf] = maxvalue
   df['transformed_q'] = transformed_q
   df['color'] = color
@@ -345,9 +346,9 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   return p, source1
 
 
-def selector(df, valtoextract):
+def selector(df, valtoextract, minlogfold=0.15, minpval=0.1):
   """A function to separate tfs from everything else"""
-  sig = (df.pvalue < 0.1) & (abs(df.log2FoldChange) > 0.15)
+  sig = (df.pvalue < minpval) & (abs(df.log2FoldChange) > minlogfold)
   not_tf = (~df.gene_id.isin(valtoextract))
   is_tf = (df.gene_id.isin(valtoextract))
   to_plot_not = df[sig & not_tf]
