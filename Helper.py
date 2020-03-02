@@ -14,6 +14,8 @@ from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
 from bokeh.models import HoverTool
+from bokeh.models import BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
+from math import pi
 
 import matplotlib
 matplotlib.use('Agg')
@@ -172,7 +174,7 @@ def bar():
 
 
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
-            width=900, height=400, standoff=10, ylabel='', marks=[]):
+            width=900, height=400, standoff=10, y_label='', marks=[]):
   """
   args:
   ----
@@ -180,6 +182,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     sampleorder: list[Sample] <- for all samples present in the df
   """
   colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+  colors = RdBu[8]
   mapper = LinearColorMapper(palette=colors, low=df.Segment_Mean.min(), high=df.Segment_Mean.max())
   if len(sample_order) == 0:
     sample_order = list(set(df.Sample.tolist()))
