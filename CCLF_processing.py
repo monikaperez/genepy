@@ -11,6 +11,7 @@ def getCNHeatMap(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",
                  output_filename = 'copy_number_heatmap.png',
                  list_sample_ids = None,
                  samplesetname = None,
+
                  outputloc= None
                  ):
   #####
@@ -37,7 +38,7 @@ def getCNHeatMap(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org",
 
 
 
-def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF_Targeted instead of CCLF_TSCA_2_0_3_HCMI or 2_0_2
+def getReport(workspace1="CCLF_TSCA_2_0_3_HCMI", namespace1="nci-mimoun-bi-org", # CCLF_Targeted instead of CCLF_TSCA_2_0_3_HCMI or 2_0_2
               pathto_cnvpng='segmented_copy_ratio_img',
               pathto_stats='sample_statistics',
               pathto_snv='filtered_variants',
@@ -48,7 +49,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
               pathto_snv_wes='mafLite',
               pathto_seg_wes='tumor_seg',
               is_from_pairs=True,
-              datadir='gs://cclf_results/targeted/kim_sept/',
+              datadir='gs://cclf_results/targeted/',
               tempdir='temp/cclfmerge/',
               specificlist=None,
               specificlist_disease=None
@@ -96,9 +97,9 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
     ###################
     # get data from targeted probes (old version is TSCA, new version is TWIST)
     ###################
+    ext_ids = [] # will collect all the external_ids from the targeted data
     if val in sample_part:
       print('Getting targeted probe data (TWIST/TSCA) for %s...' % str(val))
-      ext_ids = [] # will collect all the external_ids from the targeted data
       sample_subset = sample[sample.participant == val]
       sample_ids = [] # will collect all the sample_ids from the targeted data; sample set to make CN heat map for
       for k, condition in sample_subset.iterrows():
@@ -122,7 +123,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
           images.append(tempdir + external_id + '_copy_number_map.png')
           os.system('gsutil cp ' + imagedir + ' ' + outputloc + external_id + '_copy_number_map.png')
 
-          os.system('gsutil cp ' + condition[pathto_stats] + ' ' + outputloc + external_id + '_sample_statistics.txt')
+          os.system('gsutil cp ' + condition[pathto_stats] + ' ' + outputloc + 'sample_statistics/' + external_id + '_sample_statistics.txt')
           if is_from_pairs:
             pair_subset = pair[pair["case_sample"] == k]
             snvs = pair_subset[pathto_snv]
@@ -177,22 +178,23 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
               os.system('gsutil cp ' + imagedir + ' ' + outputloc + normal_id + '_copy_number_map.png')
             break
 
-      # we now have all the external_ids plus matched normal from the targeted data for this participant
-      # create a merged CN heat map
-      getCNHeatMap(workspace1, namespace1, mergeCNworkflow = 'PlotSomaticCNVMaps_PANCAN',
-                  list_sample_ids = sample_ids, # actually, want the sample IDs not the ext_ids for now... the workflow will grab the associated ext_ids
-                  output_filename = 'copy_number_heatmap.png',
-                  samplesetname = 'report_'+val,
-                  outputloc = outputloc
-                  ) # check whether I can use this as the samplesetname
+      # TODO: uncomment when have a way to create the correct name of the tumor_tn files; it is no longer the sample_id column, but instead
+      # # we now have all the external_ids plus matched normal from the targeted data for this participant
+      # # create a merged CN heat map
+      # getCNHeatMap(workspace1, namespace1, mergeCNworkflow = 'PlotSomaticCNVMaps_PANCAN',
+      #             list_sample_ids = sample_ids, # actually, want the sample IDs not the ext_ids for now... the workflow will grab the associated ext_ids
+      #             output_filename = 'copy_number_heatmap.png',
+      #             samplesetname = 'report_'+val,
+      #             outputloc = outputloc
+      #             ) # check whether I can use this as the samplesetname
 
     ###################
     # get data from CCLF_WES
     ###################
+    wes_ext_ids = [] # will collect all the external_ids from the WES data
+    wes_sample_ids = [] # will collect all the sample_ids from the WES data
     if val in samplewes_part:
       print('Getting WES data for %s...' % str(val))
-      wes_ext_ids = [] # will collect all the external_ids from the WES data
-      wes_sample_ids = [] # will collect all the sample_ids from the WES data
       sample_subset_wes = sample_wes[sample_wes.participant == val]
       samples_for_CN_heat_WES = []  # sample set to make CN heat map for; want list of sample_id
       for k, wes in sample_subset_wes.iterrows():
@@ -211,6 +213,8 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
               primary = pri_disease_info.iloc[0].replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
             else:
               primary = pri_disease_info.replace(' ', '_') if 'primary_disease' in specificlist_disease_df else 'unknown'
+          else:
+            primary = 'unknown'
           # if primary_disease info is added to CCLF_WES sometime, then just use the following:
           # primary = wes['primary_disease'].replace(' ', '_') if 'primary_disease' in wes else 'unknown'
 
@@ -283,7 +287,7 @@ def getReport(workspace1="CCLF_Targeted", namespace1="nci-mimoun-bi-org", # CCLF
 
             # annotate matched normal CN image
             imagedir = tempdir + normal_id + '_wes_copy_number_map.png'
-            normal_external_id = normal_sample["external_id_validation"][normal_id]
+            normal_external_id = normal_sample["external_id_capture"][normal_id]
             wes_ext_ids += [normal_external_id]
             if os.path.exists(imagedir):
               text = normal_external_id.replace("_", " ") + " (WES, matched normal)"
