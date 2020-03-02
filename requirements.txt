@@ -16,5 +16,4 @@ google-cloud-storage==1.15.0
 firecloud-dalmatian==0.0.10
 bokeh==1.2.0
 umap-learn==0.3.9
-taigapy==2.10.1
 igv==0.9.6

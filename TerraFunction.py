@@ -5,27 +5,50 @@
 
 import time
 import pandas as pd
-from google.cloud import storage
 import dalmatian as dm
 import numpy as np
 import os
+import re
 import signal
-import Helper as h
+from JKBio import Helper as h
+from JKBio import GCPFunction as gcp
+import ipdb
 
 
-def createManySubmissions(wm, workflow, references, entity=None, expression=None, use_callcache=True):
+def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
   """
   wrapper to create many submissions for a workflow
 
-  references = list of samplesetnames, or samplenames, etc.
+  Args:
+  ----
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    references: list(str) a list of name of the row in this entity
+    entity: str terra csv type (sample_id...)
+    expresson: str to use if want to compute on the direct value of the entity or on values of values
+                e.g. this.samples
+    use_callcache: Bool to false if want to recompute everything even if same input
   """
+  wm = dm.WorkspaceManager(workspace)
   submission_ids = []
-  for i in range(len(references)):
-    submission_ids += [wm.create_submission(workflow, references[i], entity, expression, use_callcache)]
+  for ref in references:
+    submission_ids += [wm.create_submission(workflow, ref, entity, expression, use_callcache)]
   return submission_ids
 
 
 def waitForSubmission(workspace, submissions, raise_errors=True):
+  """
+  wrapper to create many submissions for a workflow
+
+  Args:
+  -----
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    submissions: list[str] of submission ids
+    raise_errors: to true if errors should stop your code
+  """
   failed_submission = []
   timing = 0
   wm = dm.WorkspaceManager(workspace)
@@ -63,26 +86,35 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, fformat="fastq12", newsamples=None, samplesetname=None):
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
+                     fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
-  it also creates a sample set.
+  A very practical function when you have uploaded a folder of samples (RNA/WES/...) in google storage
+  with some naming convention, and want to have them all well listed in Terra for futher processing
+  it can create a sample set.
+  for a set of files: gs://bucket/path/to/files
 
-  gcpfolder
-  prefix: the folder path
-  wm: the workspace terra
-  sep: the separator (only takes the first part of the name before the sep character)
-  updating: if needs
-  fformat bambai, fastq12, fastqR1R2
-  newsamples
-  samplesetname
+
+  Args:
+  -----
+    gcpfolder: a gs folder path
+    prefix: str the folder path
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    sep: str the separator (only takes the first part of the name before the sep character)
+    fformat bambai, fastq12, fastqR1R2 given the set of files in the folder (they need to be in this naming format)
+            e.g. name.bam name.bai / name1.fastq name2.fastq / name_R1.fastq name_R2.fastq
+    newsamples: DONT USE
+    samplesetname: str all uploaded samples should be part of a sampleset with name..
   """
   wm = dm.WorkspaceManager(workspace)
   print('please be sure you gave access to your terra email account access to this bucket')
   if samplesetname is None:
     samplesetname = 'from:' + gcpfolder + prefix
-  files = list_blobs_with_prefix(gcpfolder, prefix, '/')
+  files = gcp.list_blobs_with_prefix(gcpfolder, prefix, '/')
   if fformat == "bambai":
     if newsamples is None:
       data = {'sample_id': [], 'bam': [], 'bai': []}
@@ -143,9 +175,10 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, ffor
   if fformat in {"fastq12", "fastqR1R2"}:
     data = {'sample_id': [], 'fastq1': [], 'fastq2': []}
     # print and return well formated data
+    print(files)
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
-        name = file.split('/')[-1].split('.')[0].split(sep)[0][:-2]
+        name = file.split('/')[-1].split('.')[0].split(sep)[0]
         if name in data['sample_id']:
           pos = data['sample_id'].index(name)
           if fformat == "fastqR1R2":
@@ -159,7 +192,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, ffor
             if file.split('.')[-3][-1] == '1':
               data['fastq1'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file.split('.')[-3][-1] == '2':
-              data['falsstq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data['fastq2'].insert(pos, 'gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq 1/2 error", file)
         else:
@@ -181,8 +214,10 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, ffor
       else:
         print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
+    print(df)
+    df["Source"] = source
+    df["participant"] = data['sample_id']
     df = df.set_index("sample_id")
-    df["participant"] = pd.Series(data['sample_id'], index=data['sample_id'])
     wm.upload_samples(df)
     wm.update_sample_set(samplesetname, df.index.values.tolist())
 
@@ -191,7 +226,14 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
   """
   update the previous All Sample sample_set with the new samples that have been added.
 
-  It is especially useful for the aggregate task
+  It is especially useful for the aggregate task. Can more generally merge two samplesets together
+
+  Args:
+  ----
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    newsample_setname: str name of sampleset to add to All_samples
   """
   prevsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[Allsample_setname]['samples'])
   newsamples = list(dm.WorkspaceManager(workspace).get_sample_sets().loc[newsample_setname]['samples'])
@@ -200,7 +242,13 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 
 def addToSampleSet(workspace, samplesetid, samples):
-  # will create new if doesn't already exist, else adds to existing
+  """
+
+  will create new if doesn't already exist, else adds to existing
+
+  Args:
+  ----
+  """
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
     samples.extend(prevsamples)
@@ -210,7 +258,10 @@ def addToSampleSet(workspace, samplesetid, samples):
 
 
 def addToPairSet(workspace, pairsetid, pairs):
-  # will create new if doesn't already exist, else adds to existing
+  """
+  Similar to above but for a pairset
+  """
+
   try:
     prevpairs = dm.WorkspaceManager(workspace).get_pair_sets().loc[[pairsetid]].pairs[0]
     pairs.extend(prevpairs)
@@ -232,37 +283,6 @@ def addToPairSet(workspace, pairsetid, pairs):
 #   wm.update_pair_set(pairsetid, list(set(pairs)))
 
 
-def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
-  """Lists all the blobs in the bucket that begin with the prefix.
-
-  This can be used to list all blobs in a "folder", e.g. "public/".
-
-  The delimiter argument can be used to restrict the results to only the
-  "files" in the given "folder". Without the delimiter, the entire tree under
-  the prefix is returned. For example, given these blobs:
-
-      /a/1.txt
-      /a/b/2.txt
-
-  If you just specify prefix = '/a', you'll get back:
-
-      /a/1.txt
-      /a/b/2.txt
-
-  However, if you specify prefix='/a' and delimiter='/', you'll get back:
-
-      /a/1.txt
-
-  """
-  storage_client = storage.Client()
-  bucket = storage_client.get_bucket(bucket_name)
-  ret = []
-  blobs = bucket.list_blobs(prefix=prefix, delimiter=delimiter)
-  for blob in blobs:
-    ret.append(blob.name)
-  return(ret)
-
-
 def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
                     pathto_stats='sample_statistics',
                     specific_cohorts=[],
@@ -272,6 +292,9 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
                     pathto_seg='cnv_calls',
                     datadir='gs://cclf_results/targeted/kim_sept/',
                     specific_samples=[]):
+  """
+
+  """
   if specific_cohorts:
     samples = dm.WorkspaceManager(workspace).get_samples()
     samples = samples[samples.index.isin(specificlist)]
@@ -292,16 +315,11 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
 
 
-# ["gs://fc-35446f22-ea37-483a-bd6c-5e9fc56851ff/",
-#  "gs://fc-c23078b3-05b3-4158-ba8f-2b1eeb1bfa16/",
-#  "gs://fc-51050008-201e-4a40-8ec7-28b6fb2b1885/"]
-# "gs://fc-secure-98816a9e-5207-4361-8bf0-f9e046966e62/"
-#
-#
-
-
 def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run = False):
+                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run=False):
+  """
+
+  """
   flaglist = []
   data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
@@ -409,6 +427,10 @@ def changeGSlocation(workspacefrom, workspaceto=None, prevgslist=[], newgs='', i
 
 
 def renametsvs(workspace, wmto=None, index_func=None):
+  """
+  ################## WIP ############
+  only works for one use case
+  """
   data = {}
   wmfrom = dm.WorkspaceManager(workspace)
   try:
@@ -483,10 +505,22 @@ def renametsvs(workspace, wmto=None, index_func=None):
         wmto.update_sample_set(i, val.samples)
 
 
-def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam", baicol="WES_bai"):
+def findBackErasedDuplicaBamteFromTerraBucket(workspace, gsfolder, bamcol="WES_bam", baicol="WES_bai"):
+  """
+  If you have erased bam files in gcp with bai files still present and the bam files are stored elsewhere
+  and their location is in a terra workspace.
 
-    # get ls of all files folder
-  samples = os.popen('gsutil -m ls -al ' + folder + '**.bai').read().split('\n')
+  Will find them back by matching bai sizes and copy them back to their original locations
+
+  Args:
+  ----
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    gsfolder: str the gsfolder where the bam files are
+  """
+  # get ls of all files folder
+  samples = os.popen('gsutil -m ls -al ' + gsfolder + '**.bai').read().split('\n')
   # compute size filepath
 
   sizes = {'gs://' + val.split('gs://')[1].split('#')[0]: int(val.split("2019-")[0]) for val in samples[:-2]}
@@ -512,7 +546,7 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
         for va in names[sizes[val[baicol]]]:
           # for all duplicate size
           # if ls bam of bai duplicate size work
-          # mv bam to bampath in folder
+          # mv bam to bampath in gsfolder
           if '.bam' in va:
             if os.system('gsutil ls ' + va.split('.bam.bai')[0] + ".bam") == 0:
               print('gsutil mv ' + va.split('.bam.bai')[0] + ".bam " + val[bamcol])
@@ -531,8 +565,19 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, folder, bamcol="WES_bam
 
 def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
   """
+  will share some files from gcp with a set of users using terra as metadata repo.
+
   only works with files that are listed on a terra workspace tsv but actually
   point to a regular google bucket and not a terra bucket.
+
+  Args:
+  ----
+    users: list[str] of users' google accounts
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    samples list[str] of samples_id for which you want to share data
+    bamcols: list[str] list of column names
   """
   if type(users) is str:
     users = [users]
@@ -542,7 +587,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil acl ch -ru " + user + ":R" + files)
+    code = os.system("gsutil -m acl ch -ru " + user + ":R" + files)
     if code == signal.SIGINT:
       print('Awakened')
       break
@@ -555,47 +600,23 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
 
 
 def saveConfigs(workspace, filepath):
+  """
+  will save everything about a workspace into a csv and json file
+
+  Args:
+  -----
+    workspace: str namespace/workspace from url typically
+      namespace (str): project to which workspace belongs
+      workspace (str): Workspace name
+    filepath to save files
+  """
   wm = dm.WorkspaceManager(workspace)
   h.createFoldersFor(filepath)
+
   conf = wm.get_configs()
   conf.to_csv(filepath + '.csv')
   params = {}
+  params['GENERAL'] = wm.get_workspace_metadata()
   for k, val in conf.iterrows():
-    params[k] = wm.get_config(val.name)
+    params[k] = wm.get_config(val['name'])
   h.dictToFile(params, filepath + '.json')
-
-
-def mvFiles(files, location):
-  by = len(files) if len(files) < 50 else 50
-  for sfiles in grouped(files, by):
-    a = ''
-    for val in sfiles:
-      a += val + ' '
-    code = os.system("gsutil -m mv " + a + location)
-    if code == signal.SIGINT:
-      print('Awakened')
-      break
-
-
-def cpFiles(files, location):
-  by = len(files) if len(files) < 50 else 50
-  for sfiles in grouped(files, by):
-    a = ''
-    for val in sfiles:
-      a += val + ' '
-    code = os.system("gsutil -m cp " + a + location)
-    if code == signal.SIGINT:
-      print('Awakened')
-      break
-
-
-def rmFiles(files):
-  by = len(files) if len(files) < 50 else 50
-  for sfiles in h.grouped(files, by):
-    a = ''
-    for val in sfiles:
-      a += val + ' '
-    code = os.system("gsutil -m rm " + a)
-    if code == signal.SIGINT:
-      print('Awakened')
-      break

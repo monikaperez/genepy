@@ -35,12 +35,12 @@ make.mapping <- function(full.map, input.type, output.type, id.subset, check.uni
 read.mapping <- (function() {
     # save value from previous read to avoid fetching from url every time
     cell.line.mapping.cache <- NULL
-    mapping.url <- getOption("celllinemapr.url", "~/.celllinemapr/data/naming.csv")
-    cache.path <- getOption("celllinemapr.cache.path", "~/.celllinemapr.Rds")
+    mapping.url <- getOption("celllinemapr.url", "../naming.csv")
+    cache.path <- getOption("celllinemapr.cache.path", "../.celllinemapr.Rds")
 
     function(force=F) {
       if(is.null(cell.line.mapping.cache) || force) {
-            mapping <- try(read.csv("~/.celllinemapr/data/naming.csv"))
+            mapping <- try(read.csv("../naming.csv"))
             if(class(mapping) == "try-error") {
                 # if we got an error, then warn user that this failed and try loading from cache file.
                 warning(paste0("Could not fetch mapping from ", mapping.url, ", attempting to read most recent cached mapping from ", cache.path))
