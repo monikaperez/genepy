@@ -65,7 +65,7 @@ def mvFiles(files, location):
 
 def lsFiles(files, add='', group=50):
     """
-    move a set of files in parallel (when the set is huge)
+    list a set of files in parallel (when the set is huge)
 
     Args:
     ----
@@ -211,7 +211,7 @@ def extractSize(val):
     """
     extract the size from the string returned by an ls -l|a command
     """
-    return int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
+    return val.split('gs://')[1].split('#')[0], int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
 
 
 def extractPath(val):

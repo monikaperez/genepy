@@ -128,9 +128,8 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   return(renamed, not_parsed)
 
 
-# do deseq data on different comparison
-# do volcano plot
-def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, **kargs):
+def scatter(data, labels=None, xname='x', yname='x', title='scatter plot', showlabels=False,
+            colors=None, importance=None, radi=5, alpha=0.8, **kargs):
   """
   Args:
   -----
@@ -158,58 +157,20 @@ def scatter(data, labels=None, colors=None, importance=None, radi=5, alpha=0.8, 
       ("name", "@labels"),
       ("(x,y)", "(@x, @y)"),
   ]
-  p = figure(tools=TOOLS, tooltips=TOOLTIPS)
+  p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title)
   p.circle('x', 'y', color='fill_color',
            fill_alpha='fill_alpha',
            line_width=0,
            radius='radius', source=source)
+  p.xaxis[0].axis_label = xname
+  p.yaxis[0].axis_label = yname
+  if showlabels:
+    labels = LabelSet(text='labels', level='glyph',
+                      x_offset=5, y_offset=5, source=source, render_mode='canvas')
+    p.add_layout(labels)
+
   show(p)
   return(p)
-
-
-def bar():
-  data['Year'] = data['Year'].astype(str)
-  data = data.set_index('Year')
-  data.drop('Annual', axis=1, inplace=True)
-  data.columns.name = 'Month'
-
-  years = list(data.index)
-  months = list(data.columns)
-
-  # reshape to 1D array or rates with a month and year for each row.
-  df = pd.DataFrame(data.stack(), columns=['rate']).reset_index()
-
-  # this is the colormap from the original NYTimes plot
-  colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-  mapper = LinearColorMapper(palette=colors, low=df.rate.min(), high=df.rate.max())
-
-  TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
-
-  p = figure(title="US Unemployment ({0} - {1})".format(years[0], years[-1]),
-             x_range=years, y_range=list(reversed(months)),
-             x_axis_location="above", plot_width=900, plot_height=400,
-             tools=TOOLS, toolbar_location='below',
-             tooltips=[('date', '@Month @Year'), ('rate', '@rate%')])
-
-  p.grid.grid_line_color = None
-  p.axis.axis_line_color = None
-  p.axis.major_tick_line_color = None
-  p.axis.major_label_text_font_size = "5pt"
-  p.axis.major_label_standoff = 0
-  p.xaxis.major_label_orientation = pi / 3
-
-  p.rect(x="Year", y="Month", width=1, height=1,
-         source=df,
-         fill_color={'field': 'rate', 'transform': mapper},
-         line_color=None)
-
-  color_bar = ColorBar(color_mapper=mapper, major_label_text_font_size="5pt",
-                       ticker=BasicTicker(desired_num_ticks=len(colors)),
-                       formatter=PrintfTickFormatter(format="%d%%"),
-                       label_standoff=6, border_line_color=None, location=(0, 0))
-  p.add_layout(color_bar, 'right')
-
-  show(p)      # show the plot
 
 
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
