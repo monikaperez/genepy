@@ -18,6 +18,8 @@ from bokeh.models.widgets import TextInput
 from bokeh.layouts import layout, widgetbox, column, row
 import itertools
 from math import pi
+import random
+import string
 
 import matplotlib
 import venn as pyvenn
@@ -496,6 +498,26 @@ def createFoldersFor(filepath):
     prevval += val + '/'
     if not os.path.exists(prevval):
       os.mkdir(prevval)
+
+
+def randomString(stringLength=6, stype='all', withdigits=True):
+  """
+  Generate a random string of letters and digits 
+
+  Args:
+  -----
+
+
+  """
+  if stype=='lowercase':
+    lettersAndDigits = ascii_lowercase
+  elif stype=='uppercase':
+    lettersAndDigits = ascii_uppercase
+  else:
+    lettersAndDigits = string.ascii_letters
+  if withdigits:
+    lettersAndDigits += string.digits
+  return ''.join(random.choice(lettersAndDigits) for i in range(stringLength))
 
 
 def pdDo(df, op="mean", of="value1", over="value2"):
