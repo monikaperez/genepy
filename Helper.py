@@ -13,10 +13,12 @@ import bokeh
 from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
-from bokeh.models import HoverTool, CustomJS
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
 from bokeh.models.widgets import TextInput
 from bokeh.layouts import layout, widgetbox, column, row
 import itertools
+from math import pi
+
 import matplotlib
 import venn as pyvenn
 import sys
@@ -174,7 +176,7 @@ def scatter(data, labels=None, xname='x', yname='x', title='scatter plot', showl
 
 
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
-            width=900, height=400, standoff=10, ylabel='', marks=[]):
+            width=900, height=400, standoff=10, y_label='', marks=[]):
   """
   GENERAL DESCRIPT
 
@@ -191,6 +193,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     a:
   """
   colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+  colors = RdBu[8]
   mapper = LinearColorMapper(palette=colors, low=df.Segment_Mean.min(), high=df.Segment_Mean.max())
   if len(sample_order) == 0:
     sample_order = list(set(df.Sample.tolist()))
@@ -514,7 +517,7 @@ def pdDo(df, op="mean", of="value1", over="value2"):
         ret[j] = np.max(data)
       elif of == "min":
         ret[j] = np.min(data)
-      index.appesnd(k)
+      index.append(k)
       j += 1
       data = [val[of]]
   return index, ret
