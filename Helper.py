@@ -509,9 +509,9 @@ def randomString(stringLength=6, stype='all', withdigits=True):
 
 
   """
-  if stype=='lowercase':
+  if stype == 'lowercase':
     lettersAndDigits = ascii_lowercase
-  elif stype=='uppercase':
+  elif stype == 'uppercase':
     lettersAndDigits = ascii_uppercase
   else:
     lettersAndDigits = string.ascii_letters
@@ -559,3 +559,16 @@ def parrun(cmds, cores):
       exe = ''
       if res != 0:
         raise Exception("Leave command pressed or command failed")
+
+
+def inttodate(i, lim=1965):
+  a = int(i // 365)
+  if a > lim:
+    a = str(a)
+    r = i % 365
+    m = str(int(r // 30)) if int(r) > 0 else str(1)
+    r = r % 30
+    d = str(int(r)) if int(r) > 0 else str(1)
+  else:
+    return 'U'
+  return d + '/' + m + '/' + a
