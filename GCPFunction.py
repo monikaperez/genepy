@@ -211,7 +211,7 @@ def extractSize(val):
     """
     extract the size from the string returned by an ls -l|a command
     """
-    return val.split('gs://')[1].split('#')[0], int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
+    return 'gs://' + val.split('gs://')[1].split('#')[0], int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
 
 
 def extractPath(val):

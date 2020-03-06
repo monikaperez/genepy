@@ -9,11 +9,13 @@ from pybedtools import BedTool
 import seaborn as sns
 import pyBigWig
 import matplotlib.pyplot as plt
-import pdb
+import ipdb
+import signal
 from scipy.optimize import curve_fit
 from sklearn.preprocessing import normalize
 # from scipy.misc import factorial
 from scipy.stats import poisson
+import subprocess
 
 
 size = {"GRCh37": 2864785220,
@@ -105,9 +107,11 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, ver
     """
     run the bigwig command line for a set of bam files in a folder
     """
+    if "bigwig" not in os.listdir(folder if folder else '.'):
+        os.mkdir(folder + "bigwig")
     for i, bam in enumerate(bams):
         in1 = folder + bam
-        out1 = folder + "bigwig/" + bam.split('.')[0].split('/')[-1] + '.bw'
+        out1 = folder + "bigwig/" + bam.split('/')[-1].split('.')[0] + '.bw'
         cmd = "bamCoverage --effectiveGenomeSize " + str(size[genome]) + " -p " + str(numthreads) +\
             " -b " + in1 + " -o " + out1
         if scaling is not None:
@@ -231,7 +235,7 @@ def bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpe
 
 
 def computePeaksAt(peaks, bigwigs, folder='', window=1000, numpeaks=4000, numthreads=8,
-                   width=5, length=10, name='temp/peaksat.png', scale=None, sort=False):
+                   width=5, length=10, name='temp/peaksat.png', scale=None, sort=False, withDeeptools=True):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -239,6 +243,10 @@ def computePeaksAt(peaks, bigwigs, folder='', window=1000, numpeaks=4000, numthr
     append to an array
     return array, normalized
     """
+    # if withDeeptools:
+    #   for val in peaks
+
+    # else:
     if 'relative_summit_pos' in peaks.columns:
         center = [int((val['start'] + val['relative_summit_pos'])) for k, val in peaks.iterrows()]
     else:
@@ -757,7 +765,8 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
     return norm, mapped,  # unique_mapped
 
 
-def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData/', res_directory="diffPeaks/"):
+def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData/',
+                 res_directory="diffPeaks/", isTF=False, compute_size=True):
     """
     will use macs2 to call differential peak binding
 
@@ -772,15 +781,35 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
     print("doing diff from " + bam1 + " and " + bam2)
     name1 = bam1.split('/')[-1].split('.')[0]
     name2 = bam2.split('/')[-1].split('.')[0]
+    if isTF:
+        size = 147
+    else:
+        size = 200
+    if compute_size:
+        print('computing the fragment avg size')
+        cmd = "macs2 predictd -i " + bam1
+        ret = subprocess.run(cmd, capture_output=True, shell=True)
+        size = re.findall("# predicted fragment length is (\d+)", str(ret))[0]
+    else:
+        print('using default size')
     if control2 is None:
         control2 = control1
-    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize 120 -n " + name1 + " --outdir " + directory
-    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize 120 -n " + name2 + " --outdir " + directory
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + size + " -n " + name1 + " --outdir " + directory
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + size + " -n " + name2 + " --outdir " + directory
     if scaling is None:
-        ret = os.popen(cmd1).read()
-        scaling1 = re.findall("tags after filtering in control: (\d+)", ret)[0]
-        ret = os.popen(cmd2).read()
-        scaling2 = re.findall("tags after filtering in control: (\d+)", ret)[0]
+        print('computing the scaling values')
+        ret = os.popen(cmd1)
+        if ret == signal.SIGINT:
+            raise Exception("Leave command pressed or command failed")
+        scaling1a = re.findall("tags after filtering in treatment: (\d+)", ret.read())[0]
+        scaling1b = re.findall("tags after filtering in control: (\d+)", ret.read())[0]
+        scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
+        ret = os.popen(cmd2)
+        if ret == signal.SIGINT:
+            raise Exception("Leave command pressed or command failed")
+        scaling2a = re.findall("tags after filtering in treatment: (\d+)", ret.read())[0]
+        scaling2b = re.findall("tags after filtering in control: (\d+)", ret.read())[0]
+        scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
     else:
         res = os.system(cmd1)
         scaling1 = scaling[0]
@@ -788,12 +817,12 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
         scaling2 = scaling[1]
     if res != 0:
         raise Exception("Leave command pressed or command failed")
-    diffPeak(name1, name2, res_directory, directory, scaling1, scaling2)
+    diffPeak(name1, name2, res_directory, directory, scaling1, scaling2, size)
 
 
-def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2):
+def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2, size):
     res = os.system("macs2 bdgdiff --t1 " + directory + name1 + "_treat_pileup.bdg --c1 " + directory + name1 + "_control_lambda.bdg\
   --t2 " + directory + name2 + "_treat_pileup.bdg --c2 " + directory + name2 + "_control_lambda.bdg --d1 " + str(scaling1) + " --d2 \
-  " + str(scaling2) + " -g 60 -l 120 --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory)
+  " + str(scaling2) + " -g 60 -l " + size + " --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory)
     if res != 0:
         raise Exception("Leave command pressed or command failed")
