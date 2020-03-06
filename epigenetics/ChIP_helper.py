@@ -766,7 +766,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
 
 
 def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='diffData/',
-                 res_directory="diffPeaks/", isTF=False, compute_size=True):
+                 res_directory="diffPeaks/", isTF=False, compute_size=True, pairedend=True):
     """
     will use macs2 to call differential peak binding
 
@@ -789,26 +789,27 @@ def fullDiffPeak(bam1, bam2, control1, control2=None, scaling=None, directory='d
         print('computing the fragment avg size')
         cmd = "macs2 predictd -i " + bam1
         ret = subprocess.run(cmd, capture_output=True, shell=True)
-        size = re.findall("# predicted fragment length is (\d+)", str(ret))[0]
+        size = re.findall("# predicted fragment length is (\d+)", str(ret.stderr))[0]
     else:
         print('using default size')
+    pairedend = "BAMPE" if pairedend else "BAM"
     if control2 is None:
         control2 = control1
-    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + size + " -n " + name1 + " --outdir " + directory
-    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + size + " -n " + name2 + " --outdir " + directory
+    cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + size + " -n " + name1 + " --outdir " + directory + " -f " + pairedend
+    cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + size + " -n " + name2 + " --outdir " + directory + " -f " + pairedend
     if scaling is None:
         print('computing the scaling values')
-        ret = os.popen(cmd1)
+        ret = subprocess.run(cmd1, capture_output=True, shell=True)
         if ret == signal.SIGINT:
             raise Exception("Leave command pressed or command failed")
-        scaling1a = re.findall("tags after filtering in treatment: (\d+)", ret.read())[0]
-        scaling1b = re.findall("tags after filtering in control: (\d+)", ret.read())[0]
+        scaling1a = re.findall("tags after filtering in treatment: (\d+)", str(ret.stderr))[0]
+        scaling1b = re.findall("tags after filtering in control: (\d+)", str(ret.stderr))[0]
         scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
-        ret = os.popen(cmd2)
+        ret = subprocess.run(cmd2, capture_output=True, shell=True)
         if ret == signal.SIGINT:
             raise Exception("Leave command pressed or command failed")
-        scaling2a = re.findall("tags after filtering in treatment: (\d+)", ret.read())[0]
-        scaling2b = re.findall("tags after filtering in control: (\d+)", ret.read())[0]
+        scaling2a = re.findall("tags after filtering in treatment: (\d+)", str(ret.stderr))[0]
+        scaling2b = re.findall("tags after filtering in control: (\d+)", str(ret.stderr))[0]
         scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
     else:
         res = os.system(cmd1)
