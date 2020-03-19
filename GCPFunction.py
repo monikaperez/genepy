@@ -7,6 +7,7 @@ from google.cloud import storage
 import dalmatian as dm
 import numpy as np
 import os
+import subprocess
 import signal
 import re
 from JKBio import Helper as h
@@ -78,14 +79,15 @@ def lsFiles(files, add='', group=50):
         a = ''
         for val in sfiles:
             a += val + ' '
-        data = os.popen("gsutil -m ls " + add + " " + a)
-        if data == signal.SIGINT:
-            print('Awakened')
-            break
-        else:
-            res += data.read().split('\n')[:-1]
-            if "TOTAL:" in res[-1]:
-                res = res[:-1]
+        data = subprocess.run("gsutil -m ls " + add + " " + a, capture_output=True, shell=True)
+        if data.returncode != 0:
+            if "One or more URLs matched no objects" not in str(data.stderr):
+                raise ValueError('issue with the command: ' + str(data.stderr))
+        if len(str(data.stdout)) < 4:
+            return 0
+        res += str(data.stdout).split('\n')[:-1]
+        if "TOTAL:" in res[-1]:
+            res = res[:-1]
     return res
 
 
