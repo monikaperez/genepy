@@ -10,6 +10,7 @@ from taigapy import TaigaClient
 tc = TaigaClient()
 from bokeh.palettes import *
 import bokeh
+import subprocess
 from bokeh.resources import CDN
 import numpy as np
 from bokeh.plotting import *
@@ -22,6 +23,7 @@ import random
 import string
 
 import matplotlib
+from matplotlib import pyplot as plt
 import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
@@ -287,7 +289,6 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
   # the key from the pandas groupby funciton.
   df = df1.copy()
   transformed_q = -df[y].apply(np.log10).values
-  print(transformed_q.min(), df[y].max())
   transformed_q[transformed_q == np.inf] = maxvalue
   df['transformed_q'] = transformed_q
   df['color'] = color
@@ -385,18 +386,23 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
     p.rect('xname', 'yname', 0.9, 0.9, source=data,
            color='colors', alpha='alphas', line_color=None,
            hover_line_color='black', hover_color='colors')
+    try:
+      show(p)
+    except:
+      show(p)
+    save(p, title + '.html')
 
-    save(p, 'temp/corrmat.html')
     return p  # show the plot
   else:
     plt.figure(figsize=(size, 200))
     plt.title('the correlation matrix')
     plt.imshow(data.T if invert else data)
-    plt.savefig("temp/corrmat.pdf")
+    plt.savefig(title + ".pdf")
     plt.show()
 
 
-def venn(inp, names):
+def venn(inp, names, title="venn"):
+  matplotlib.use('Agg')
   labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
   if len(inp) == 2:
     fig, ax = pyvenn.venn2(labels, names=names)
@@ -408,7 +414,9 @@ def venn(inp, names):
     fig, ax = pyvenn.venn5(labels, names=names)
   if len(inp) == 6:
     fig, ax = pyvenn.venn6(labels, names=names)
+  ax.set_title(title)
   fig.show()
+  fig.savefig(title + '.pdf')
 
 
 def grouped(iterable, n):
@@ -502,7 +510,7 @@ def createFoldersFor(filepath):
 
 def randomString(stringLength=6, stype='all', withdigits=True):
   """
-  Generate a random string of letters and digits 
+  Generate a random string of letters and digits
 
   Args:
   -----
@@ -545,20 +553,44 @@ def pdDo(df, op="mean", of="value1", over="value2"):
   return index, ret
 
 
-def parrun(cmds, cores):
+def parrun(cmds, cores, add=[]):
   count = 0
   exe = ''
+  if len(add) != 0 and len(add) != len(cmds):
+    raise ValueError("we would want them to be the same size")
+  else:
+    addexe = ''
   for i, cmd in enumerate(cmds):
     count += 1
     exe += cmd
+    if len(add) != 0:
+      addexe += add[i]
     if count < cores and i < len(cmds) - 1:
       exe += ' & '
+      if len(add) != 0:
+        addexe += ' & '
     else:
       count = 0
-      res = os.system(exe)
+      res = subprocess.run(exe, capture_output=True, shell=True)
+      if res.returncode != 0:
+        raise ValueError('issue with the command: ' + str(res.stderr))
       exe = ''
-      if res != 0:
-        raise Exception("Leave command pressed or command failed")
+      if len(add) != 0:
+        res = subprocess.run(addexe, capture_output=True, shell=True)
+        if res.returncode != 0:
+          raise ValueError('issue with the command: ' + str(res.stderr))
+        addexe = ''
+
+
+def askif(quest):
+  print(quest)
+  inp = input()
+  if inp in ['yes', 'y', 'Y', 'YES', 'oui', 'si']:
+    return 1
+  elif inp in ['n', 'no', 'nope', 'non', 'N']:
+    return 0
+  else:
+    return askif('you need to answer by yes or no')
 
 
 def inttodate(i, lim=1965):
@@ -572,3 +604,109 @@ def inttodate(i, lim=1965):
   else:
     return 'U'
   return d + '/' + m + '/' + a
+
+
+def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
+                            pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
+                            totrim=True, tomap=True, tofilter=True, results='res/', toremove=False):
+  """
+  Will do spike in control to allow for unormalizing sequence data
+
+  Count based sequencing data is not absolute and will be normalized as each sample will be sequenced at a specific depth. To figure out what was the actual sample concentration, we use Spike In control
+
+  You should have FastQfolder/[NAME].fastq & BigWigFolder/[NAME].bw with NAME being the same for the same samples
+
+  If
+
+  @
+
+  Args:
+  -----
+  refgenome: str the file path to the indexed reference genome
+  FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
+  BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
+  mapper: str flag to 'bwa', ...
+  pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
+
+  Returns:
+  --------
+  dict(file,float) the scaling factor dict
+
+  """
+  if len(fastQfolder) > 0:
+    print('using all files from folder')
+    fastqs = os.listdir(fastQfolder)
+    fastqs = [i for i in fastqs if '.fq.gz' == i[-6:] or '.fastq.gz' == i[-9:]]
+    fastqs.sort()
+    if pairedEnd and (tomap or totrim):
+      print("need to be name_*1, name_*2")
+      fastqs = [i for i in grouped(fastqs, 2)]
+  elif fastq is None:
+    raise Error('you need input files')
+  else:
+    if type(fastq) is list:
+      print('your files need to be all in the same folder')
+      fastQfolder = '/'.join(fastq[0].split('/')[:-1]) + '/'
+      if not totrim and not tomap:
+        fastqs = [f.split('/')[-1] for f in fastq]
+      else:
+        print("need to be name_*1, name_*2")
+        fastqs = [[f[0].split('/')[-1], f[1].split('/')[-1]] for f in grouped(fastq, 2)]
+    else:
+      fastQfolder = '/'.join(fastq.split('/')[:-1]) + '/'
+      fastqs = [fastq.split('/')[-1]]
+  print(fastqs)
+  if not totrim:
+    print("you need to have your files in the " + results + " folder")
+  if totrim and tomap:
+    print("\n\ntrimming\n\n")
+    if pairedEnd:
+      cmds = []
+      rm = []
+      for file in fastqs:
+        cmd = pathtotrim_galore + ' --paired --fastqc --gzip ' + fastQfolder + file[0] + ' ' + fastQfolder + file[1] + " -o " + results
+        if toremove:
+          rm.append('rm ' + fastQfolder + file[0] + ' ' + fastQfolder + file[1])
+        cmds.append(cmd)
+      print(cmds)
+      parrun(cmds, cores, add=rm)
+      fastqs = [[file[0].split('.')[0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
+  if tomap:
+    print("\n\nmapping\n\n")
+    if pairedEnd:
+      cmds = []
+      rm = []
+      for file in fastqs:
+        cmd = pathtobwa + ' mem ' + refgenome + ' ' + results + file[0] + ' ' + results +\
+            file[1] + ' | ' + pathtosam + ' sort - -o ' + results + file[0].split('.')[0] + '.sorted.bam'
+        if toremove:
+          rm.append('rm ' + results + file[0] + ' ' + results + file[1])
+        cmds.append(cmd)
+      parrun(cmds, cores, add=rm)
+      fastqs = [file[0].split('.')[0] + '.sorted.bam' for file in fastqs]
+
+  if tofilter:
+    print("\n\nfiltering\n\n")
+    cmds = []
+    rm = []
+    parrun([pathtosam + ' index ' + results + file.split('.')[0] + '.sorted.bam' for file in fastqs], cores)
+    parrun([pathtosam + ' flagstat ' + results + file.split('.')[0] + '.sorted.bam > ' + results + file.split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
+    parrun([pathtosam + ' idxstats ' + results + file.split('.')[0] + '.sorted.bam > ' + results + file.split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
+    fastqs = [file.split('.')[0] + '.sorted.bam' for file in fastqs]
+  else:
+    print("files need to be named: NAME.sorted.bam")
+    fastqs = [file for file in fastqs if '.sorted.bam' == file[-11:]]
+  mapped = {}
+  norm = {}
+  unique_mapped = {}
+  print("\n\ncounting\n\n")
+  for file in fastqs:
+    mapped[file.split('.')[0]] = int(os.popen(pathtosam + ' view -c -F 0x004 -F 0x0008 -f 0x001 -F 0x0400 -q 1 ' + results +
+                                              file + ' -@ ' + str(cores)).read().split('\n')[0])
+   # unique_mapped[file.split('.')[0]] = int(re.findall("Mapped reads: (\d+)", os.popen('bamtools stats -in '+results +
+    #                                             file + '.sorted.bam').read())[0])
+  nbmapped = np.array([i for i in mapped.values()])
+  nbmapped = np.sort(nbmapped)[0] / nbmapped.astype(float)
+  for i, val in enumerate(mapped.keys()):
+    norm[val] = nbmapped[i]
+  return norm, mapped,  # unique_mapped
