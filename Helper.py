@@ -18,7 +18,10 @@ from bokeh.models.widgets import TextInput
 from bokeh.layouts import layout, widgetbox, column, row
 import itertools
 from math import pi
+import re
+import signal
 import random
+import ipdb
 import string
 
 import matplotlib
@@ -502,7 +505,7 @@ def createFoldersFor(filepath):
 
 def randomString(stringLength=6, stype='all', withdigits=True):
   """
-  Generate a random string of letters and digits 
+  Generate a random string of letters and digits
 
   Args:
   -----
@@ -561,14 +564,54 @@ def parrun(cmds, cores):
         raise Exception("Leave command pressed or command failed")
 
 
-def inttodate(i, lim=1965):
+def inttodate(i, lim=1965, unknown='U', sep='-', order="asc"):
   a = int(i // 365)
   if a > lim:
     a = str(a)
     r = i % 365
-    m = str(int(r // 30)) if int(r) > 0 else str(1)
-    r = r % 30
+    m = str(int(r // 32)) if int(r) > 0 else str(1)
+    r = r % 32
     d = str(int(r)) if int(r) > 0 else str(1)
   else:
-    return 'U'
-  return d + '/' + m + '/' + a
+    return unknown
+  return d + '-' + m + '-' + a if order == "asc" else a + '-' + m + '-' + d
+
+
+def datetoint(dt, split='-', unknown='U', order="asc"):
+  if len(dt) > 1:
+
+    arr = np.array(dt[0].split(split) if dt[0] != unknown else [0, 0, 0]).astype(int)
+    for val in dt[1:]:
+      arr = np.vstack((arr, np.array(val.split(split) if val != unknown else [0, 0, 0]).astype(int)))
+    arr = arr.T
+  else:
+    arr = np.array(dt.split(split) if dt != unknown else [0, 0, 0]).astype(int)
+  return arr[2] * 365 + arr[1] * 31 + arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
+
+
+def getBamDate(bams, split='/', order="des"):
+  DTs = []
+  for i, bam in enumerate(bams):
+    print(i / len(bams), end='\r')
+    data = os.popen('export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token`\
+       && samtools view -H ' + bam + ' | grep "^@RG"')
+    if data == signal.SIGINT:
+      print('Awakened')
+      break
+    else:
+      res = data.read()
+      ipdb.set_trace()
+      dt = re.findall("(?<=\tDT:).+?\t", res)
+    if len(dt) > 1:
+      arr = np.array(dt[0].split(split)).astype(int)
+      for val in dt[1:]:
+        arr = np.vstack((arr, np.array(val.split(split)).astype(int)))
+      arr = arr.T
+      i = arr[0] * 365 + arr[1] * 31 + arr[2] if order == "asc" else arr[2] * 365 + arr[1] * 31 + arr[0]
+      DTs.append(dt[np.argsort(i)[0]])
+    elif len(dt) == 1:
+      dt = np.array(val.split(split)).astype(int)
+      DTs.append(dt)
+    else:
+      DTs.append(0)
+  return DTs
