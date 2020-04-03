@@ -396,27 +396,29 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
   else:
     plt.figure(figsize=(size, 200))
     plt.title('the correlation matrix')
-    plt.imshow(data.T if invert else data)
+    plt.imshow(data.T if invert else data);
     plt.savefig(title + ".pdf")
-    plt.show()
+    plt.show();
 
 
 def venn(inp, names, title="venn"):
-  matplotlib.use('Agg')
   labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
   if len(inp) == 2:
     fig, ax = pyvenn.venn2(labels, names=names)
-  if len(inp) == 3:
+  elif len(inp) == 3:
     fig, ax = pyvenn.venn3(labels, names=names)
-  if len(inp) == 4:
+  elif len(inp) == 4:
     fig, ax = pyvenn.venn4(labels, names=names)
-  if len(inp) == 5:
+  elif len(inp) == 5:
     fig, ax = pyvenn.venn5(labels, names=names)
-  if len(inp) == 6:
+  elif len(inp) == 6:
     fig, ax = pyvenn.venn6(labels, names=names)
+  else:
+    raise ValueError('need to be between 2 to 6')
   ax.set_title(title)
-  fig.show()
-  fig.savefig(title + '.pdf')
+  fig.savefig(title + '.png')
+  fig.show();
+  plt.pause(0.1);
 
 
 def grouped(iterable, n):
