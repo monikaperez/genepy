@@ -13,6 +13,7 @@ import bokeh
 import subprocess
 from bokeh.resources import CDN
 import numpy as np
+from JKBio import GCPFunction as gcp
 from bokeh.plotting import *
 from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
 from bokeh.models.widgets import TextInput
@@ -755,18 +756,18 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
   return norm, mapped,  # unique_mapped
 
 
-def changeToBucket(samples, gsfolderto, values=['bam', 'bai']):
+def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
   # to do the download to the new dataspace
-  ipdb.set_trace()
   for i, val in samples.iterrows():
-    for name in values:
-      if not gcp.exists(gsfolderto + val[name].split('/')[-1]):
-        cmd = 'gsutil cp ' + val[name] + ' ' + val[name] + ' ' + gsfolderto
-        res = os.system(cmd)
-        if res != 0:
-          print("error in command '" + cmd + "'")
+    for ntype in values:
+      name = val[ntype].split('/')[-1] if catchdup else randomString(6, 'underscore', withdigits=False) + '_' + val[ntype].split('/')[-1]
+      if not gcp.exists(gsfolderto + val[ntype].split('/')[-1]) or not catchdup:
+        cmd = 'gsutil cp ' + name + ' ' + gsfolderto
+        res = subprocess.run(cmd, shell=True, capture_output=True)
+        if res.returncode != 0:
+          raise ValueError(str(res.stderr))
       else:
-        print(val[name].split('/')[-1] + ' already exists in the folder: ' + folderto)
-  for name in values:
-    samples[name] = [gsfolderto + a[name].split('/')[-1] for _, a in samples.iterrows()]
+        print(name + ' already exists in the folder: ' + gsfolderto)
+        print(gcp.lsFiles([gsfolderto + name], '-la'))
+      samples.loc[i, ntype] = gsfolderto + name
   return samples
