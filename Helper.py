@@ -762,7 +762,7 @@ def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
     for ntype in values:
       name = val[ntype].split('/')[-1] if catchdup else randomString(6, 'underscore', withdigits=False) + '_' + val[ntype].split('/')[-1]
       if not gcp.exists(gsfolderto + val[ntype].split('/')[-1]) or not catchdup:
-        cmd = 'gsutil cp ' + name + ' ' + gsfolderto
+        cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
         res = subprocess.run(cmd, shell=True, capture_output=True)
         if res.returncode != 0:
           raise ValueError(str(res.stderr))
