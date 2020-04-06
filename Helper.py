@@ -399,9 +399,9 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
   else:
     plt.figure(figsize=(size, 200))
     plt.title('the correlation matrix')
-    plt.imshow(data.T if invert else data);
+    plt.imshow(data.T if invert else data)
     plt.savefig(title + ".pdf")
-    plt.show();
+    plt.show()
 
 
 def venn(inp, names, title="venn"):
@@ -420,8 +420,8 @@ def venn(inp, names, title="venn"):
     raise ValueError('need to be between 2 to 6')
   ax.set_title(title)
   fig.savefig(title + '.png')
-  fig.show();
-  plt.pause(0.1);
+  fig.show()
+  plt.pause(0.1)
 
 
 def grouped(iterable, n):
@@ -611,7 +611,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc"):
   return d + sep + m + sep + a if order == "asc" else a + sep + m + sep + d
 
 
-def datetoint(dt, split='-', unknown='U', order="asc"):
+def datetoint(dt, split='-', unknown='U', order="des"):
   if len(dt) > 1:
 
     arr = np.array(dt[0].split(split) if dt[0] != unknown else [0, 0, 0]).astype(int)
@@ -623,7 +623,7 @@ def datetoint(dt, split='-', unknown='U', order="asc"):
   return arr[2] * 365 + arr[1] * 31 + arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
 
 
-def getBamDate(bams, split='/', order="des"):
+def getBamDate(bams, split='-', order="des", unknown='U'):
   DTs = []
   for i, bam in enumerate(bams):
     print(i / len(bams), end='\r')
@@ -634,20 +634,18 @@ def getBamDate(bams, split='/', order="des"):
       break
     else:
       res = data.read()
-      ipdb.set_trace()
       dt = re.findall("(?<=\tDT:).+?\t", res)
     if len(dt) > 1:
-      arr = np.array(dt[0].split(split)).astype(int)
+      arr = np.array(dt[0].split('T')[0].split(split)).astype(int)
       for val in dt[1:]:
-        arr = np.vstack((arr, np.array(val.split(split)).astype(int)))
+        arr = np.vstack((arr, np.array(val.split('T')[0].split(split)).astype(int)))
       arr = arr.T
       i = arr[0] * 365 + arr[1] * 31 + arr[2] if order == "asc" else arr[2] * 365 + arr[1] * 31 + arr[0]
-      DTs.append(dt[np.argsort(i)[0]])
+      DTs.append(dt[np.argsort(i)[0]].split('T')[0])
     elif len(dt) == 1:
-      dt = np.array(val.split(split)).astype(int)
-      DTs.append(dt)
+      DTs.append(dt[0].split('T')[0])
     else:
-      DTs.append(0)
+      DTs.append(unknown)
   return DTs
 
 
@@ -755,3 +753,20 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
   for i, val in enumerate(mapped.keys()):
     norm[val] = nbmapped[i]
   return norm, mapped,  # unique_mapped
+
+
+def changeToBucket(samples, gsfolderto, values=['bam', 'bai']):
+  # to do the download to the new dataspace
+  ipdb.set_trace()
+  for i, val in samples.iterrows():
+    for name in values:
+      if not gcp.exists(gsfolderto + val[name].split('/')[-1]):
+        cmd = 'gsutil cp ' + val[name] + ' ' + val[name] + ' ' + gsfolderto
+        res = os.system(cmd)
+        if res != 0:
+          print("error in command '" + cmd + "'")
+      else:
+        print(val[name].split('/')[-1] + ' already exists in the folder: ' + folderto)
+  for name in values:
+    samples[name] = [gsfolderto + a[name].split('/')[-1] for _, a in samples.iterrows()]
+  return samples
