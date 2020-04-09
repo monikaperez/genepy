@@ -13,6 +13,7 @@ import signal
 from JKBio import Helper as h
 from JKBio import GCPFunction as gcp
 import ipdb
+import subprocess
 
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
@@ -630,3 +631,25 @@ def saveConfigs(workspace, filepath):
   for k, val in conf.iterrows():
     params[k] = wm.get_config(val['name'])
   h.dictToFile(params, filepath + '.json')
+
+
+def cleanWorkspace(workspaceid, toleave=[], defaulttoleave=['files', 'data', 'hound', 'references', 'name', 'folder']):
+  """
+  removes all processing folder in a terra workspace easily
+
+  args:
+    workspaceid: str, the workspace
+    toleave: a list of first order folder in the bucket that you don't want to be deleted  
+    defaulttoleave: it should contain non processing folders that contain metadata and files for the workspace
+  """
+  toleave.extend(defaulttoleave)
+  bucket = dm.WorkspaceManager(workspaceid).get_bucket_id()
+  res = subprocess.run('gsutil -m ls gs://' + bucket, shell=True, capture_output=True)
+  if res.returncode != 0:
+    raise ValueError(str(res.stderr))
+  res = str(res.stdout)[2:-1].split('\\n')[:-1]
+  toremove = [val for val in res if val.split('/')[-2] not in toleave]
+  if h.askif('we are going to remove ' + str(len(toremove)) + " files/folders:\n" + str(toremove) + "\nare you sure?"):
+    gcp.rmFiles(toremove, add='-r')
+  else:
+    print("aborting")

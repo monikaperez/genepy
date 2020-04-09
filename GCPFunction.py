@@ -146,7 +146,7 @@ def catFiles(files, group=50, split=False, cut=False):
     return res
 
 
-def rmFiles(files, group=50):
+def rmFiles(files, group=50, add=''):
     """
     remove a set of files in parallel (when the set is huge)
 
@@ -158,8 +158,10 @@ def rmFiles(files, group=50):
     for sfiles in h.grouped(files, by):
         a = ''
         for val in sfiles:
-            a += val + ' '
-        code = os.system("gsutil -m rm " + a)
+            a += ' ' + val
+        if add:
+            add = ' ' + add
+        code = os.system("gsutil -m rm" + add + a)
         if code != 0:
             print('pressed ctrl+c or command failed')
             break
