@@ -604,7 +604,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc"):
   if a > lim:
     a = str(a)
     r = i % 365
-    m = str(int(r // 32)) if int(r) > 0 else str(1)
+    m = str(int(r // 32)) if int(r // 32) > 0 else str(1)
     r = r % 32
     d = str(int(r)) if int(r) > 0 else str(1)
   else:

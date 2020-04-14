@@ -97,7 +97,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   # print and return well formated data
 
 
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=0,
                      fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
@@ -131,7 +131,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
       data = {'sample_id': [], 'bam': [], 'bai': []}
       for file in files:
         if val.split('.')[-1] in ["bam", "bai"]:
-          name = file.split('/')[-1].split('.')[0].split(sep)[0][:-2]
+          name = file.split('/')[-1].split('.')[0].split(sep)[loc][:-2]
           if name in data['sample_id']:
             pos = data['sample_id'].index(name)
             if file[-4:] == ".bam":
@@ -189,7 +189,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False,
     print(files)
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
-        name = file.split('/')[-1].split('.')[0].split(sep)[0]
+        name = file.split('/')[-1].split('.')[0].split(sep)[loc]
         if name in data['sample_id']:
           pos = data['sample_id'].index(name)
           if fformat == "fastqR1R2":
@@ -633,7 +633,7 @@ def saveConfigs(workspace, filepath):
   h.dictToFile(params, filepath + '.json')
 
 
-def cleanWorkspace(workspaceid, toleave=[], defaulttoleave=['files', 'data', 'hound', 'references', 'name', 'folder']):
+def cleanWorkspace(workspaceid, toleave=[], defaulttoleave=['workspace', 'scripts', 'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
   """
   removes all processing folder in a terra workspace easily
 
