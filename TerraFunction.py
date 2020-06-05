@@ -62,7 +62,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
   """
   failed_submission = []
   timing = 0
-  wm = dm.WorkspaceManager(workspace)
+  wm = dm.WorkspaceManager(workspace).disable_hound()
   assert submissions is not None
   if type(submissions) is type(""):
     submissions = [submissions]
@@ -95,6 +95,22 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
     raise RuntimeError(str(len(failed_submission)) + " failed submission")
   return failed_submission
   # print and return well formated data
+
+
+def removeSamples(workspace, samples):
+  """
+  """
+  wm = dm.WorkspaceManager(workspace).disable_hound()
+  try:
+    wm.delete_sample(samples)
+  except:
+    print('we had pairs.')
+    pairs = wm.get_pairs()
+    pairid = pairs[pairs.case_sample.isin(toremove)].index.tolist()
+    for k, val in wm.get_pair_sets().iterrows():
+      wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
+    wm.delete_pair(pairid)
+    wm.delete_sample(samples)
 
 
 def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=0,
