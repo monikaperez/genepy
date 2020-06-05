@@ -45,7 +45,7 @@ def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
     return(ret)
 
 
-def mvFiles(files, location, group=50):
+def mvFiles(files, location, group=50, listen_to_errors=False):
     """
     move a set of files in parallel (when the set is huge)
 
@@ -60,7 +60,7 @@ def mvFiles(files, location, group=50):
         for val in sfiles:
             a += val + ' '
         code = os.system("gsutil -m mv " + a + location)
-        if code != 0:
+        if code != 0 and listen_to_errors:
             print('pressed ctrl+c or command failed')
             break
 
