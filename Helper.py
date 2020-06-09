@@ -5,36 +5,41 @@
 from __future__ import print_function
 
 import pdb
+import ipdb
 import pandas as pd
+from math import pi
+import numpy as np
+import itertools
+import random
+
 from taigapy import TaigaClient
 tc = TaigaClient()
 from IPython import get_ipython
-from bokeh.palettes import *
-import bokeh
 import subprocess
-from bokeh.resources import CDN
-import numpy as np
 from JKBio import GCPFunction as gcp
-from bokeh.plotting import *
-from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
-from bokeh.models.widgets import TextInput
-from bokeh.models.annotations import LabelSet
-from bokeh.layouts import layout, widgetbox, column, row
-import itertools
-from math import pi
 import re
 import signal
-import random
-import ipdb
 import string
-
-import matplotlib
-from matplotlib import pyplot as plt
-import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
 import os
 import json
+
+import bokeh
+from bokeh.plotting import *
+from bokeh.io import output_file, show
+from bokeh.transform import linear_cmap
+from bokeh.util.hex import hexbin
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
+from bokeh.models.widgets import TextInput
+from bokeh.models.annotations import LabelSet
+from bokeh.layouts import layout, widgetbox, column, row
+from bokeh.resources import CDN
+from bokeh.palettes import *
+
+import matplotlib
+from matplotlib import pyplot as plt
+import venn as pyvenn
 
 
 def fileToList(filename):
@@ -140,7 +145,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   return(renamed, not_parsed)
 
 
-def scatter(data, labels=None, xname='x', yname='x', title='scatter plot', showlabels=False,
+def scatter(data, labels=None, xname='x', yname='y', title='scatter plot', showlabels=False,
             colors=None, importance=None, radi=5, alpha=0.8, **kargs):
   """
   Args:
@@ -177,12 +182,46 @@ def scatter(data, labels=None, xname='x', yname='x', title='scatter plot', showl
   p.circle('x', 'y', color='fill_color',
            fill_alpha='fill_alpha',
            line_width=0,
-           radius='radius', source=source)
+           radius='radius' if radi else None, source=source)
   p.xaxis[0].axis_label = xname
   p.yaxis[0].axis_label = yname
 
   show(p)
   return(p)
+
+
+def bigScatter(data, precomputed=False, logscale=False, features=False, colors=None, title="BigScatter", binsize=0.1, folder="", showpoint=False):
+  TOOLS = "wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
+  names = [("count", "@c")]
+  if features:
+    names.append(('features', '@features'))
+  if precomputed:
+    TOOLS = "hover," + TOOLS
+  p = figure(title=title, tools=TOOLS, tooltips=names if precomputed else None,
+             match_aspect=True, background_fill_color='#440154')
+  if precomputed:
+    p.hex_tile(q="q", r="r", size=binsize, line_color=None, source=data,
+               hover_color="pink", hover_alpha=0.8,
+               fill_color=linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  else:
+    if features:
+      print("we cannot yet process features on non precomputed version")
+    r, bins = p.hexbin(data[:, 0], data[:, 1], line_color=None, size=binsize,
+                       hover_color="pink", hover_alpha=0.8,
+                       fill_color=linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  p.grid.visible = False
+  if showpoint:
+    p.circle(data[:, 0], data[:, 1], color="white", size=1)
+
+  if not precomputed:
+    p.add_tools(HoverTool(
+        tooltips=names,
+        mode="mouse", point_policy="follow_mouse", renderers=[r] if not precomputed else None
+    ))
+
+  output_file(folder + title + "_hex_plot.html")
+
+  show(p)
 
 
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
@@ -929,15 +968,16 @@ def fromGTF2BED(gtfname, bedname, gtftype='geneAnnot'):
 def showcount(i, size):
   print(str(1 + int(100 * (i / size))) + '%', end='\r')
 
+
 def combin(n, k):
-   """Nombre de combinaisons de n objets pris k a k"""
-   if k > n//2:
-       k = n-k
-   x = 1
-   y = 1
-   i = n-k+1
-   while i <= n:
-       x = (x*i)//y
-       y += 1
-       i += 1
-   return x
+  """Nombre de combinaisons de n objets pris k a k"""
+  if k > n // 2:
+    k = n - k
+  x = 1
+  y = 1
+  i = n - k + 1
+  while i <= n:
+    x = (x * i) // y
+    y += 1
+    i += 1
+  return x
