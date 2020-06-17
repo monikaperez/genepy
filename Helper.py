@@ -208,7 +208,7 @@ def bigScatter(data, precomputed=False, logscale=False, features=False, colors=N
       print("we cannot yet process features on non precomputed version")
     r, bins = p.hexbin(data[:, 0], data[:, 1], line_color=None, size=binsize,
                        hover_color="pink", hover_alpha=0.8,
-                       fill_color=linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+                       fill_color=linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
   p.grid.visible = False
   if showpoint:
     p.circle(data[:, 0], data[:, 1], color="white", size=1)

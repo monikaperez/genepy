@@ -96,7 +96,7 @@ def findReplicates(folder, sep='-', namings='-r([0-9])', namepos=2):
     return rep
 
 
-def computeSingleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
+def singleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
                      ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     run the singleEnd pipeline
@@ -114,7 +114,7 @@ def computeSingleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="p
         # it can take many TB so better delete
 
 
-def computePairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
+def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
                      ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     # run the paired end pipeline
@@ -222,7 +222,7 @@ def loadPeaks(peakFile=None,peakfolder=None, isMacs=True, CTFlist=[], skiprows=0
     return bindings.reset_index(drop=True)
 
 
-def pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
+def pysam_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
 
     # get pysam data
     # ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -250,7 +250,7 @@ def pysam_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks
     return res, fig
 
 
-def bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
+def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -289,7 +289,7 @@ def bedtools_computePeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpe
 
 
 
-def computePeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
+def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
                    width=5, length=10,torecompute=False, name='temp/peaksat.png', refpoint="TSS", scale=None, 
                    sort=False, withDeeptools=True, onlyProfile=False, cluster=1):
     """
@@ -941,13 +941,13 @@ def putInConscensus(conscensus, value, window=10, mergetype='mean'):
     return res
 
 
-def computePairwiseOverlap(bedfile, norm=True, docorrelation=True, doenrichment=True):
+def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichment=True):
     """
     considering a befile representing a conscensus set of peaks
     with each columns after the 7th one representing the signal of a given ChIP experiment
     over this conscensus
     """
-    dat = bedfile[bedfile.columns[8:]].values
+    dat = bedfile[bedfile.columns[bedcol:]].values
     # ipdb.set_trace()
     prob = dat.astype(bool).sum(0)/len(dat)
     if docorrelation:
@@ -975,12 +975,53 @@ def computePairwiseOverlap(bedfile, norm=True, docorrelation=True, doenrichment=
     overlap[i,i]=1
     if docorrelation:
         correlation[i,i]=1
-        correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[8:], columns=bedfile.columns[8:])
+        correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     if doenrichment:
         enrichment[i,i]=1 
-        enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[8:], columns=bedfile.columns[8:])
-    overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[8:], columns=bedfile.columns[8:])
+        enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+    overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     return overlap, correlation if docorrelation else None, enrichment if doenrichment else None 
+
+
+def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
+    """
+    considering a befile representing a conscensus set of peaks
+    with each columns after the 7th one representing the signal of a given ChIP experiment
+    over this conscensus
+    """
+    dat = bedfile[bedfile.columns[bedcol:]].values
+    # ipdb.set_trace()
+    prob = dat.astype(bool).sum(0)/len(dat)
+    if docorrelation:
+        if groups is not None:
+            raise ValueError("can't do correlation on groups")
+        correlation = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
+    enrichment = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
+    if groups is not None:
+        for i in set(groups):
+            overlapping = dat[groups==i]
+            for j,val in enumerate(overlapping.T):
+                enrichment[i,j] = np.log2((len(val[val!=0])/len(overlapping))/prob[j])
+    else:
+        for i, col in enumerate(dat.T):
+            overlapping = np.delete(dat,i,axis=1)[col!=0]
+            col = col[col!=0]
+            add=0
+            for j, val in enumerate(overlapping.T):
+                if j==i:
+                    add=1
+                    if docorrelation:
+                        correlation[i,i]=1
+                    enrichment[i,i]=1
+                if docorrelation:
+                    correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1] if norm else np.corrcoef(val,col)[0,1]
+                enrichment[i,j+add] = np.log2((len(val[val!=0])/len(col))/prob[j+add])
+        if docorrelation:
+            correlation[i,i]=1
+            correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+        enrichment[i,i]=1 
+    enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
+    return enrichment, correlation if docorrelation else None
 
 
 def findAdditionalCobindingSignal(conscensus, known=None, bigwigs=[], window=100):
