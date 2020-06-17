@@ -5,34 +5,41 @@
 from __future__ import print_function
 
 import pdb
+import ipdb
 import pandas as pd
+from math import pi
+import numpy as np
+import itertools
+import random
+
 from taigapy import TaigaClient
 tc = TaigaClient()
-from bokeh.palettes import *
-import bokeh
+from IPython import get_ipython
 import subprocess
-from bokeh.resources import CDN
-import numpy as np
 from JKBio import GCPFunction as gcp
-from bokeh.plotting import *
-from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, PrintfTickFormatter
-from bokeh.models.widgets import TextInput
-from bokeh.layouts import layout, widgetbox, column, row
-import itertools
-from math import pi
 import re
 import signal
-import random
-import ipdb
 import string
-
-import matplotlib
-from matplotlib import pyplot as plt
-import venn as pyvenn
 import sys
 from PIL import Image, ImageDraw, ImageFont
 import os
 import json
+
+import bokeh
+from bokeh.plotting import *
+from bokeh.io import output_file, show
+from bokeh.transform import linear_cmap
+from bokeh.util.hex import hexbin
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
+from bokeh.models.widgets import TextInput
+from bokeh.models.annotations import LabelSet
+from bokeh.layouts import layout, widgetbox, column, row
+from bokeh.resources import CDN
+from bokeh.palettes import *
+
+import matplotlib
+from matplotlib import pyplot as plt
+import venn as pyvenn
 
 
 def fileToList(filename):
@@ -239,23 +246,57 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False,
       ("name", "@labels"),
       ("(x,y)", "(@x, @y)"),
   ]
+  if showlabels:
+    labels = LabelSet(x='x', y='y', text='names', level='glyph', text_font_size='9pt',
+                      x_offset=5, y_offset=5, source=source, render_mode='canvas')
+    p.add_layout(labels)
   p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title)
   p.circle('x', 'y', color='fill_color',
            fill_alpha='fill_alpha',
            line_width=0,
-           radius='radius', source=source, kwargs)
-  p.xaxis[0].axis_label = xname
-  p.yaxis[0].axis_label = yname
-  if showlabels:
-    labels = LabelSet(text='labels', level='glyph',
-                      x_offset=5, y_offset=5, source=source, render_mode='canvas')
-    p.add_layout(labels)
+           radius = 'radius' if radi else None, source = source, kwargs)
+  p.xaxis[0].axis_label=xname
+  p.yaxis[0].axis_label=yname
 
   show(p)
   return(p)
 
 
-def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
+def bigScatter(data, precomputed = False, logscale = False, features = False, colors = None, title = "BigScatter", binsize = 0.1, folder = "", showpoint = False):
+  TOOLS="wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
+  names=[("count", "@c")]
+  if features:
+    names.append(('features', '@features'))
+  if precomputed:
+    TOOLS="hover," + TOOLS
+  p=figure(title = title, tools = TOOLS, tooltips = names if precomputed else None,
+             match_aspect = True, background_fill_color = '#440154')
+  if precomputed:
+    p.hex_tile(q = "q", r = "r", size = binsize, line_color = None, source = data,
+               hover_color = "pink", hover_alpha = 0.8,
+               fill_color = linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  else:
+    if features:
+      print("we cannot yet process features on non precomputed version")
+    r, bins=p.hexbin(data[:, 0], data[:, 1], line_color = None, size = binsize,
+                       hover_color = "pink", hover_alpha = 0.8,
+                       fill_color = linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  p.grid.visible=False
+  if showpoint:
+    p.circle(data[:, 0], data[:, 1], color = "white", size = 1)
+
+  if not precomputed:
+    p.add_tools(HoverTool(
+        tooltips=names,
+        mode="mouse", point_policy="follow_mouse", renderers=[r] if not precomputed else None
+    ))
+
+  output_file(folder + title + "_hex_plot.html")
+
+  show(p)
+
+
+def CNV_Map(df, sample_order = [], title = "CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
             width=900, height=400, standoff=10, y_label='', marks=[]):
   """
   create an interactive plot suited for visualizing segment level CN data for a set of samples using bokeh
@@ -321,7 +362,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
 def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
-            searchbox=False, minlogfold=0.15, minpval=0.1):
+            searchbox=False, logfoldtohighlight=0.15, pvaltohighlight=0.1, showlabels=False):
   """
   Make an interactive volcano plot from Differential Expression analysis tools outputs
 
@@ -338,13 +379,14 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
     searchbox: whether or not to add a searchBox to interactively highlight genes
     minlogfold: otherwise the point is not plotted
     minpval: otherwise the point is not plotted
+    logfoldtohighlight:
+    pvaltohighlight:
 
   Returns:
   --------
     The bokeh object
   """
-  # Make the hover tool
-  to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [], minlogfold, minpval)
+  to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [], logfoldtohighlight, pvaltohighlight)
   hover = bokeh.models.HoverTool(tooltips=tooltips,
                                  names=['circles'])
 
@@ -361,6 +403,10 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
   p.add_tools(hover)
   p, source1 = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', color='#1a9641', maxvalue=maxvalue)
   p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
+  if showlabels:
+    labels = LabelSet(x='log2FoldChange', y='transformed_q', text_font_size='7pt', text="gene_id", level="glyph",
+                      x_offset=5, y_offset=5, source=source2, render_mode='canvas')
+    p.add_layout(labels)
   if searchbox:
     text = TextInput(title="text", value="gene")
     text.js_on_change('value', CustomJS(
@@ -393,17 +439,16 @@ def add_points(p, df1, x, y, color='blue', alpha=0.2, outline=False, maxvalue=10
   df['alpha'] = alpha
   df['size'] = 7
   source1 = bokeh.models.ColumnDataSource(df)
-  source2 = bokeh.models.ColumnDataSource(df)
 
   # Specify data source
-  p.circle(x=x, y='transformed_q', size='size',
-           alpha='alpha', source=source1,
-           color='color', name='circles')
+  p.scatter(x=x, y='transformed_q', size='size',
+            alpha='alpha', source=source1,
+            color='color', name='circles')
   if outline:
-    p.circle(x=x, y='transformed_q', size=7,
-             alpha=1,
-             source=source2, color='black',
-             fill_color=None, name='outlines')
+    p.scatter(x=x, y='transformed_q', size=7,
+              alpha=1,
+              source=source1, color='black',
+              fill_color=None, name='outlines')
 
   # prettify
   p.background_fill_color = "#DFDFE5"
@@ -411,13 +456,19 @@ def add_points(p, df1, x, y, color='blue', alpha=0.2, outline=False, maxvalue=10
   return p, source1
 
 
-def selector(df, valtoextract, minlogfold=0.15, minpval=0.1):
+def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, minlogfold=0.15, minpval=0.1):
   """A function to separate tfs from everything else"""
-  sig = (df.pvalue < minpval) & (abs(df.log2FoldChange) > minlogfold)
-  not_tf = (~df.gene_id.isin(valtoextract))
-  is_tf = (df.gene_id.isin(valtoextract))
-  to_plot_not = df[sig & not_tf]
-  to_plot_yes = df[sig & is_tf]
+  toshow = (df.pvalue < minpval) & (abs(df.log2FoldChange) > minlogfold)
+  df = df[toshow]
+  sig = (df.pvalue < pvaltohighlight) & (abs(df.log2FoldChange) > logfoldtohighlight)
+  if valtoextract:
+    not_tf = (~df.gene_id.isin(valtoextract))
+    is_tf = (df.gene_id.isin(valtoextract))
+    to_plot_not = df[~sig | not_tf]
+    to_plot_yes = df[sig & is_tf]
+  else:
+    to_plot_not = df[~sig]
+    to_plot_yes = df[sig]
   return to_plot_not, to_plot_yes
 
 # What pops up on hover?
@@ -864,3 +915,164 @@ def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
         print(gcp.lsFiles([gsfolderto + name], '-la'))
       samples.loc[i, ntype] = gsfolderto + name
   return samples
+
+
+def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
+                      cores=8, cleanfunc=lambda i: i.split('(GO')[0]):
+  """
+  data: 
+  experiments:
+  scaling:
+  res:
+
+  """
+  for i, val in enumerate(experiments):
+    print(val)
+    totest = data[[v for v in data.columns[:-1] if val + '-' in v or 'AAVS1' in v]]
+    cls = ['Condition' if val + '-' in v else 'DMSO' for v in totest.columns]
+    if scaling:
+      if abs(scaling[val.split('_')[1]][0]) > scaling[val.split('_')[1]][1]:
+        print("rescaling this one")
+        cols = [i for i in totest.columns if val + '-' in i]
+        totest[cols] = totest[cols] * (2**scaling[val.split('_')[1]][0])
+    if val in res:
+      print(val + " is already in set")
+      continue
+    res[val] = gseapy.gsea(data=totest, gene_sets=geneset,
+                           cls=cls, no_plot=False, processes=cores)
+    res[val].res2d['Term'] = [i for i in res[val].res2d.index]
+    for i, v in res.items():
+      res[i].res2d['Term'] = [cleanfunc(i) for i in v.res2d['Term']]
+    plt.figure(i)
+    sns.barplot(data=res[val].res2d.iloc[:25], x="es", y="Term",
+                hue_order="geneset_size").set_title(val)
+  a = set()
+  for k, val in res.items():
+    a.update(set(val.res2d.Term))
+  a = {i: [0] * len(res) for i in a}
+  for n, (k, val) in enumerate(res.items()):
+    for i, v in val.res2d.iterrows():
+      a[v.Term][n] = v.es
+  res = pd.DataFrame(a, index=res.keys())
+  a = sns.clustermap(figsize=(25, 20), data=res, vmin=-1, vmax=1, yticklabels=res.index, cmap=plt.cm.RdYlBu)
+  b = sns.clustermap(-res.T.corr(), cmap=plt.cm.RdYlBu, vmin=-1, vmax=1)
+  if savename:
+    res.to_csv(savename + ".csv")
+    a.savefig(savename + "_genesets.pdf")
+    b.savefig(savename + "_correlation.pdf")
+  return res
+
+
+def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1 / 100,
+            name="RNPv2", spikevol=1, control="AAAVS1", fdr=0.1, totalrnamass=0.5):
+  ipython = get_ipython()
+  ipython.magic("load_ext rpy2.ipython")
+  ipython.magic("R library('erccdashboard')")
+  ipython.magic("R datType = 'count'")  # "count" for RNA-Seq data, "array" for microarray data
+  ipython.magic("R isNorm = F")  # flag to indicate if input expression measures are already normalized, default is FALSE
+  ipython.magic("R -i name filenameRoot = name")  # user defined filename prefix for results files
+  ipython.magic("R -i control sample2Name = control")  # name for sample 2 in the experiment
+  ipython.magic("R -i issingle erccmix < - if(issingle) 'Single' else 'RatioPair'")  # name of ERCC mixture design, "RatioPair" is default
+  ipython.magic("R -i dilution erccdilution = dilution")  # dilution factor used for Ambion spike-in mixtures
+  ipython.magic("R -i spikevol spikeVol = spikevol")  # volume (in microliters) of diluted spike-in mixture added to total RNA mass
+  ipython.magic("R -i fdr choseFDR = fdr")  # user defined false discovery rate (FDR), default is 0.05
+  ipython.magic("R exDat = ''")
+  ipython.magic("R - i totalrnamass totalRNAmass < - totalrnamass")
+
+  cols = list(ERCC.columns)
+  cols.sort()
+  res = {}
+  for val in experiments:
+    d = {}
+    e = 0
+    c = 0
+    d.update({
+        featurename: 'Feature'
+    })
+    for i in cols[:-1]:
+      if val + '-' in i:
+        e += 1
+        d.update({i: val.split('_')[-1] + '_' + str(e)})
+      if control + "-" in i:
+        c += 1
+        d.update({i: control + "_" + str(c)})
+    a = ERCC[list(d.keys())].rename(columns=d)
+    a.to_csv('/tmp/ERCC_estimation.csv', index=None)
+    val = val.split('_')[-1]
+
+    ipython.magic("R -i val print(val)")
+
+    ipython.magic("R print(sample2Name)")
+    ipython.magic("R a <- read.csv('/tmp/ERCC_estimation.csv')")
+    ipython.magic("R print(head(a))")
+
+    try:
+
+      ipython.magic("R - i val exDat = initDat(datType=datType, isNorm=isNorm, exTable=a,\
+                                 filenameRoot=filenameRoot, sample1Name=val,\
+                                 sample2Name=sample2Name, erccmix=erccmix,\
+                                 erccdilution=erccdilution, spikeVol=spikeVol,\
+                                 totalRNAmass=totalRNAmass, choseFDR=choseFDR)")
+      ipython.magic("R exDat = est_r_m(exDat)")
+      ipython.magic("R exDat = dynRangePlot(exDat)")
+
+    except Warning:
+      print("failed for " + val)
+      continue
+    except:
+      print('worked for ' + val)
+
+    ipython.magic("R print(summary(exDat))")
+    ipython.magic("R grid.arrange(exDat$Figures$dynRangePlot)")
+    ipython.magic("R grid.arrange(exDat$Figures$r_mPlot)")
+    ipython.magic("R grid.arrange(exDat$Figures$rangeResidPlot)")
+
+    ipython.magic("R -o rm rm <- exDat$Results$r_m.res$r_m.mn")
+    ipython.magic("R -o se se <- exDat$Results$r_m.res$r_m.mnse")
+
+    res[val] = (rm[0], se[0])
+  for i, v in res.items():
+    if abs(v[0]) > v[1]:
+      print(i, v[0])
+  return res
+
+
+def fromGTF2BED(gtfname, bedname, gtftype='geneAnnot'):
+  if gtftype == 'geneAnnot':
+    gtf = pd.read_csv(gtfname, sep='\t', header=0, names=["chr", "val", "type", "start", 'stop', 'dot', 'strand', 'loc', 'name'])
+    gtf['name'] = [i.split('gene_id "')[-1].split('"; trans')[0] for i in gtf['name']]
+    prevname = ''
+    newbed = {'chr': [], 'start': [], 'end': [], 'gene': []}
+    for i, val in gtf.iterrows():
+      showcount(i, len(gtf))
+      if val['name'] == prevname:
+        newbed['end'][-1] = val['stop']
+      else:
+        newbed['chr'].append(val['chr'])
+        newbed['start'].append(val['start'])
+        newbed['end'].append(val['stop'])
+        newbed['gene'].append(val['name'])
+      prevname = val['name']
+    newbed = pd.DataFrame(newbed)
+    newbed = newbed[~newbed.chr.str.contains('_fix')]
+    newbed.to_csv(bedname + ".bed", sep='\t', index=None)
+    newbed.to_csv(bedname + "_genes.bed", sep='\t', index=None)
+    return newbed
+
+
+def showcount(i, size):
+  print(str(1 + int(100 * (i / size))) + '%', end='\r')
+
+
+def combin(n, k):
+  """Nombre de combinaisons de n objets pris k a k"""
+  if k > n // 2:
+    k = n - k
+  x = 1
+  y = 1
+  i = n - k + 1
+  while i <= n:
+    x = (x * i) // y
+    y += 1
+    i += 1
+  return x
