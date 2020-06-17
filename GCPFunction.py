@@ -152,7 +152,9 @@ def rmFiles(files, group=50, add=''):
 
     Args:
     ----
-            files: gs paths
+        files: gs paths
+        group: number to do in parallel
+        add: additional gsutil cp params
     """
     by = len(files) if len(files) < group else group
     for sfiles in h.grouped(files, by):
