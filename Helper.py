@@ -1258,3 +1258,21 @@ def combin(n, k):
     y += 1
     i += 1
   return x
+
+
+def mergeSplicingVariants(df, defined='.'):
+  df = df.T.sort_index()
+  foundpoint = False
+  for i, v in enumerate(df.index.tolist()):
+    if foundpoint:
+      if defined in v:
+        tomerge.append(v)
+      else:
+        if foundpoint not in df.index:
+          df.loc[foundpoint] = df.loc[tomerge].sum(1)
+        df = df.drop(index=tomerge)
+        foundpoint = False
+    elif defined in v:
+      foundpoint = v.split(defined)[0]
+      tomerge = [v]
+  return df
