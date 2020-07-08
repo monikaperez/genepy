@@ -254,7 +254,7 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False,
   p.circle('x', 'y', color='fill_color',
            fill_alpha='fill_alpha',
            line_width=0,
-           radius = 'radius' if radi else None, source = source, kwargs)
+           radius = 'radius' if radi else None, source = source, **kwargs)
   p.xaxis[0].axis_label=xname
   p.yaxis[0].axis_label=yname
 
@@ -834,7 +834,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
     d = str(int(r)) if int(r) > 0 else str(1)
   else:
     return unknown
-  return d + sep + m + sep + a+ if order == "asc" else a + sep + m + sep + d
+  return d + sep + m + sep + a if order == "asc" else a + sep + m + sep + d
 
 
 def datetoint(dt, split='-', unknown='U', order="des"):
@@ -913,15 +913,15 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
 
   Args:
   -----
-  refgenome: str the file path to the indexed reference genome
-  FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
-  BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
-  mapper: str flag to 'bwa', ...
-  pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
+    refgenome: str the file path to the indexed reference genome
+    FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
+    BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
+    mapper: str flag to 'bwa', ...
+    pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
 
   Returns:
   --------
-  dict(file,float) the scaling factor dict
+    dict(file,float) the scaling factor dict
 
   """
   if len(fastQfolder) > 0:
@@ -1005,6 +1005,20 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
 
 def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
   """
+  moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
+
+  will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
+
+  Args:
+  ----
+    samples: pandas.dataframe with columns to move
+    gsfolderto: the bucket path to move the data to
+    values: list of the cols in the dataframe containing the gs object path to be moved 
+    catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
+
+  Returns:
+  --------
+    the updated sample pandas.dataframe
   """
   # to do the download to the new dataspace
   for i, val in samples.iterrows():

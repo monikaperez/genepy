@@ -193,7 +193,7 @@ def recoverFiles(files):
 def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
     """
     rename/move a bunch of GCP objects found in some specific places
-    
+
     Args:
     -----
         rename_dict: dict(prevName,newName)
@@ -202,12 +202,17 @@ def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
                     ** means any occurence of this file in any folder will change its name
                    .* means all file unregarding of the suffix, will rename them all a.bam [a]da.bai to b.bam, [b]da.bai
                    *. means all files with the suffix, will change the suffix of these files from a to b
-                   _.* means all file unregarding of the suffix, will rename them. not just replacing the a part with a to b but the full file name [a]dea.bam to b.bam
+                   -.* means all file unregarding of the suffix, will rename them. not just replacing the a part with a to b but the full file name [a]dea.bam to b.bam
         types: Nothing yet
         test: if test, just shows the command but does not run it
         cores:  cores tells on how many processor to parallelize the task
     """
     r = 0
+    val = []
+    for k, v in rename_dict.items():
+        val.append(v)
+        if k in val:
+            raise ValueError('circular dependency in the rename with key ' + k)
     for k, v in rename_dict.items():
         loc = location
         if '**' in wildcards:

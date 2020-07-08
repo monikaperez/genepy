@@ -57,10 +57,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
 
   Returns:
   -------
-    failed
-
-  Raises:
-  ------
+    list of ids of failed submissions
   """
   failed_submission = []
   timing = 0
@@ -101,6 +98,12 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
 
 def removeSamples(workspace, samples):
   """
+  removes a set of samples from a workspace (very usefull when we have linked pairs and pairsets)
+
+  Args:
+  -----
+    workspace: workspace name
+    samples: list of samples
   """
   wm = dm.WorkspaceManager(workspace).disable_hound()
   try:
@@ -272,11 +275,15 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samp
 
 def addToSampleSet(workspace, samplesetid, samples):
   """
+  add samples to a sample set
 
   will create new if doesn't already exist, else adds to existing
 
   Args:
   ----
+    workspace: the workspace name
+    samplesetid: the sample set name
+    samples: a list of samples
   """
   try:
     prevsamples = dm.WorkspaceManager(workspace).get_sample_sets()['samples'][samplesetid]
@@ -288,7 +295,15 @@ def addToSampleSet(workspace, samplesetid, samples):
 
 def addToPairSet(workspace, pairsetid, pairs):
   """
-  Similar to above but for a pairset
+  add pairs to a pair set
+
+  will create new if doesn't already exist, else adds to existing
+
+  Args:
+  ----
+    workspace: the workspace name
+    pairsetid: the pair set name
+    pairs: a list of pairs
   """
 
   try:
@@ -322,7 +337,21 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
                     datadir='gs://cclf_results/targeted/kim_sept/',
                     specific_samples=[]):
   """
+  *WIP* For a workspace containing all omics workflows (CNV/SNV) (like CCLF's) copies all interesting output to a data bucket
 
+  Args:
+  -----
+    workspace: the workspace name
+    pathto_cnvpng: sample col of the CNV plot results
+    pathto_stats: sample col of the bam QC results
+    specific_cohorts: if provided, will only look for this specific
+    speicifc_celllines: if need to rrun on specific cell lines  
+    is_from_pairs: if we process on pairs or samples data
+    pathto_snv: sample col of the snv files
+    pathto_seg: sample col of the segment files
+    datadir: gs bucket path where to copy the resulting files 
+    specific_samples: if provided will only look for these samples
+  
   """
   if specific_cohorts:
     samples = dm.WorkspaceManager(workspace).get_samples()
@@ -344,17 +373,39 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
 
 
-def changeGSlocation(workspacefrom, newgs, data=None, workspaceto=None, prevgslist=[], index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run=False, par=20):
+def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], index_func=None,
+                     flag_non_matching=False, onlycol=[], entity='samples', droplists=True, keeppath=True, dry_run=False, par=20):
   """
+  Function to move data around from one workspace to a bucket or to another workspace. 
 
+  can also work on dataframes containing lists of paths
+
+  Args:
+  -----
+    workspacefrom: the workspace name where the data is
+    newgs: the newgs bucket where to copy the data in
+    workspaceto: if we should have these new samples and columns added to another workspace instead \
+    of just updating the same one (usefull to copy one workspace to another)
+    prevgslist: if providded, will only move files that are in the set of google bucket listed here
+    index_func: *WIP* unused
+    flag_non_matching: if set to true and prevgslist is set to some value, will return a list of samples that were not 
+    matched to anything in the prevgslist
+    onlycol: do this only on a subset of columns in terra workspace
+    entity: the entity in the terra workspace on which to do this
+    droplists: if set to true remove all columns containing list of paths (list of path are not uploaded well in terra)
+    keeppath: if set to true, will keep the full object path and just change the bucket
+    dry_run: if set to true will not update anything on Terra but just return the result
+    par: on how many processor do the gs copy commands.
+
+  Returns:
+  -------
+    torename: the pandas.df containing the new paths
+    flaglist: the samples that were non matching (if flag_non_matching is set to true)
   """
   flaglist = []
-  data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
-  if data is None:
-    a = wmfrom.get_entities(entity)
-    print("using the data from " + workspacefrom + " " + entity + " list")
+  a = wmfrom.get_entities(entity)
+  print("using the data from " + workspacefrom + " " + entity + " list")
   if len(a) == 0:
     raise ValueError('no ' + entity)
   if onlycol:
@@ -572,6 +623,10 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
       workspace (str): Workspace name
     samples list[str] of samples_id for which you want to share data
     bamcols: list[str] list of column names
+
+  Returns:
+  --------
+    a list of the gs path we have been giving access to
   """
   if type(users) is str:
     users = [users]
@@ -596,8 +651,26 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
 def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
+  """
+  same as shareTerraBams but is completed to work with CCLE bams from the CCLE sample tracker
 
+  You need to have gsheet installed and you '~/.client_secret.json', '~/.storage.json' set up
+
+  Args:
+  ----
+    users: list[str] of users' google accounts
+    samples list[str] of samples cds_ids for which you want to share data
+    bamcols: list[str] list of column names where bams/bais are
+    raise_error: whether or not to raise an error if we find blacklisted lines
+    refsheet_url: the google spreadsheet where the samples are stored
+    privacy_sheeturl: the google spreadsheet where the samples are stored
+
+  Returns:
+  --------
+    a list of the gs path we have been giving access to
+  """
   sheets = Sheets.from_files('~/.client_secret.json', '~/.storage.json')
+  print("You need to have gsheet installed and you '~/.client_secret.json', '~/.storage.json' set up")
   privacy = sheets.get(privacy_sheeturl).sheets[6].to_frame()
   refdata = sheets.get(refsheet_url).sheets[0].to_frame().set_index('cds_sample_id', drop=True)
   blacklist = [i for i in privacy['blacklist'].values.tolist() if i is not np.nan]
