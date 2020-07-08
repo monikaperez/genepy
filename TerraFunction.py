@@ -14,6 +14,7 @@ from JKBio import Helper as h
 from JKBio import GCPFunction as gcp
 import ipdb
 import subprocess
+from gsheets import Sheets
 
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
@@ -56,6 +57,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
 
   Returns:
   -------
+    failed
 
   Raises:
   ------
@@ -342,7 +344,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
       os.system('gsutil cp ' + val[pathto_snv] + ' ' + datadir + i + '/')
 
 
-def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], index_func=None,
+def changeGSlocation(workspacefrom, newgs, data=None, workspaceto=None, prevgslist=[], index_func=None,
                      flag_non_matching=False, onlycol=[], entity='', droplists=True, keeppath=True, dry_run=False, par=20):
   """
 
@@ -350,7 +352,9 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
   flaglist = []
   data = {}
   wmfrom = dm.WorkspaceManager(workspacefrom)
-  a = wmfrom.get_entities(entity)
+  if data is None:
+    a = wmfrom.get_entities(entity)
+    print("using the data from " + workspacefrom + " " + entity + " list")
   if len(a) == 0:
     raise ValueError('no ' + entity)
   if onlycol:
@@ -553,7 +557,7 @@ def findBackErasedDuplicaBamteFromTerraBucket(workspace, gsfolder, bamcol="WES_b
       print("no data for " + str(k))
 
 
-def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
+def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", "internal_bai_filepath"]):
   """
   will share some files from gcp with a set of users using terra as metadata repo.
 
@@ -577,12 +581,47 @@ def shareTerraBams(users, workspace, samples, bamcols=["WES_bam", "WES_bai"]):
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil -m acl ch -ru " + user + ":R" + files)
+    code = os.system("gsutil -m acl ch -ru " + user + ":R " + files)
     if code == signal.SIGINT:
       print('Awakened')
       break
   print('the files are stored here:\n\n')
   print(togiveaccess)
+  print('\n\njust install and use gsutil to copy them')
+  print('https://cloud.google.com/storage/docs/gsutil_install')
+  print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
+  return togiveaccess
+
+
+def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+                  refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
+                  privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
+
+  sheets = Sheets.from_files('~/.client_secret.json', '~/.storage.json')
+  privacy = sheets.get(privacy_sheeturl).sheets[6].to_frame()
+  refdata = sheets.get(refsheet_url).sheets[0].to_frame().set_index('cds_sample_id', drop=True)
+  blacklist = [i for i in privacy['blacklist'].values.tolist() if i is not np.nan]
+  blacklisted = set(blacklist) & set(samples)
+  print("we have " + str(len(blacklist)) + ' blacklisted files')
+  if len(blacklisted):
+    print("these lines are blacklisted " + blacklisted)
+  if raise_error:
+    raise ValueError("blacklistedlines")
+  if type(users) is str:
+    users = [users]
+
+  togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
+  usrs = ""
+  for user in users:
+    usrs += " " + user + ":R"
+  files = ''
+  for i in togiveaccess:
+    files += ' ' + i
+  code = os.system("gsutil -m acl ch -ru " + usrs +":R "+ files)
+  if code == signal.SIGINT:
+    print('Awakened')
+    return
+  print('the files are stored here:\n\n' + refsheet_url)
   print('\n\njust install and use gsutil to copy them')
   print('https://cloud.google.com/storage/docs/gsutil_install')
   print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
