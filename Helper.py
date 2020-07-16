@@ -185,7 +185,8 @@ def scatter(data, labels=None, xname='x', yname='y', title='scatter plot', showl
            radius='radius' if radi else None, source=source)
   p.xaxis[0].axis_label = xname
   p.yaxis[0].axis_label = yname
-
+  output_file(folder + title.replace(' ', "_") + "_scatter.html")
+  output_file(folder + title.replace(' ', "_") + "_scatter.pdf")
   show(p)
   return(p)
 
@@ -219,7 +220,8 @@ def bigScatter(data, precomputed=False, logscale=False, features=False, colors=N
         mode="mouse", point_policy="follow_mouse", renderers=[r] if not precomputed else None
     ))
 
-  output_file(folder + title + "_hex_plot.html")
+  output_file(folder + title.replace(' ', "_") + "_scatter.html")
+  output_file(folder + title.replace(' ', "_") + "_scatter.pdf")
 
   show(p)
 
@@ -282,10 +284,13 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     hline = Span(location=val, dimension='width', line_color='green', line_width=0.2)
     p.renderers.extend([hline])
 
+  output_file(folder + title.replace(' ', "_") + "_cn_plot.html")
+  output_file(folder + title.replace(' ', "_") + "_cn_plot.pdf")
   show(p)      # show the plot
+  return p
 
 
-def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id')],
+def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
             searchbox=False, logfoldtohighlight=0.15, pvaltohighlight=0.1, showlabels=False):
   """A function to plot the bokeh single mutant comparisons."""
@@ -330,6 +335,8 @@ def volcano(data, genenames=None, tohighlight=None, tooltips=[('gene', '@gene_id
       console.log(source)
       """))
     p = column(text, p)
+  output_file(folder + title.replace(' ', "_") + "_volcano.html")
+  output_file(folder + title.replace(' ', "_") + "_volcano.pdf")
   return p
 
 
@@ -444,7 +451,9 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
       show(p)
     except:
       show(p)
-    save(p, title + '.html')
+
+    output_file(folder + title.replace(' ', "_") + "_correlation.html")
+    output_file(folder + title.replace(' ', "_") + "_correlation.pdf")
 
     return p  # show the plot
   else:
@@ -455,7 +464,7 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
     plt.show()
 
 
-def venn(inp, names, title="venn"):
+def venn(inp, names, title="venn", folder=''):
   labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
   if len(inp) == 2:
     fig, ax = pyvenn.venn2(labels, names=names)
@@ -470,7 +479,8 @@ def venn(inp, names, title="venn"):
   else:
     raise ValueError('need to be between 2 to 6')
   ax.set_title(title)
-  fig.savefig(title + '.png')
+  if folder:
+    fig.savefig(folder + title + '.pdf')
   fig.show()
   plt.pause(0.1)
 
