@@ -351,7 +351,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
     pathto_seg: sample col of the segment files
     datadir: gs bucket path where to copy the resulting files 
     specific_samples: if provided will only look for these samples
-  
+
   """
   if specific_cohorts:
     samples = dm.WorkspaceManager(workspace).get_samples()
@@ -648,7 +648,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
   return togiveaccess
 
 
-def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
@@ -678,8 +678,8 @@ def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_file
   print("we have " + str(len(blacklist)) + ' blacklisted files')
   if len(blacklisted):
     print("these lines are blacklisted " + blacklisted)
-  if raise_error:
-    raise ValueError("blacklistedlines")
+    if raise_error:
+      raise ValueError("blacklistedlines")
   if type(users) is str:
     users = [users]
 
@@ -690,7 +690,7 @@ def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_file
   files = ''
   for i in togiveaccess:
     files += ' ' + i
-  code = os.system("gsutil -m acl ch -ru " + usrs +":R "+ files)
+  code = os.system("gsutil -m acl ch -ru" + usrs + files)
   if code == signal.SIGINT:
     print('Awakened')
     return
