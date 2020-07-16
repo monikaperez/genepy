@@ -236,3 +236,8 @@ ssd () { # gets my ssd storage left (only in linux)
   df -h | grep "/mnt/"
 }
 
+remove_port_rsub () {
+  username=${1:-jeremie}
+  ps -u username
+  # kill # of first process named sshd 
+}  
