@@ -51,8 +51,9 @@ def mvFiles(files, location, group=50, listen_to_errors=False):
 
     Args:
     ----
-            files: gs paths
-            location: to move the files to
+        files: gs paths
+        location: to move the files to
+        group: files to do in parallel
     """
     by = len(files) if len(files) < group else group
     for sfiles in h.grouped(files, by):
@@ -71,8 +72,9 @@ def lsFiles(files, add='', group=50):
 
     Args:
     ----
-            files: gs paths
-            add: additional params to add
+        files: gs paths
+        add: additional params to add
+        group: files to do in parallel
     """
     print('listing files in gs')
     by = len(files) if len(files) < group else group
@@ -99,8 +101,9 @@ def cpFiles(files, location, group=50):
 
     Args:
     ----
-            files: gs paths
-            location to copy
+        files: gs paths
+        location to copy
+        group: files to do in parallel
     """
     by = len(files) if len(files) < group else group
     for sfiles in h.grouped(files, by):
@@ -119,8 +122,11 @@ def catFiles(files, group=50, split=False, cut=False):
 
     Args:
     ----
-            files: gs paths
-            location to copy
+        files: gs paths
+        location to copy
+        group: files to do in parallel
+        cut: split all lines into chunks of size cut
+        split: split lines by split e.g. \\n
     """
     by = len(files) if len(files) < group else group
     res = []
@@ -152,7 +158,9 @@ def rmFiles(files, group=50, add=''):
 
     Args:
     ----
-            files: gs paths
+        files: gs paths
+        group: number to do in parallel
+        add: additional gsutil cp params
     """
     by = len(files) if len(files) < group else group
     for sfiles in h.grouped(files, by):
@@ -169,12 +177,14 @@ def rmFiles(files, group=50, add=''):
 
 def recoverFiles(files):
     """
-    move a set of files in parallel (when the set is huge)
+    recover a set of files in parallel that were erased 
+
+    files need to have their #id appended found using ls -al file
 
     Args:
     ----
-            files: gs paths
-            location: to move the files to
+        files: gs paths
+        location: to move the files to
     """
     cmd = ['gsutil mv ' + f + ' ' + f.split('#')[0] for f in files]
     h.parrun(cmd, cores=cores)
@@ -182,11 +192,27 @@ def recoverFiles(files):
 
 def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
     """
+    rename/move a bunch of GCP objects found in some specific places
 
     Args:
-        wildcards: list[str] can be one of  ['**', '.*', '*.','-.*']
+    -----
+        rename_dict: dict(prevName,newName)
+        location:
+        wildcards: list[str] can be one of  ['**', '.*', '*.','-.*'] if needs to be 
+                    ** means any occurence of this file in any folder will change its name
+                   .* means all file unregarding of the suffix, will rename them all a.bam [a]da.bai to b.bam, [b]da.bai
+                   *. means all files with the suffix, will change the suffix of these files from a to b
+                   -.* means all file unregarding of the suffix, will rename them. not just replacing the a part with a to b but the full file name [a]dea.bam to b.bam
+        types: Nothing yet
+        test: if test, just shows the command but does not run it
+        cores:  cores tells on how many processor to parallelize the task
     """
     r = 0
+    val = []
+    for k, v in rename_dict.items():
+        val.append(v)
+        if k in val:
+            raise ValueError('circular dependency in the rename with key ' + k)
     for k, v in rename_dict.items():
         loc = location
         if '**' in wildcards:

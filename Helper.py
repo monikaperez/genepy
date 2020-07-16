@@ -43,44 +43,75 @@ import venn as pyvenn
 
 
 def fileToList(filename):
+  """
+  loads an input file with a\\n b\\n.. into a list [a,b,..]
+  """
   with open(filename) as f:
     return [val[:-1] for val in f.readlines()]
 
 
 def listToFile(l, filename):
+  """
+  loads a list with [a,b,..] into an input file a\\n b\\n..
+  """
   with open(filename, 'w') as f:
     for item in l:
       f.write("%s\n" % item)
 
 
 def dictToFile(d, filename):
+  """
+  turn a dict into a json file
+  """
   with open(filename, 'w') as json_file:
     json.dump(d, json_file)
 
 
 def fileToDict(filename):
+  """
+  loads a json file into a python dict
+  """
   with open(filename) as f:
     data = json.load(f)
   return data
 
 
 def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
+  """
+  moves a set of files l into a folder:
+
+  Args:
+  -----
+    l: file list
+    pattern: if files are a set of patterns to match
+    folder: folder to move file into
+    add: some additional mv parameters
+  """
   for val in l:
     cmd = 'mv '
     if add:
       cmd += add + ' '
-    cmd += folder
     if '*.' in pattern:
       cmd += '*'
-    cmd += k
+    cmd += val
     if '.*' in pattern:
       cmd += '*'
+    cmd += " " + folder
     res = os.system(cmd)
     if res != 0:
       raise Exception("Leave command pressed or command failed")
 
 
 def batchRename(dt, folder='', add=''):
+  """
+  Given a dict renames corresponding files in a folder
+
+  Args:
+  ----
+    dt: dict(currentName:newName) renaming dictionnary
+    folder: folder to look into
+    add: some additional mv parameters
+  """
   files = os.popen('ls ' + folder).read().split('\n')
   for k, val in dt.items():
     for f in files:
@@ -98,18 +129,31 @@ def batchRename(dt, folder='', add=''):
           raise Exception("Leave command pressed or command failed")
 
 
-def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
-  # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
+def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
+  """
+  Given a list of genes, provide the args where the genes are protein coding genes:
+
+  This functtion will use a file in taiga, you need taigapy installed
+
+  Args:
+  -----
+    listofgenes: list of genes
+    from_idtype: one of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name", the gene name format
+
+  Returns:
+  -------
+    the args where the genes are protein coding
+  """
   tokeep = []
   b = 0
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   for i, val in enumerate(listofgenes):
-    if idtype == "ensembl_gene_id":
+    if from_idtype == "ensembl_gene_id":
       val = val.split(".")[0]
-    elif idtype == "hgnc_id":
+    elif from_idtype == "hgnc_id":
       val = "HGNC:" + str(val)
-    a = gene_mapping["locus_group"][gene_mapping[idtype] == val].values
+    a = gene_mapping["locus_group"][gene_mapping[from_idtype] == val].values
     if len(a) > 0:
       if a[0] == "protein-coding gene":
         tokeep.append(i)
@@ -120,7 +164,22 @@ def filterProteinCoding(listofgenes, idtype='ensembl_gene_id'):
 
 
 def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol"):
-  # idtype can be of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name"
+  """
+  Given a list of genes, provide the args where the genes are protein coding genes:
+
+  This functtion will use a file in taiga, you need taigapy installed
+
+  Args:
+  -----
+    listofgenes: list of genes
+    from_idtype: one of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name", the gene name format
+    to_idtype: one of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name", the gene name format
+
+  Returns:
+  -------
+    1: the new names for each genes that were matched else the same name
+    2: the names of genes that could not be matched
+  """
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   not_parsed = []
@@ -145,12 +204,25 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   return(renamed, not_parsed)
 
 
-def scatter(data, labels=None, xname='x', yname='y', title='scatter plot', showlabels=False,
-            colors=None, importance=None, radi=5, alpha=0.8, **kargs):
+def scatter(data, labels=None, title='scatter plot', showlabels=False,
+            colors=None, importance=None, radi=5, alpha=0.8, **kwargs):
   """
+  Makes an interactive scatter plot using Bokeh
+
   Args:
   -----
-  data:
+    data: an array-like with shape [N,2]
+    labels: a list of N names for each points
+    title: the plot title
+    showlabels: if the labels shoul be always displayed or not (else just on hover)
+    colors: a list of N integers from 0 up to 256 for the dot's colors
+    importance: a list of N values to scale the size of the dots and their opacity by
+    radi: the size of the dots
+    alpha: the opacity of the dots
+    **args: additional bokeh.figure args
+  Returns:
+  ------
+    the bokeh object
   """
   TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
 
@@ -191,28 +263,28 @@ def scatter(data, labels=None, xname='x', yname='y', title='scatter plot', showl
   return(p)
 
 
-def bigScatter(data, precomputed=False, logscale=False, features=False, colors=None, title="BigScatter", binsize=0.1, folder="", showpoint=False):
-  TOOLS = "wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
-  names = [("count", "@c")]
+def bigScatter(data, precomputed = False, logscale = False, features = False, colors = None, title = "BigScatter", binsize = 0.1, folder = "", showpoint = False):
+  TOOLS="wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
+  names=[("count", "@c")]
   if features:
     names.append(('features', '@features'))
   if precomputed:
-    TOOLS = "hover," + TOOLS
-  p = figure(title=title, tools=TOOLS, tooltips=names if precomputed else None,
-             match_aspect=True, background_fill_color='#440154')
+    TOOLS="hover," + TOOLS
+  p=figure(title = title, tools = TOOLS, tooltips = names if precomputed else None,
+             match_aspect = True, background_fill_color = '#440154')
   if precomputed:
-    p.hex_tile(q="q", r="r", size=binsize, line_color=None, source=data,
-               hover_color="pink", hover_alpha=0.8,
-               fill_color=linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+    p.hex_tile(q = "q", r = "r", size = binsize, line_color = None, source = data,
+               hover_color = "pink", hover_alpha = 0.8,
+               fill_color = linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
   else:
     if features:
       print("we cannot yet process features on non precomputed version")
-    r, bins = p.hexbin(data[:, 0], data[:, 1], line_color=None, size=binsize,
-                       hover_color="pink", hover_alpha=0.8,
-                       fill_color=linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
-  p.grid.visible = False
+    r, bins=p.hexbin(data[:, 0], data[:, 1], line_color = None, size = binsize,
+                       hover_color = "pink", hover_alpha = 0.8,
+                       fill_color = linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  p.grid.visible=False
   if showpoint:
-    p.circle(data[:, 0], data[:, 1], color="white", size=1)
+    p.circle(data[:, 0], data[:, 1], color = "white", size = 1)
 
   if not precomputed:
     p.add_tools(HoverTool(
@@ -226,22 +298,25 @@ def bigScatter(data, precomputed=False, logscale=False, features=False, colors=N
   show(p)
 
 
-def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
+def CNV_Map(df, sample_order = [], title = "CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
             width=900, height=400, standoff=10, y_label='', marks=[]):
   """
-  GENERAL DESCRIPT
-
-  de
-  dede
+  create an interactive plot suited for visualizing segment level CN data for a set of samples using bokeh
 
   args:
   ----
-    df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] explain
+    df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] the df containing segment level copy number (can be subsetted to a specific region or genome-wide)
     sampleorder: list[Sample] <- for all samples present in the df
+    title: plot title
+    width: int width
+    height: int height
+    standoff: the space between the plot and the x axis
+    y_label: the y axis label
+    marks: location of lines at specific loci
 
   Returns:
   --------
-    a:
+    The bokeh object
   """
   colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
   colors = RdBu[8]
@@ -293,9 +368,29 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
             searchbox=False, logfoldtohighlight=0.15, pvaltohighlight=0.1, showlabels=False):
-  """A function to plot the bokeh single mutant comparisons."""
-  # Make the hover tool
-  # data should be df gene*samples + genenames
+  """
+  Make an interactive volcano plot from Differential Expression analysis tools outputs
+
+  Args:
+  -----
+    data: a df with rows genes and cols [log2FoldChange, pvalue, gene_id]
+    genenames: 
+    tohighlight: a list of genes to highlight in the plot
+    tooltips: if user wants tot specify another bokeh tooltip
+    title: plot title
+    xlabel: if user wants tot specify another
+    ylabel: if user wants tot specify another
+    maxvalue: the max -log2(pvalue authorized usefull when managing inf vals)
+    searchbox: whether or not to add a searchBox to interactively highlight genes
+    minlogfold: otherwise the point is not plotted
+    minpval: otherwise the point is not plotted
+    logfoldtohighlight:
+    pvaltohighlight:
+
+  Returns:
+  --------
+    The bokeh object
+  """
   to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [], logfoldtohighlight, pvaltohighlight)
   hover = bokeh.models.HoverTool(tooltips=tooltips,
                                  names=['circles'])
@@ -311,8 +406,8 @@ def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene'
 
   # Add the hover tool
   p.add_tools(hover)
-  p, source1 = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', 'se_b', color='#1a9641', maxvalue=maxvalue)
-  p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', 'se_b', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
+  p, source1 = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', color='#1a9641', maxvalue=maxvalue)
+  p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
   if showlabels:
     labels = LabelSet(x='log2FoldChange', y='transformed_q', text_font_size='7pt', text="gene_id", level="glyph",
                       x_offset=5, y_offset=5, source=source2, render_mode='canvas')
@@ -340,7 +435,8 @@ def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene'
   return p
 
 
-def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxvalue=100):
+def add_points(p, df1, x, y, color='blue', alpha=0.2, outline=False, maxvalue=100):
+  """parts of volcano plot"""
   # Define colors in a dictionary to access them with
   # the key from the pandas groupby funciton.
   df = df1.copy()
@@ -369,7 +465,7 @@ def add_points(p, df1, x, y, se_x, color='blue', alpha=0.2, outline=False, maxva
 
 
 def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, minlogfold=0.15, minpval=0.1):
-  """A function to separate tfs from everything else"""
+  """Part of Volcano plot: A function to separate tfs from everything else"""
   toshow = (df.pvalue < minpval) & (abs(df.log2FoldChange) > minlogfold)
   df = df[toshow]
   sig = (df.pvalue < pvaltohighlight) & (abs(df.log2FoldChange) > logfoldtohighlight)
@@ -389,13 +485,26 @@ def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, 
 def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False,
                           invert=False, size=40, interactive=False, rangeto=None):
   """
-  data arrayLike of int / float/ bool of size(names*val)
-  names list like string
-  colors, list like size(names)
+  Make an interactive correlation matrix from an array using bokeh
+
+  Args:
+  -----
+    data: arrayLike of int / float/ bool of size(names*val) or (names*names)
+    names: list of names for each rows
+    colors: list of size(names) a color for each names (good to display clusters)
+    title: the plot title
+    dataIsCorr: if not true, we will compute the corrcoef of the data array
+    invert: whether or not to invert the matrix before running corrcoef
+    size: the plot size
+    interactive: whether or not to make the plot interactive (else will use matplotlib)
+    rangeto: unused for now
+
+  Returns:
+    the bokeh object if interactive else None
 
   """
   if not dataIsCorr:
-    data = np.corrcoef(np.array(data))
+    data = np.corrcoef(np.array(data) if not invert else np.array(data).T)
   else:
     data = np.array(data)
 
@@ -459,12 +568,20 @@ def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False
   else:
     plt.figure(figsize=(size, 200))
     plt.title('the correlation matrix')
-    plt.imshow(data.T if invert else data)
+    plt.imshow(data)
     plt.savefig(title + ".pdf")
     plt.show()
 
 
 def venn(inp, names, title="venn", folder=''):
+  """
+  Plots a venn diagram using the pyvenn package
+
+  Args:
+    inp: a list of sets of values (e.g. [(1,2,3,4),(2,3),(1,3,4,5)]) 
+    names: list of the name of each leaf
+    title: the plot title
+  """
   labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
   if len(inp) == 2:
     fig, ax = pyvenn.venn2(labels, names=names)
@@ -499,6 +616,14 @@ def grouped(iterable, n):
 
 
 def mergeImages(images, outputpath):
+  """
+  will merge a set of images in python
+
+  Args:
+  -----
+    images: list of image filepath
+    outputpath: where to save the resulting merger
+  """
   images = list(map(Image.open, images))
   widths, heights = zip(*(i.size for i in images))
 
@@ -515,9 +640,21 @@ def mergeImages(images, outputpath):
   new_im.save(outputpath)
 
 
-def addTextToImage(imagedir, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize=64):
-    # adds black text to the upper left by default, Arial size 64
-  img = Image.open(imagedir)
+def addTextToImage(image, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize=64):
+  """
+  will add some text to an image in python
+
+  Args:
+  ----
+    image: the image filepath
+    text: the text to write
+    outputpath: the location of the resulting image
+    xy: the location of the text
+    color: tuple(a,b,c) a tuple of 3 ints between 0 and 256
+    fontSize: an int for the font size
+  """
+  # adds black text to the upper left by default, Arial size 64
+  img = Image.open(image)
   draw = ImageDraw.Draw(img)
   # the below file path assumes you're operating macOS
   font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
@@ -567,6 +704,9 @@ def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
+  """
+  will recursively create folders if needed until having all the folders required to save the file in this filepath
+  """
   prevval = ''
   for val in filepath.split('/')[:-1]:
     prevval += val + '/'
@@ -580,8 +720,13 @@ def randomString(stringLength=6, stype='all', withdigits=True):
 
   Args:
   -----
+    stringLength: the amount of char
+    stype: one of lowercase, uppercase, all
+    withdigits: digits allowed in the string?
 
-
+  Returns:
+  -------
+    the string
   """
   if stype == 'lowercase':
     lettersAndDigits = ascii_lowercase
@@ -595,6 +740,9 @@ def randomString(stringLength=6, stype='all', withdigits=True):
 
 
 def pdDo(df, op="mean", of="value1", over="value2"):
+  """
+  apply a function to a panda dataframe WIP
+  """
   df = df.sort_values(by=over)
   index = []
   data = df.iloc[0, of]
@@ -620,6 +768,15 @@ def pdDo(df, op="mean", of="value1", over="value2"):
 
 
 def parrun(cmds, cores, add=[]):
+  """
+  runs a set of commands in parallel using the "&" command
+
+  Args:
+  -----
+    cmds: the list of commands
+    cores: number of parallel execution
+    add: an additional list(len(cmds)) of command to run in parallel at the end of each parallel run
+  """
   count = 0
   exe = ''
   if len(add) != 0 and len(add) != len(cmds):
@@ -649,6 +806,9 @@ def parrun(cmds, cores, add=[]):
 
 
 def askif(quest):
+  """
+  asks a y/n question to the user about something and returns true or false given his answer
+  """
   print(quest)
   inp = input()
   if inp in ['yes', 'y', 'Y', 'YES', 'oui', 'si']:
@@ -659,10 +819,25 @@ def askif(quest):
     return askif('you need to answer by yes or no')
 
 
-def inttodate(i, lim=1965, unknown='U', sep='-', order="asc"):
+def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
+  """
+  transforms an int representing days into a date
+
+  Args:
+  ----
+    i: the int
+    lim: the limited year below which we have a mistake
+    unknown: what to return when unknown (date is bellow the limited year)
+    sep: the sep between your date (e.g. /, -, ...)
+    order: if 'asc', do d,m,y else do y,m,d
+    startsatyear: when is the year to start counting for this int
+
+  Returns:
+    the date or unknown
+  """
   a = int(i // 365)
   if a > lim:
-    a = str(a)
+    a = str(a+startsatyear)
     r = i % 365
     m = str(int(r // 32)) if int(r // 32) > 0 else str(1)
     r = r % 32
@@ -673,6 +848,19 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc"):
 
 
 def datetoint(dt, split='-', unknown='U', order="des"):
+  """
+  same as inttodate but in the opposite way;
+
+  starts at 0y,0m,0d
+
+  dt: the date string
+  split: the splitter in the string (e.g. /,-,...)
+  unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
+  order: if 'asc', do d,m,y else do y,m,d
+
+  Returns:
+    the date
+  """
   arr = np.array(dt[0].split(split) if dt[0] != unknown else [0, 0, 0]).astype(int)
   if len(dt) > 1:
     for val in dt[1:]:
@@ -683,6 +871,20 @@ def datetoint(dt, split='-', unknown='U', order="des"):
 
 
 def getBamDate(bams, split='-', order="des", unknown='U'):
+  """
+  from bam files (could be in a google bucket) returns their likely sequencing date if available in the header
+
+  Args:
+  -----
+    bams: the bams file|bucket paths 
+    split: the splitter in the output date
+    unknown: maybe the some dates can't be found the program will output unknown for them
+    order: if 'asc', do d,m,y else do y,m,d
+
+  Returns:
+  -------
+    a list of likely dates or [unknown]s
+  """
   DTs = []
   for i, bam in enumerate(bams):
     print(i / len(bams), end='\r')
@@ -712,27 +914,24 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
                             pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
                             totrim=True, tomap=True, tofilter=True, results='res/', toremove=False):
   """
-  Will do spike in control to allow for unormalizing sequence data
+  Will extract the spikeInControls from a fastq file (usefull for, let say ChIPseq data with spike ins)
 
-  Count based sequencing data is not absolute and will be normalized as each sample will be sequenced at a specific depth. To figure out what was the actual sample concentration, we use Spike In control
-
+  Count based sequencing data is not absolute and will be normalized as each sample will be sequenced at a specific depth. 
+  To figure out what was the actual sample concentration, we use Spike In control
   You should have FastQfolder/[NAME].fastq & BigWigFolder/[NAME].bw with NAME being the same for the same samples
 
-  If
-
-  @
 
   Args:
   -----
-  refgenome: str the file path to the indexed reference genome
-  FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
-  BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
-  mapper: str flag to 'bwa', ...
-  pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
+    refgenome: str the file path to the indexed reference genome
+    FastQfolder: str the folder path where the fastq files are stored (should be named the same as files in BigWigFolder)
+    BigWigFolder: str the folder path where the bigwig files are stored (should be named the same as files in FastQfolder)
+    mapper: str flag to 'bwa', ...
+    pairedEnd: Bool flat to true for paired end sequences. if true, You should have FastQfolder/[NAME]_1|2.fastq
 
   Returns:
   --------
-  dict(file,float) the scaling factor dict
+    dict(file,float) the scaling factor dict
 
   """
   if len(fastQfolder) > 0:
@@ -815,6 +1014,22 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
 
 
 def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
+  """
+  moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
+
+  will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
+
+  Args:
+  ----
+    samples: pandas.dataframe with columns to move
+    gsfolderto: the bucket path to move the data to
+    values: list of the cols in the dataframe containing the gs object path to be moved 
+    catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
+
+  Returns:
+  --------
+    the updated sample pandas.dataframe
+  """
   # to do the download to the new dataspace
   for i, val in samples.iterrows():
     ran = randomString(6, 'underscore', withdigits=False)
@@ -835,11 +1050,24 @@ def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
 def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
                       cores=8, cleanfunc=lambda i: i.split('(GO')[0]):
   """
-  data: 
-  experiments:
-  scaling:
-  res:
 
+  Will run GSEA on a set of experiment
+  
+  Args:
+  -----
+    data: a pandas.df rows: gene counts; columns: [experimentA_X,..., experimentD_X..., control_X] where X is the replicate number
+    experiments: a list of experiment names (here experimentA,.. experimentD)
+    scaling: a dict(experiment:(mean,std)) of scaling factors and their associated standard error for each experiments
+    res: you can provide a dict containing results from
+    savename: if you want to save the plots as pdfs, provides a location/name
+    geneset: the geneset to run it on. (can be a filepath to your own geneset)
+    cores: to run GSEA on
+    cleanfunc: a func applied to the names of the gene sets to change it in some way (often to make it more readable)
+  Returns
+  -------
+    plots the results
+    1: returns a matrix with the enrichment for each term for each experiment
+    2: returns a dict(experiment:pd.df) with dataframe being the output of GSEA (with pvalues etc..) for each experiments
   """
   for i, val in enumerate(experiments):
     print(val)
@@ -868,19 +1096,48 @@ def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], genese
   for n, (k, val) in enumerate(res.items()):
     for i, v in val.res2d.iterrows():
       a[v.Term][n] = v.es
-  res = pd.DataFrame(a, index=res.keys())
+  pres = pd.DataFrame(a, index=res.keys())
   a = sns.clustermap(figsize=(25, 20), data=res, vmin=-1, vmax=1, yticklabels=res.index, cmap=plt.cm.RdYlBu)
   b = sns.clustermap(-res.T.corr(), cmap=plt.cm.RdYlBu, vmin=-1, vmax=1)
   if savename:
     res.to_csv(savename + ".csv")
     a.savefig(savename + "_genesets.pdf")
     b.savefig(savename + "_correlation.pdf")
-  return res
+  return pres, res
 
 
 def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1 / 100,
             name="RNPv2", spikevol=1, control="AAAVS1", fdr=0.1, totalrnamass=0.5):
-  ipython = get_ipython()
+  """
+  Runs the ERCC dashboard Rpackage on your notebook
+
+  you will need to run this function from ipython and to have the R package erccdashboard installed
+  
+  Args:
+  ----
+    ERCC: a pandas.df rows: ERCC counts columns: [experimentA_X,..., experimentD_X..., control_X] where X is the replicate number
+    experiments: a list of experiment names (here experimentA,.. experimentD)
+    featurename: columns where the ERCC pseudo gene names are stored
+    issingle: ERCC parameters to choose between Single and RatioPair
+    dilution: ERCC dilution parameter
+    name: the name of the experiment set
+    spikevol: ERCC spikevol parameter
+    control: the control name (here control)
+    fdr: ERCC fdr parameter
+    totalrnamass: ERCC totalrnamass parameter
+  
+  Returns:
+  -------
+    a dict(experimentName:(val, ste)) a dict containing the scaling factor and its standard error for each experiment
+
+  Raises:
+  ------
+    RuntimeError: if you are not on ipython
+  """
+  try:
+    ipython = get_ipython()
+  except:
+    raise RuntimeError('you need to be on ipython')
   ipython.magic("load_ext rpy2.ipython")
   ipython.magic("R library('erccdashboard')")
   ipython.magic("R datType = 'count'")  # "count" for RNA-Seq data, "array" for microarray data
@@ -953,6 +1210,20 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
 
 
 def fromGTF2BED(gtfname, bedname, gtftype='geneAnnot'):
+  """
+  transforms a  gtf file into a bed file
+
+  Args:
+  ----
+    gtfname: filepath to gtf file
+    bedname: filepath to beddfile
+    gtftype: only geneAnnot for now
+
+  Returns:
+  --------
+    newbed: the bedfile as a pandas.df
+
+  """
   if gtftype == 'geneAnnot':
     gtf = pd.read_csv(gtfname, sep='\t', header=0, names=["chr", "val", "type", "start", 'stop', 'dot', 'strand', 'loc', 'name'])
     gtf['name'] = [i.split('gene_id "')[-1].split('"; trans')[0] for i in gtf['name']]
@@ -976,11 +1247,17 @@ def fromGTF2BED(gtfname, bedname, gtftype='geneAnnot'):
 
 
 def showcount(i, size):
+  """
+  pretty print of i/size%, to put in a for loop
+  """
   print(str(1 + int(100 * (i / size))) + '%', end='\r')
 
 
 def combin(n, k):
-  """Nombre de combinaisons de n objets pris k a k"""
+  """
+  Nombre de combinaisons de n objets pris k a k
+  Number of comabination of n object taken k at a time
+  """
   if k > n // 2:
     k = n - k
   x = 1
@@ -991,3 +1268,21 @@ def combin(n, k):
     y += 1
     i += 1
   return x
+
+
+def mergeSplicingVariants(df, defined='.'):
+  df = df.T.sort_index()
+  foundpoint = False
+  for i, v in enumerate(df.index.tolist()):
+    if foundpoint:
+      if defined in v:
+        tomerge.append(v)
+      else:
+        if foundpoint not in df.index:
+          df.loc[foundpoint] = df.loc[tomerge].sum(1)
+        df = df.drop(index=tomerge)
+        foundpoint = False
+    elif defined in v:
+      foundpoint = v.split(defined)[0]
+      tomerge = [v]
+  return df
