@@ -204,8 +204,8 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   return(renamed, not_parsed)
 
 
-def scatter(data, labels=None, title='scatter plot', showlabels=False,
-            colors=None, importance=None, radi=5, alpha=0.8, **kwargs):
+def scatter(data, labels=None, title='scatter plot', showlabels=False, folder='',
+            colors=None, xname='', yname="", importance=None, radi=5, alpha=0.8, **kwargs):
   """
   Makes an interactive scatter plot using Bokeh
 
@@ -246,10 +246,6 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False,
       ("name", "@labels"),
       ("(x,y)", "(@x, @y)"),
   ]
-  if showlabels:
-    labels = LabelSet(x='x', y='y', text='names', level='glyph', text_font_size='9pt',
-                      x_offset=5, y_offset=5, source=source, render_mode='canvas')
-    p.add_layout(labels)
   p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title)
   p.circle('x', 'y', color='fill_color',
            fill_alpha='fill_alpha',
@@ -257,34 +253,39 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False,
            radius='radius' if radi else None, source=source)
   p.xaxis[0].axis_label = xname
   p.yaxis[0].axis_label = yname
+  if showlabels:
+    labels = LabelSet(x='x', y='y', text='labels', level='glyph', text_font_size='9pt',
+                      x_offset=5, y_offset=5, source=source, render_mode='canvas')
+    p.add_layout(labels)
   output_file(folder + title.replace(' ', "_") + "_scatter.html")
   output_file(folder + title.replace(' ', "_") + "_scatter.pdf")
   show(p)
   return(p)
 
 
-def bigScatter(data, precomputed = False, logscale = False, features = False, colors = None, title = "BigScatter", binsize = 0.1, folder = "", showpoint = False):
-  TOOLS="wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
-  names=[("count", "@c")]
+def bigScatter(data, precomputed=False, logscale=False, features=False, colors=None,
+               title="BigScatter", binsize=0.1, folder="", showpoint=False):
+  TOOLS = "wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
+  names = [("count", "@c")]
   if features:
     names.append(('features', '@features'))
   if precomputed:
-    TOOLS="hover," + TOOLS
-  p=figure(title = title, tools = TOOLS, tooltips = names if precomputed else None,
-             match_aspect = True, background_fill_color = '#440154')
+    TOOLS = "hover," + TOOLS
+  p = figure(title=title, tools=TOOLS, tooltips=names if precomputed else None,
+             match_aspect=True, background_fill_color='#440154')
   if precomputed:
-    p.hex_tile(q = "q", r = "r", size = binsize, line_color = None, source = data,
-               hover_color = "pink", hover_alpha = 0.8,
-               fill_color = linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+    p.hex_tile(q="q", r="r", size=binsize, line_color=None, source=data,
+               hover_color="pink", hover_alpha=0.8,
+               fill_color=linear_cmap('c', 'Viridis256', 0, max(data.c)) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
   else:
     if features:
       print("we cannot yet process features on non precomputed version")
-    r, bins=p.hexbin(data[:, 0], data[:, 1], line_color = None, size = binsize,
-                       hover_color = "pink", hover_alpha = 0.8,
-                       fill_color = linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
-  p.grid.visible=False
+    r, bins = p.hexbin(data[:, 0], data[:, 1], line_color=None, size=binsize,
+                       hover_color="pink", hover_alpha=0.8,
+                       fill_color=linear_cmap('c', 'Viridis256', 0, None) if not logscale else {'field': 'c', 'transform': LogColorMapper('Viridis256')})
+  p.grid.visible = False
   if showpoint:
-    p.circle(data[:, 0], data[:, 1], color = "white", size = 1)
+    p.circle(data[:, 0], data[:, 1], color="white", size=1)
 
   if not precomputed:
     p.add_tools(HoverTool(
@@ -298,7 +299,7 @@ def bigScatter(data, precomputed = False, logscale = False, features = False, co
   show(p)
 
 
-def CNV_Map(df, sample_order = [], title = "CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
+def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
             width=900, height=400, standoff=10, y_label='', marks=[]):
   """
   create an interactive plot suited for visualizing segment level CN data for a set of samples using bokeh
@@ -366,7 +367,7 @@ def CNV_Map(df, sample_order = [], title = "CN heatmaps sorted by SMAD4 loss, po
 
 
 def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
-            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=250,
+            title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=100,
             searchbox=False, logfoldtohighlight=0.15, pvaltohighlight=0.1, showlabels=False):
   """
   Make an interactive volcano plot from Differential Expression analysis tools outputs
@@ -391,6 +392,7 @@ def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene'
   --------
     The bokeh object
   """
+  # pdb.set_trace()
   to_plot_not, to_plot_yes = selector(data, tohighlight if tohighlight is not None else [], logfoldtohighlight, pvaltohighlight)
   hover = bokeh.models.HoverTool(tooltips=tooltips,
                                  names=['circles'])
@@ -482,8 +484,8 @@ def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, 
 # What pops up on hover?
 
 
-def plotCorrelationMatrix(data, names, colors=None, title=None, dataIsCorr=False,
-                          invert=False, size=40, interactive=False, rangeto=None):
+def plotCorrelationMatrix(data, names, colors=None, title="correlation Matrix", dataIsCorr=False,
+                          invert=False, size=40, folder='', interactive=False, rangeto=None):
   """
   Make an interactive correlation matrix from an array using bokeh
 
@@ -837,7 +839,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
   """
   a = int(i // 365)
   if a > lim:
-    a = str(a+startsatyear)
+    a = str(a + startsatyear)
     r = i % 365
     m = str(int(r // 32)) if int(r // 32) > 0 else str(1)
     r = r % 32
@@ -1052,7 +1054,7 @@ def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], genese
   """
 
   Will run GSEA on a set of experiment
-  
+
   Args:
   -----
     data: a pandas.df rows: gene counts; columns: [experimentA_X,..., experimentD_X..., control_X] where X is the replicate number
@@ -1065,7 +1067,7 @@ def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], genese
     cleanfunc: a func applied to the names of the gene sets to change it in some way (often to make it more readable)
   Returns
   -------
-    plots the results
+    plots the results 
     1: returns a matrix with the enrichment for each term for each experiment
     2: returns a dict(experiment:pd.df) with dataframe being the output of GSEA (with pvalues etc..) for each experiments
   """
@@ -1112,7 +1114,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
   Runs the ERCC dashboard Rpackage on your notebook
 
   you will need to run this function from ipython and to have the R package erccdashboard installed
-  
+
   Args:
   ----
     ERCC: a pandas.df rows: ERCC counts columns: [experimentA_X,..., experimentD_X..., control_X] where X is the replicate number
@@ -1125,7 +1127,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
     control: the control name (here control)
     fdr: ERCC fdr parameter
     totalrnamass: ERCC totalrnamass parameter
-  
+
   Returns:
   -------
     a dict(experimentName:(val, ste)) a dict containing the scaling factor and its standard error for each experiment
@@ -1286,3 +1288,59 @@ def mergeSplicingVariants(df, defined='.'):
       foundpoint = v.split(defined)[0]
       tomerge = [v]
   return df
+
+
+def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
+                     minvar_toremove=0, mincount_toremove=5):
+  files = os.listdir(loc)
+  files = [file for file in files if file.endswith('.tsv')]
+  data = {}
+  for file in files:
+    data[file.split('/')[-1].split('.')[0]] = pd.read_csv(loc + file, sep='\t', comment='#', header=0)
+  prev = -2
+  print("found " + str(len(data)) + ' files:' + str(data.keys()))
+  for k, val in data.items():
+    if len(set(val.Name)) != prev and prev != -2:
+      raise ValueError('we do not have the same number of genes in each file')
+    prev = len(set(val.Name))
+  readcounts = {i: [0] * len(data) for i in val.Name.unique()}
+  tccounts = {i: [0] * len(data) for i in val.Name.unique()}
+  for n, (_, val) in enumerate(data.items()):
+    val = val.sort_values(by="Name")
+    j = 0
+    #print('              ',end='\r')
+    readcount = [val.iloc[0].ReadCount]
+    tccount = [val.iloc[0].TcReadCount]
+    prevname = val.iloc[0].Name
+    for _, v in val.iloc[1:].iterrows():
+      if v.Name == 4609:
+        print(v.ReadCount, v.TcReadCount)
+        print(readcount, tccount)
+      if v.Name == prevname:
+        readcount.append(v.ReadCount)
+        tccount.append(v.TcReadCount)
+      else:
+        readcounts[prevname][n] = np.sum(readcount)
+        tccounts[prevname][n] = np.sum(tccount)
+        # if np.var(readcount) > flag_var:
+        #    print("pb with "+str(v.Name))
+        prevname = v.Name
+        j += 1
+        # print(j,end='\r')
+        readcount = [v.ReadCount]
+        tccount = [v.TcReadCount]
+  files = [*data]
+  readcounts = pd.DataFrame(data=readcounts, columns=val.Name.unique(), index=data.keys()).T
+  tccounts = pd.DataFrame(data=tccounts, columns=val.Name.unique(), index=data.keys()).T
+  if convertTo:
+    names, _ = convertGenes(readcounts.index.tolist(), from_idtype="entrez_id", to_idtype=convertTo)
+    readcounts.index = names
+    names, _ = convertGenes(tccounts.index.tolist(), from_idtype="entrez_id", to_idtype=convertTo)
+    tccounts.index = names
+  nottodrop = np.argwhere(tccounts.values.var(1) >= minvar_toremove).ravel()
+  tccounts = tccounts.iloc[nottodrop]
+  readcounts = readcounts.iloc[nottodrop]
+  nottodrop = np.argwhere(readcounts.values.max(1) >= mincount_toremove).ravel()
+  tccounts = tccounts.iloc[nottodrop]
+  readcounts = readcounts.iloc[nottodrop]
+  return readcounts, tccounts

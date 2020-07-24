@@ -976,7 +976,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichme
         enrichment[i,i]=1 
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-    return overlap, correlation if docorrelation else None, enrichment if doenrichment else None 
+    return overlap, correlation if docorrelation else None, enrichment.replace(-np.inf,-100) if doenrichment else None 
 
 
 def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
