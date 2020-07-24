@@ -119,7 +119,8 @@ def removeSamples(workspace, samples):
 
 
 def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=0,
-                     fformat="fastq12", newsamples=None, samplesetname=None, source='U'):
+                     fformat="fastq12", newsamples=None, samplesetname=None, source='U',
+                     bamcol="bam", baicol="bai"):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -149,28 +150,29 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=
   files = gcp.list_blobs_with_prefix(gcpfolder, prefix, '/')
   if fformat == "bambai":
     if newsamples is None:
-      data = {'sample_id': [], 'bam': [], 'bai': []}
+      data = {'sample_id': [], bamcol: [], baicol: []}
       for file in files:
-        if val.split('.')[-1] in ["bam", "bai"]:
-          name = file.split('/')[-1].split('.')[0].split(sep)[loc][:-2]
+        if file.split('.')[-1] in ["bam", "bai"]:
+          name = file.split('/')[-1].split('.')[0].split(sep)[loc]
           if name in data['sample_id']:
             pos = data['sample_id'].index(name)
             if file[-4:] == ".bam":
-              data['bam'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data[bamcol].insert(pos, 'gs://' + gcpfolder + '/' + file)
             elif file[-4:] == ".bai":
-              data['bai'].insert(pos, 'gs://' + gcpfolder + '/' + file)
+              data[baicol].insert(pos, 'gs://' + gcpfolder + '/' + file)
           else:
             data['sample_id'].append(name)
             if file[-4:] == ".bam":
-              data['bam'].append('gs://' + gcpfolder + '/' + file)
+              data[bamcol].append('gs://' + gcpfolder + '/' + file)
             elif file[-4:] == ".bai":
-              data['bai'].append('gs://' + gcpfolder + '/' + file)
+              data[baicol].append('gs://' + gcpfolder + '/' + file)
             else:
               raise Exception("No fastq R1/R2 error", file)
         else:
           print("unrecognized file type : " + file)
       df = pd.DataFrame(data)
       df = df.set_index("sample_id")
+      print(df)
       df["participant"] = pd.Series(data['sample_id'], index=data['sample_id'])
       wm.upload_samples(df)
       wm.update_sample_set(samplesetname, df.index.values.tolist())
@@ -351,7 +353,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
     pathto_seg: sample col of the segment files
     datadir: gs bucket path where to copy the resulting files 
     specific_samples: if provided will only look for these samples
-  
+
   """
   if specific_cohorts:
     samples = dm.WorkspaceManager(workspace).get_samples()
@@ -648,7 +650,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
   return togiveaccess
 
 
-def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
@@ -678,8 +680,8 @@ def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_file
   print("we have " + str(len(blacklist)) + ' blacklisted files')
   if len(blacklisted):
     print("these lines are blacklisted " + blacklisted)
-  if raise_error:
-    raise ValueError("blacklistedlines")
+    if raise_error:
+      raise ValueError("blacklistedlines")
   if type(users) is str:
     users = [users]
 
@@ -690,7 +692,7 @@ def shareCCLEbams(users, samples, raise_error=False, bamcols=["internal_bam_file
   files = ''
   for i in togiveaccess:
     files += ' ' + i
-  code = os.system("gsutil -m acl ch -ru " + usrs +":R "+ files)
+  code = os.system("gsutil -m acl ch -ru" + usrs + files)
   if code == signal.SIGINT:
     print('Awakened')
     return

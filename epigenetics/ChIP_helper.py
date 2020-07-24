@@ -164,7 +164,7 @@ def mergeBams(rep):
             in1 += ' ' + bam
         os.system("samtools merge " + out1 + in1)
 
-def ReadRoseSuperEnhancers(roseFolder, containsINPUT=True):
+def ReadRoseSuperEnhancers(roseFolder, containsINPUT=True, name="MV411"):
     beds = os.listdir(roseFolder)
     superenhan = pd.DataFrame()
     for i in beds:
@@ -173,7 +173,7 @@ def ReadRoseSuperEnhancers(roseFolder, containsINPUT=True):
     data = [superenhan.columns[6]] + superenhan.columns[8:].tolist()
     if containsINPUT:
         inputd = superenhan.columns[7]
-    superenhan['name'] = [i.split('MV411')[1].split('_')[2] for i in superenhan['REGION_ID']]
+    superenhan['name'] = [i.split(name)[1].split('_')[2] for i in superenhan['REGION_ID']]
     superenhan = superenhan.rename(columns={'CONSTITUENT_SIZE':'size','REGION_ID':"id",'CHROM':'chrom','START':'start','STOP':'end',"NUM_LOCI":'num'}).replace(np.nan,0)
     superenhan['foldchange'] = superenhan[data].sum(1)/superenhan[inputd]
     superenhan = superenhan.drop(columns=data+[inputd])
@@ -290,7 +290,7 @@ def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=
 
 
 def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
-                   width=5, length=10,torecompute=False, name='temp/peaksat.png', refpoint="TSS", scale=None, 
+                   width=5, length=10,torecompute=False, name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
                    sort=False, withDeeptools=True, onlyProfile=False, cluster=1):
     """
     get pysam data
@@ -615,9 +615,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             presence = []
             for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
                 presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-            h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=tf)
-            if saveloc:
-                plt.savefig(saveloc+tf+"_before_venn.png")
+            h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=tf+"_before_venn", folder=saveloc)
             plt.show()
         else:
             print('too many replicates for Venn: '+str(peakmatrix.shape[1]))
@@ -655,14 +653,14 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation of peaks in each replicate", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_before_pairplot.png")
+                plt.savefig(saveloc+tf+"_before_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=1).sum(1).astype(bool)==0, peakmatrix[:,i])
                 sns.kdeplot(merged_bed[val][unique_inval], legend=True).set(xlim=(0,None))
             plt.title("distribution of unique peaks in each replicate")
             if saveloc:
-                plt.savefig(saveloc+tf+"_before_unique_kdeplot.png")
+                plt.savefig(saveloc+tf+"_before_unique_kdeplot.pdf")
             plt.show()
         biggest_ind = sort[ib]
         peakmatrix = peakmatrix.T
@@ -751,7 +749,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             tomergebam.append([biggest, peakname])
         plt.title('distribution of new found peaks')
         if saveloc:
-            plt.savefig(saveloc+tf+"_new_found_peaks_kdeplot.png")
+            plt.savefig(saveloc+tf+"_new_found_peaks_kdeplot.pdf")
         plt.show()
         # new distplot
         # new correlation plot
@@ -775,23 +773,21 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation and distribution of peaks after recovery", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_after_pairplot.png")
+                plt.savefig(saveloc+tf+"_after_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=0).sum(0).astype(bool)==0, peakmatrix[i])
                 sns.kdeplot(merged_bed[val][unique_inval], legend=True).set(xlim=(0,None))
             plt.title("distribution of unique peaks in each replicate after recovery")
             if saveloc:
-                plt.savefig(saveloc+tf+"_after_unique_kdeplot.png")
+                plt.savefig(saveloc+tf+"_after_unique_kdeplot.pdf")
             plt.show()
         if len(peakmatrix.shape) > 1 and doPlot and tf not in remove:
             if peakmatrix.shape[0] < 7:
                 presence = []
                 for peakpres in peakmatrix:  # https://github.com/tctianchi/pyvenn
                     presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=tf+'_recovered')
-                if saveloc:
-                    plt.savefig(saveloc+tf+'_venn_after.png')
+                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=tf+'_recovered',folder=save)
                 plt.show()
             else:
                 print('too many replicates for Venn')    
@@ -806,7 +802,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         fig = sns.barplot(pd.DataFrame(ratiosofunique),index=['percentage of unique'])
         fig.title("ratios of unique in replicates across experiments")
         if saveloc:
-            fig.savefig(saveloc+"All_ratios_unique.png")
+            fig.savefig(saveloc+"All_ratios_unique.pdf")
         plt.show()
     return mergedpeak, tomergebam, remove,ratiosofunique
 
@@ -980,7 +976,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichme
         enrichment[i,i]=1 
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-    return overlap, correlation if docorrelation else None, enrichment if doenrichment else None 
+    return overlap, correlation if docorrelation else None, enrichment.replace(-np.inf,-100) if doenrichment else None 
 
 
 def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
@@ -1266,3 +1262,55 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
             skiprows=1).drop(columns=[4,5,6,7]).rename(columns=
             {0:'chr',1:'start',2:'end',3:'state',8:"color"})
     return ret
+
+def loadMEMEmotifs(file, tfsubset=[],motifspecies='HUMAN'):
+    if file.endswith('.gff'):
+        print('converting to bed, you need to have "gfftobed" installed')
+        cmd = 'gff2bed < '+file+' > '+file+'.bed'
+        file = file+'.bed'
+        res = subprocess.run(cmd,capture_output=True, shell=True)
+        if res.returncode != 0:
+            raise ValueError('issue with the command: ' + str(res.stderr))
+        else:
+            print(res.stdout.decode("utf-8"))
+    ## What are the motifs of our CRC members in ATACseq but not in our matrix
+    merged_motif = pd.read_csv(file, sep='\t',skiprows=0,index_col=None, names=['pos',"fimo", 
+        "nucleotide_motif","relStart","relEnd","pval","strand",".","data"])
+    merged_motif['tf']=[i[5:].split("_"+motifspecies)[0] for i in merged_motif.data]
+    if tfsubset:
+        merged_motif = merged_motif[merged_motif.tf.isin(tfsubset)] 
+    merged_motif['chrom'] = [i.split(':')[0][3:] for i in merged_motif.index]
+    merged_motif['start'] = [i.split(':')[1].split('-')[0] for i in merged_motif.index]
+    merged_motif['end'] = [i.split(':')[1].split('-')[1] for i in merged_motif.index]
+    merged_motif = merged_motif.reset_index(drop=True)
+    merged_motif = merged_motif.rename(columns={'pos':'relStart','fimo':'relEnd','nucleotide_motif':'pos',
+        'relStart':'pval','relEnd':'strand','pval':'fimo','strand':'motif'})
+    merged_motif['motif'] = [i.split('sequence=')[1].split(';')[0] for i in merged_motif.data]
+    merged_motif['p_val'] = [i.split('pvalue=')[1].split(';')[0] for i in merged_motif.data]
+    merged_motif['q_val'] = [i.split('qvalue=')[1].split(';')[0] for i in merged_motif.data]
+    merged_motif = merged_motif.drop(columns=['pos','.','fimo','data'])
+    merged_motif = merged_motif[merged_motif.columns[[6,7,8,0,1,3,2,9,10,5,4]]]
+    merged_motif = merged_motif.sort_values(by=['chrom','start','end']).reset_index(drop=True)
+    return merged_motif
+
+
+def simpleMergeMotifs(motifs, window=0):
+    if type(motifs) is list:
+        motifs = pd.concat(motifs)
+    motifs = motifs.sort_values(by=['chrom', 'start'])
+    toremove = []
+    issues = []
+    prevmotif = motifs.iloc[0]
+    for i, (pos, motif) in enumerate(motifs.iloc[1:].iterrows()):
+        print(str(i / len(motifs)), end="\r")
+        if prevmotif['end'] + window > motif['start'] and prevmotif['chrom'] == motif['chrom']:
+            # can be merged
+            if motif['tf']!= prevmotif['tf'] or motif['motif'] != prevmotif['motif']:
+                print('found different motifs overlapping')
+                issues.extend([motif,prevmotif])
+            else:
+                toremove.append(pos)
+        prevmotif = motif
+    motifs = motifs.drop(index=toremove).reset_index(drop=True)
+    issues = pd.concat(issues)
+    return motifs, issues
