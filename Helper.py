@@ -43,8 +43,9 @@ from matplotlib import pyplot as plt
 import venn as pyvenn
 
 
-rename_mut = {'contig':'chr','position':'pos','Reference_Allele':'ref','ref_allele':'ref','alt_allele':'alt',
-'Chromosome':'chr','End_postition':'end','Start_position':'pos','Tumor_Seq_Allele1':"alt"}
+rename_mut = {'contig': 'chr', 'position': 'pos', 'Reference_Allele': 'ref', 'ref_allele': 'ref', 'alt_allele': 'alt',
+              'Chromosome': 'chr', 'End_postition': 'end', 'Start_position': 'pos', 'Tumor_Seq_Allele1': "alt"}
+
 
 def fileToList(filename):
   """
@@ -1279,84 +1280,88 @@ def combin(n, k):
 def mergeSplicingVariants(df, defined='.'):
   df = df.sort_index()
   foundpoint = False
-  #pdb.set_trace()
-  torename={}
-  todrop =[]
+  # pdb.set_trace()
+  torename = {}
+  todrop = []
   for i, v in enumerate(df.index.tolist()):
-    showcount(i,len(df))
+    showcount(i, len(df))
     if foundpoint:
       if foundpoint in v:
         tomerge.append(v)
       else:
         if foundpoint not in df.index:
-          if len(tomerge)>1:
+          if len(tomerge) > 1:
             #print("merging "+str(len(tomerge)))
             df.loc[foundpoint] = df.loc[tomerge].sum()
             todrop.extend(tomerge)
           else:
-            torename.update({tomerge[0]:foundpoint})
+            torename.update({tomerge[0]: foundpoint})
+        else:
+          todrop.extend(tomerge)
+          tomerge.append(foundpoint)
+          df.loc[foundpoint] = df.loc[tomerge].sum()
         foundpoint = False
     elif defined in v:
       foundpoint = v.split(defined)[0]
       tomerge = [v]
-  if len(torename)>0:
+  if len(torename) > 0:
     df = df.rename(index=torename)
   df = df.drop(index=todrop)
   return df
 
 
-def vcf_to_df(path, hasfilter=False, additional_fields=[], samples=['sample'],additional_unique=[]):
-    uniqueargs=['DB','SOMATIC','GERMLINE',"OVERLAP", "IN_PON","STR","ReverseComplementedAlleles",'NEGATIVE_TRAIN_SITE',"POSITIVE_TRAIN_SITE"]+additional_unique
-    def read_comments(f):
-        fields = {}
-        description = {}
-        for l in f: 
-            l = l.decode("utf-8") if type(l) is not str else l
-            if l.startswith('##'):
-                if 'FORMAT' in l[:20]:
-                    res = l.split('ID=')[1].split(',')[0]
-                    desc = l.split('Description=')[1][:-2]
-                    description.update({res:desc})
-                if 'INFO' in l[:20]:
-                    res = l.split('ID=')[1].split(',')[0]
-                    desc = l.split('Description=')[1][:-2]
-                    description.update({res:desc})
-                    fields.update({res:[]})
-            else:
-                break
-        return fields, description
-    if path.endswith('.gz'):
-        with gzip.open(path,'r') as f:
-            fields, description = read_comments(f)
-    else:
-        with open(path, 'r') as f:
-            fields, description = read_comments(f)
-    names = ['chr','pos','id','ref','alt','qual']
-    names += ['filter'] if hasfilter else ['strand']
-    names +=['data','format']+samples
-    a =  pd.read_csv(path, sep='\t', comment="#", header=None,names=names, index_col=False)
-    print(description)
-    fields.update({i:[] for i in additional_fields})
-    try:
-      for j, val in enumerate(a.data.str.split(';').values.tolist()):
-          res = dict([(v,True) if v in uniqueargs else tuple(v.split('=')) for v in val])
-          for k in fields.keys():
-              fields[k].append(res.get(k,None))
-    except ValueError:
-      print(val)
-      raise ValueError('unknown field')
-    a = pd.concat([a.drop(columns='data'), pd.DataFrame(data=fields, index=a.index)],axis=1)
-    for sample in samples:
-      sorting = a.format[0].split(':')
-      res = a[sample].str.split(':').values.tolist()
-      maxcols = max([len(v) for v in res])
-      if maxcols - len(sorting) >0:
-        for i in range(maxcols - len(sorting)):
-          sorting.append(sorting[-1]+'_'+str(i+1))
-      if len(samples)>1:
-        sorting =[sample+'_'+v for v in sorting]
-      a = pd.concat([a.drop(columns=sample), pd.DataFrame(data = res, columns = sorting, index=a.index)], axis=1)
-    return a.drop(columns='format'), description
+def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_unique=[]):
+  uniqueargs = ['DB', 'SOMATIC', 'GERMLINE', "OVERLAP", "IN_PON", "STR", "ReverseComplementedAlleles"] + additional_unique
+
+  def read_comments(f):
+    fields = {}
+    description = {}
+    for l in f:
+      l = l.decode("utf-8") if type(l) is not str else l
+      if l.startswith('##'):
+        if 'FORMAT' in l[:20]:
+          res = l.split('ID=')[1].split(',')[0]
+          desc = l.split('Description=')[1][:-2]
+          description.update({res: desc})
+        if 'INFO' in l[:20]:
+          res = l.split('ID=')[1].split(',')[0]
+          desc = l.split('Description=')[1][:-2]
+          description.update({res: desc})
+          fields.update({res: []})
+      else:
+        break
+    return fields, description
+  if path.endswith('.gz'):
+    with gzip.open(path, 'r') as f:
+      fields, description = read_comments(f)
+  else:
+    with open(path, 'r') as f:
+      fields, description = read_comments(f)
+  names = ['chr', 'pos', 'id', 'ref', 'alt', 'qual']
+  names += ['filter'] if hasfilter else ['strand']
+  names += ['data', 'format'] + samples
+  a = pd.read_csv(path, sep='\t', comment="#", header=None, names=names, index_col=False)
+  print(description)
+  try:
+    for j, val in enumerate(a.data.str.split(';').values.tolist()):
+      res = dict([(v, True) if v in uniqueargs else tuple(v.split('=')) for v in val])
+      for k in fields.keys():
+        fields[k].append(res.get(k, None))
+  except ValueError:
+    print(val)
+    raise ValueError('unknown field')
+  a = pd.concat([a.drop(columns='data'), pd.DataFrame(data=fields, index=a.index)], axis=1)
+  for sample in samples:
+    sorting = a.format[0].split(':')
+    res = a[sample].str.split(':').values.tolist()
+    maxcols = max([len(v) for v in res])
+    if maxcols - len(sorting) > 0:
+      for i in range(maxcols - len(sorting)):
+        sorting.append(sorting[-1] + '_' + str(i + 1))
+    if len(samples) > 1:
+      sorting = [sample + '_' + v for v in sorting]
+    a = pd.concat([a.drop(columns=sample), pd.DataFrame(data=res, columns=sorting, index=a.index)], axis=1)
+  return a.drop(columns='format'), description
 
 
 def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
@@ -1413,3 +1418,11 @@ def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
   return readcounts, tccounts
+
+
+def dups(lst):
+  seen = set()
+  # adds all elements it doesn't know yet to seen and all other to seen_twice
+  seen_twice = set(x for x in lst if x in seen or seen.add(x))
+  # turn the set into a list (as requested)
+  return list(seen_twice)
