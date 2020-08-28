@@ -1305,8 +1305,8 @@ def mergeSplicingVariants(df, defined='.'):
   return df
 
 
-def vcf_to_df(path, hasfilter=False, samples=['sample'],additional_unique=[]):
-    uniqueargs=['DB','SOMATIC','GERMLINE',"OVERLAP", "IN_PON","STR","ReverseComplementedAlleles"]+additional_unique
+def vcf_to_df(path, hasfilter=False, additional_fields=[], samples=['sample'],additional_unique=[]):
+    uniqueargs=['DB','SOMATIC','GERMLINE',"OVERLAP", "IN_PON","STR","ReverseComplementedAlleles",'NEGATIVE_TRAIN_SITE',"POSITIVE_TRAIN_SITE"]+additional_unique
     def read_comments(f):
         fields = {}
         description = {}
@@ -1336,6 +1336,7 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'],additional_unique=[]):
     names +=['data','format']+samples
     a =  pd.read_csv(path, sep='\t', comment="#", header=None,names=names, index_col=False)
     print(description)
+    fields.update({i:[] for i in additional_fields})
     try:
       for j, val in enumerate(a.data.str.split(';').values.tolist()):
           res = dict([(v,True) if v in uniqueargs else tuple(v.split('=')) for v in val])
