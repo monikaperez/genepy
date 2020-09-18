@@ -1299,6 +1299,10 @@ def mergeSplicingVariants(df, defined='.'):
             todrop.extend(tomerge)
           else:
             torename.update({tomerge[0]: foundpoint})
+        else:
+          todrop.extend(tomerge)
+          tomerge.append(foundpoint)
+          df.loc[foundpoint] = df.loc[tomerge].sum()
         foundpoint = False
     elif defined in v:
       foundpoint = v.split(defined)[0]
@@ -1417,3 +1421,11 @@ def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
   return readcounts, tccounts
+
+
+def dups(lst):
+  seen = set()
+  # adds all elements it doesn't know yet to seen and all other to seen_twice
+  seen_twice = set(x for x in lst if x in seen or seen.add(x))
+  # turn the set into a list (as requested)
+  return list(seen_twice)

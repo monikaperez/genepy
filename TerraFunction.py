@@ -377,7 +377,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
 
 
 def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='samples', droplists=True, keeppath=True, dry_run=False, par=20):
+                     flag_non_matching=False, onlycol=[], entity='samples', droplists=True, keeppath=True, dry_run=True, par=20):
   """
   Function to move data around from one workspace to a bucket or to another workspace. 
 
@@ -727,7 +727,7 @@ def saveConfigs(workspace, filepath):
   h.dictToFile(params, filepath + '.json')
 
 
-def cleanWorkspace(workspaceid, toleave=[], defaulttoleave=['workspace', 'scripts', 'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
+def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts', 'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
   """
   removes all processing folder in a terra workspace easily
 
@@ -743,6 +743,8 @@ def cleanWorkspace(workspaceid, toleave=[], defaulttoleave=['workspace', 'script
     raise ValueError(str(res.stderr))
   res = str(res.stdout)[2:-1].split('\\n')[:-1]
   toremove = [val for val in res if val.split('/')[-2] not in toleave]
+  if only: #you were here
+    toremove = [val for val in res if val.split('/')[-2] in only]
   if h.askif('we are going to remove ' + str(len(toremove)) + " files/folders:\n" + str(toremove) + "\nare you sure?"):
     gcp.rmFiles(toremove, add='-r')
   else:
