@@ -9,7 +9,7 @@ from pybedtools import BedTool
 import seaborn as sns
 import pyBigWig
 import matplotlib.pyplot as plt
-import ipdb
+import pdb
 import signal
 from scipy.optimize import curve_fit,minimize
 from sklearn.preprocessing import normalize
@@ -291,7 +291,8 @@ def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=
 
 def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
                    width=5, length=10,torecompute=False, name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
-                   sort=False, withDeeptools=True, onlyProfile=False, cluster=1):
+                   sort=False, withDeeptools=True, onlyProfile=False, cluster=1, vmax=None, vmin=None, overlap=False,
+                   legendLoc=None):
     """
     get pysam data
     ask for counts only at specific locus based on windows from center+-size from sorted MYC peaks
@@ -326,34 +327,47 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
             bigwigs = folder + bigwigs + ' '
         h.createFoldersFor(name)
         cmd= ''
-        if not os.path.exists(name) or torecompute:
+        if not os.path.exists('.'.join(name.split('.')[:-1]) + ".gz") or torecompute:
             cmd += "computeMatrix reference-point -S "
             cmd += bigwigs
             cmd += " --referencePoint "+refpoint
             cmd += " --regionsFileName " + peaks
-            cmd += " --missingDataAsZero"
+            cmd += "--missingDataAsZero"
             cmd += " --outFileName " + '.'.join(name.split('.')[:-1]) + ".gz"
             cmd += " --upstream " + str(window) + " --downstream " + str(window)
             cmd += " --numberOfProcessors " + str(numthreads) + ' && '
-        cmd += "plotHeatmap " if not onlyProfile else 'plotProfile '
-        cmd += "--matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
+        if type(name) is list: 
+            cmd+= " --matrixFile " + '.gz '.join(name) + ".gz"
+        cmd += "plotHeatmap" if not onlyProfile else 'plotProfile'
+        cmd += " --matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
         cmd += " --outFileName " + name
         cmd += " --refPointLabel "+ refpoint
+        if vmax is not None:
+            cmd += " -max "+str(vmax)
+        if vmin is not None:
+            cmd += " -min "+str(vmin)
         if cluster>1:
             cmd += " --perGroup --kmeans "+str(cluster)
+        if overlap:
+            if onlyProfile:
+                cmd += " --plotType overlapped_lines"
+            else:
+                raise ValueError("overlap only works when onlyProfile is set")
+        if legendLoc:
+            cmd+=" --legendLocation "+legendLoc
 
         if len(peaknames) > 0:
             pe = ''
             for i in peaknames:
-                pe += i + ' '
+                pe += ' ' + i
             peaknames = pe
-            cmd += " --regionsLabel " + peaknames
+            cmd += " --regionsLabel" + peaknames
         if len(bigwignames) > 0:
             pe = ''
             for i in bigwignames:
-                pe += i + ' '
+                pe += ' ' + i
             bigwignames = pe
-            cmd += " --samplesLabel " + bigwignames
+            cmd += " --samplesLabel" + bigwignames
         if title:
             cmd += " --plotTitle " + title
         data = subprocess.run(cmd, shell=True, capture_output=True)
@@ -937,14 +951,15 @@ def putInConscensus(conscensus, value, window=10, mergetype='mean'):
     return res
 
 
-def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichment=True):
+def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=True, doenrichment=True):
     """
     considering a befile representing a conscensus set of peaks
     with each columns after the 7th one representing the signal of a given ChIP experiment
     over this conscensus
     """
+    if correct:
+        print("we will be correcting for fully similar lines/ columns by removing 1 on their last value")
     dat = bedfile[bedfile.columns[bedcol:]].values
-    # ipdb.set_trace()
     prob = dat.astype(bool).sum(0)/len(dat)
     if docorrelation:
         correlation = np.zeros((dat.shape[1],dat.shape[1]))
@@ -961,10 +976,20 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichme
                 if docorrelation:
                     correlation[i,i]=1
                 if doenrichment:
-                    enrichment[i,i]=1
+                    enrichment[i,i]=0
                 overlap[i,i]=1
             if docorrelation:
-                correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1] if norm else np.corrcoef(val,col)[0,1]
+                if norm and not np.isnan(zscore(col).sum()) and not np.isnan(zscore(val).sum()) or not correct:
+                    correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1]
+                else:
+                    tmp = np.corrcoef(val,col)[0,1]
+                    if np.isnan(tmp) and correct:
+                        # one contains only the same value everywhere
+                        col[-1]-=1
+                        val[-1]-=1
+
+                        tmp = np.corrcoef(val,col)[0,1]
+                    correlation[i,j+add] = tmp if val.sum()!=-1 else 0
             if doenrichment:
                 enrichment[i,j+add] = np.log2((len(val[val!=0])/len(col))/prob[j+add])
             overlap[i,j+add]=len(val[val!=0])/len(col)
@@ -973,7 +998,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, docorrelation=True, doenrichme
         correlation[i,i]=1
         correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     if doenrichment:
-        enrichment[i,i]=1 
+        enrichment[i,i]=0
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     return overlap, correlation if docorrelation else None, enrichment.replace(-np.inf,-100) if doenrichment else None 
@@ -986,7 +1011,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
     over this conscensus
     """
     dat = bedfile[bedfile.columns[bedcol:]].values
-    # ipdb.set_trace()
+    # pdb.set_trace()
     prob = dat.astype(bool).sum(0)/len(dat)
     if docorrelation:
         if groups is not None:
@@ -1139,40 +1164,39 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
         size = re.findall("# predicted fragment length is (\d+)", str(ret.stderr))[0]
         print(size)
     else:
-        print('using default size')
+        print('using default|given size')
     pairedend = "BAMPE" if pairedend else "BAM"
     if control2 is None:
         control2 = control1
     cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + str(size) + " -n " + name1 + " --outdir " + directory + " -f " + pairedend
     cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + str(size) + " -n " + name2 + " --outdir " + directory + " -f " + pairedend
-    if scaling is None:
-        print('computing the scaling values')
-        ret = subprocess.run(cmd1, capture_output=True, shell=True)
-        print(ret.stderr)
-        scaling1a = re.findall("tags after filtering in treatment: (\d+)", str(ret.stderr))[0]
-        scaling1b = re.findall("tags after filtering in control: (\d+)", str(ret.stderr))[0]
-        scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
-        ret = subprocess.run(cmd2, capture_output=True, shell=True)
-        print(ret.stderr)
-        scaling2a = re.findall("tags after filtering in treatment: (\d+)", str(ret.stderr))[0]
-        scaling2b = re.findall("tags after filtering in control: (\d+)", str(ret.stderr))[0]
-        scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
-    else:
-        res = subprocess.run(cmd1, capture_output=True, shell=True)
-        scaling1 = scaling[0]
-        res = subprocess.run(cmd2, capture_output=True, shell=True)
-        scaling2 = scaling[1]
+    print('computing the scaling values')
+    ret = subprocess.run(cmd1, capture_output=True, shell=True)
+    print(ret.stderr)
+    scaling1a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling1b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
+    ret = subprocess.run(cmd2, capture_output=True, shell=True)
+    print(ret.stderr)
+    scaling2a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling2b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
+    if scaling is not None:
+        scaling1 = int(scaling1*scaling[0])
+        scaling2 = int(scaling2*scaling[1])
     print(scaling1, scaling2)
-    diffPeak(name1, name2, res_directory, directory, scaling1, scaling2, size)
+    return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg", 
+        directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg", 
+        res_directory, scaling1, scaling2, size)
 
 
-def diffPeak(name1, name2, res_directory, directory, scaling1, scaling2, size):
+def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2, size):
     print("doing differential peak binding")
-    cmd = "macs2 bdgdiff --t1 " + directory + name1 + "_treat_pileup.bdg --c1 "
-    cmd += directory + name1 + "_control_lambda.bdg --t2 " + directory + name2
-    cmd += "_treat_pileup.bdg --c2 " + directory + name2 + "_control_lambda.bdg "
-    cmd += "--d1 " + str(scaling1) + " --d2 " + str(scaling2) + " -g 60 "
-    cmd += "-l " + str(size) + " --o-prefix " + name1 + "_vs_" + name2 + " --outdir " + res_directory
+    cmd = "macs2 bdgdiff --t1 " + name1 + " --c1 "
+    cmd += control1+" --t2 " + name2 +" --c2 " + control2
+    cmd += " --d1 " + str(scaling1) + " --d2 " + str(scaling2) + " -g 60 "
+    cmd += "-l " + str(size) + " --o-prefix " + name1.split('/')[-1].split('.')[0] + "_vs_" 
+    cmd += name2.split('/')[-1].split('.')[0] + " --outdir " + res_directory
     res = subprocess.run(cmd, capture_output=True, shell=True)
     return res
 

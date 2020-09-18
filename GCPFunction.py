@@ -190,7 +190,7 @@ def recoverFiles(files):
     h.parrun(cmd, cores=cores)
 
 
-def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
+def patternRN(rename_dict, location, wildcards, types=[], test=True, check_dependencies=True, cores=1):
     """
     rename/move a bunch of GCP objects found in some specific places
 
@@ -211,7 +211,7 @@ def patternRN(rename_dict, location, wildcards, types=[], test=True, cores=1):
     val = []
     for k, v in rename_dict.items():
         val.append(v)
-        if k in val:
+        if k in val and check_dependencies:
             raise ValueError('circular dependency in the rename with key ' + k)
     for k, v in rename_dict.items():
         loc = location
