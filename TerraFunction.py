@@ -469,7 +469,7 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
     wmto = dm.WorkspaceManager(workspaceto)
   torename = pd.DataFrame(data=torename, index=a.index.tolist())
   if not dry_run:
-    wmto.update_entity_attributes(entity, torename)
+    wmto.disable_hound().update_entity_attributes(entity, torename)
   return torename, flaglist
 
 
@@ -726,7 +726,8 @@ def saveConfigs(workspace, filepath):
   h.dictToFile(params, filepath + '.json')
 
 
-def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts', 'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
+def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts', 
+  'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
   """
   removes all processing folder in a terra workspace easily
 
