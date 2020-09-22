@@ -187,6 +187,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   """
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
+  print(gene_mapping.columns)
   not_parsed = []
   renamed = []
   b = 0
