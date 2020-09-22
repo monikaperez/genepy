@@ -12,7 +12,7 @@ import re
 import signal
 from JKBio import Helper as h
 from JKBio import GCPFunction as gcp
-import ipdb
+import pdb
 import subprocess
 from gsheets import Sheets
 
@@ -118,9 +118,9 @@ def removeSamples(workspace, samples):
     wm.delete_sample(samples)
 
 
-def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=0,
+def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', loc=0,
                      fformat="fastq12", newsamples=None, samplesetname=None, source='U',
-                     bamcol="bam", baicol="bai"):
+                     bamcol="bam", baicol="bai", test=True):
   """
   upload samples (virtually: only creates tsv file) from a google bucket to a terra workspace
 
@@ -212,7 +212,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=
     print(files)
     for file in files:
       if file[-9:] == ".fastq.gz" or file[-6:] == ".fq.gz":
-        name = file.split('/')[-1].split('.')[0].split(sep)[loc]
+        name = re.split(sep, file.split('/')[-1].split('.')[0])[loc]
         if name in data['sample_id']:
           pos = data['sample_id'].index(name)
           if fformat == "fastqR1R2":
@@ -248,12 +248,13 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', updating=False, loc=
       else:
         print("unrecognized file type : " + file)
     df = pd.DataFrame(data)
-    print(df)
     df["Source"] = source
     df["participant"] = data['sample_id']
     df = df.set_index("sample_id")
-    wm.upload_samples(df)
-    wm.update_sample_set(samplesetname, df.index.values.tolist())
+    if not test:
+      wm.upload_samples(df)
+      wm.update_sample_set(samplesetname, df.index.values.tolist())
+    return df
 
 
 def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samples'):

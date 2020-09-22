@@ -28,7 +28,7 @@ import json
 
 import bokeh
 from bokeh.plotting import *
-from bokeh.io import output_file, show
+from bokeh.io import output_file, show, export_png
 from bokeh.transform import linear_cmap
 from bokeh.util.hex import hexbin
 from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
@@ -263,10 +263,10 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
     labels = LabelSet(x='x', y='y', text='labels', level='glyph', text_font_size='9pt',
                       x_offset=5, y_offset=5, source=source, render_mode='canvas')
     p.add_layout(labels)
-  output_file(folder + title.replace(' ', "_") + "_scatter.html")
-  output_file(folder + title.replace(' ', "_") + "_scatter.pdf")
   show(p)
-  return(p)
+  save(p, folder + title.replace(' ', "_") + "_scatter.html")
+  #export_png(p, filename=folder + title.replace(' ', "_") + "_scatter.png")
+  return p
 
 
 def bigScatter(data, precomputed=False, logscale=False, features=False, colors=None,
@@ -299,10 +299,14 @@ def bigScatter(data, precomputed=False, logscale=False, features=False, colors=N
         mode="mouse", point_policy="follow_mouse", renderers=[r] if not precomputed else None
     ))
 
-  output_file(folder + title.replace(' ', "_") + "_scatter.html")
-  output_file(folder + title.replace(' ', "_") + "_scatter.pdf")
+  try:
+    show(p)
+  except:
+    show(p)
+  save(p, folder + title.replace(' ', "_") + "_scatter.html")
+  #export_png(p, filename=folder + title.replace(' ', "_") + "_scatter.png")
 
-  show(p)
+  return p
 
 
 def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointing VPS4B",
@@ -366,8 +370,8 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     hline = Span(location=val, dimension='width', line_color='green', line_width=0.2)
     p.renderers.extend([hline])
 
-  output_file(folder + title.replace(' ', "_") + "_cn_plot.html")
-  output_file(folder + title.replace(' ', "_") + "_cn_plot.pdf")
+  save(p, folder + title.replace(' ', "_") + "_cn_plot.html")
+  #export_png(p, filename=folder + title.replace(' ', "_") + "_cn_plot.png")
   show(p)      # show the plot
   return p
 
@@ -438,8 +442,9 @@ def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene'
       console.log(source)
       """))
     p = column(text, p)
-  output_file(folder + title.replace(' ', "_") + "_volcano.html")
-  output_file(folder + title.replace(' ', "_") + "_volcano.pdf")
+  save(p, folder + title.replace(' ', "_") + "_volcano.html")
+  #export_png(p, filename=folder + title.replace(' ', "_") + "_volcano.png")
+  show(p)
   return p
 
 
@@ -564,20 +569,18 @@ def plotCorrelationMatrix(data, names, colors=None, title="correlation Matrix", 
     p.rect('xname', 'yname', 0.9, 0.9, source=data,
            color='colors', alpha='alphas', line_color=None,
            hover_line_color='black', hover_color='colors')
+    save(p, folder + title.replace(' ', "_") + "_correlation.html")
+    #export_png(p, filename=folder + title.replace(' ', "_") + "_correlation.png")
     try:
       show(p)
     except:
       show(p)
-
-    output_file(folder + title.replace(' ', "_") + "_correlation.html")
-    output_file(folder + title.replace(' ', "_") + "_correlation.pdf")
-
     return p  # show the plot
   else:
     plt.figure(figsize=(size, 200))
     plt.title('the correlation matrix')
     plt.imshow(data)
-    plt.savefig(title + ".pdf")
+    plt.savefig(title + "_correlation.pdf")
     plt.show()
 
 
@@ -605,7 +608,7 @@ def venn(inp, names, title="venn", folder=''):
     raise ValueError('need to be between 2 to 6')
   ax.set_title(title)
   if folder:
-    fig.savefig(folder + title + '.pdf')
+    fig.savefig(folder + title + '_venn.pdf')
   fig.show()
   plt.pause(0.1)
 
