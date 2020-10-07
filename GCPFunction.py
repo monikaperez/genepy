@@ -200,12 +200,12 @@ def patternRN(rename_dict, location, wildcards, types=[], test=True, check_depen
         location:
         wildcards: list[str] can be one of  ['**', '.*', '*.','-.*'] if needs to be 
                     ** means any occurence of this file in any folder will change its name
-                   .* means all file unregarding of the suffix, will rename them all a.bam [a]da.bai to b.bam, [b]da.bai
-                   *. means all files with the suffix, will change the suffix of these files from a to b
-                   -.* means all file unregarding of the suffix, will rename them. not just replacing the a part with a to b but the full file name [a]dea.bam to b.bam
+                    .* means all file unregarding of the suffix, will rename them all a.bam [a]da.bai to b.bam, [b]da.bai
+                    *. means all files with the suffix, will change the suffix of these files from a to b
+                    -.* means all file unregarding of the suffix, will rename them. not just replacing the a part with a to b but the full file name [a]dea.bam to b.bam
         types: Nothing yet
         test: if test, just shows the command but does not run it
-        cores:  cores tells on how many processor to parallelize the task
+        cores:  cores tells on how many processor to parallelize the tas#k
     """
     r = 0
     val = []
