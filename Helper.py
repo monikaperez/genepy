@@ -1442,3 +1442,14 @@ def dups(lst):
   seen_twice = set(x for x in lst if x in seen or seen.add(x))
   # turn the set into a list (as requested)
   return list(seen_twice)
+
+
+def gsva(data, geneset_file, pathtoJKBio, method='ssgsea'):
+  data.to_csv('/tmp/data_JKBIOhelper_gsva.csv',index_col=0)
+  cmd = "Rscript "+pathtoJKBio+"/helper/ssGSEA.R /tmp/data_JKBIOhelper_gsva.csv " + geneset_file + " " + ssgsea
+  res = subprocess.run(cmd, shell=True, capture_output=True)
+  if res.returncode != 0:
+    raise ValueError('issue with the command: ' + str(res.stderr))
+  print(res)
+  res = pd.read_csv("/tmp/res_JKBIO_ssGSEA.csv")
+  return res
