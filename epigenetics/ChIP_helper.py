@@ -97,7 +97,7 @@ def findReplicates(folder, sep='-', namings='-r([0-9])', namepos=2):
 
 
 def singleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
-                     ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
+                    ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     run the singleEnd pipeline
     for alignment etc, one can use pysam ready made implementation of samtools
@@ -115,7 +115,7 @@ def singleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
 
 
 def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
-                     ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
+                    ismapped=False, mappedFolder='mapped/', refFolder='data/reference/index'):
     """
     # run the paired end pipeline
     """
@@ -124,7 +124,7 @@ def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
         in1 = folder + val[0]
         in2 = folder + val[1]
         os.system("bowtie2 -x " + refFolder + " --threads " + str(numthreads) + " -t -k 1 \
-      --very-sensitive -1 " + in1 + " -2 " + in2 + " - S " + out1)
+        --very-sensitive -1 " + in1 + " -2 " + in2 + " - S " + out1)
         out2 = folder + peaksFolder + val[0].split('.')[0]
         print(out1)
         changefrom = out1
@@ -151,7 +151,7 @@ def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, ver
             cmd += ' 2> ' + bam + '.error.log'
         res = subprocess.run(cmd, capture_output=True, shell=True)
         if res.returncode != 0:
-          raise ValueError('issue with the command: ' + str(res.stderr))
+            raise ValueError('issue with the command: ' + str(res.stderr))
 
 
 def mergeBams(rep):
