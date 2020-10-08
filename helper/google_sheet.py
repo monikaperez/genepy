@@ -5,19 +5,12 @@ from typing import List, Optional, Tuple
 from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from logger import log
+import gspread
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
 ]
-
-
-def get_credentials():
-    cred_filename = "loom-dev-key.json"
-    return service_account.Credentials.from_service_account_file(
-        cred_filename, scopes=SCOPES
-    )
 
 
 def colnum_string(n):
@@ -38,30 +31,63 @@ def get_cell_from_index(row_idx: int, col_idx: int):
     return colnum_string(col_idx + 1) + str(row_idx + 1)
 
 
-def get_sheet_url(document_id: str, sheet_id: str):
-    return f"https://docs.google.com/spreadsheets/d/{document_id}/edit#gid={sheet_id}"
+def get_credentials():
+    # return gspread.login('jkalfon@broadinstitute.org', 'JEREM1//kal')
+    #gc = gspread.oauth()
+    # Fetch credentials from storage
+    credentials = STORAGE.get()
+    # If the credentials doesn't exist in the storage location then run the flow
+    if credentials is None or credentials.invalid:
+        flow = flow_from_clientsecrets(CLIENT_SECRET, scope=SCOPE)
+        http = httplib2.Http()
+        credentials = run_flow(flow, STORAGE, http=http)
+    return credentials
+    credentials = authorize_credentials()
 
 
-class SheetQueries:
-    def __init__(self, credentials):
-        self.service = build("sheets", "v4", credentials=credentials)
-        self.drive_service = build("drive", "v3", credentials=credentials)
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+
+class GSheet:
+    def __init__(self, creds: str, document_id: str, sheet_id: str):
+        #os.system('mkdir ~/.config/')
+        os.system('mkdir ~/.config/gspread/')
+        os.system('mv ' + creds + " ~/.config/gspread/credentials.json")
+        self.credientials = get_credentials()
+        self.document_id = document_id
+        self.sheet_id = sheet_id
         self.size_cache = {}
         self.cache = {}
         self.sheet_name_cache = {}
         self.request_counts = defaultdict(lambda: {"read": 0, "write": 0})
+        self.client = gspread.authorize(self.credentials)
 
-    def get_last_modified_date(self, document_id):
+    def upload_pandas(self, df):
+        df.to_csv('/tmp/googlesheetfunctiontopanda.csv')
+        self.upload_csv('/tmp/googlesheetfunctiontopanda.csv')
+
+    def upload_csv(self, file):
+        spreadsheet = self.client.open(self.document_id)
+
+        with open(file, 'r') as file_obj:
+            content = file_obj.read()
+            client.import_csv(spreadsheet.id, data=content)
+
+    def get_sheet_url(self):
+        return f"https://docs.google.com/spreadsheets/d/{self.document_id}/edit#gid={self.sheet_id}"
+
+    def get_last_modified_date(self):
         response = (
-            self.drive_service.files()
-            .get(fileId=document_id, fields="modifiedTime")
+            self.client.files()
+            .get(fileId=self.document_id, fields="modifiedTime")
             .execute()
         )
-        self.request_counts[document_id]["read"] += 1
+        self.request_counts[self.document_id]["read"] += 1
         return response["modifiedTime"]
 
-    def get_annotation_cell(self, document_id, sheet_id, annotation) -> Optional[str]:
-        sheet = self.read_sheet(document_id, sheet_id)
+    def get_annotation_cell(self, annotation) -> Optional[str]:
+        sheet = self.read_sheet()
         for row_idx, row in enumerate(sheet):
             for col_idx, val in enumerate(row):
                 if val == annotation:
@@ -76,14 +102,14 @@ class SheetQueries:
         return matching_sheets[0]
 
     # Gets the upper bound of size (no ragged right/down)
-    def get_size(self, document_id, sheet_id):
-        key = (document_id, sheet_id)
+    def get_size(self):
+        key = (self.document_id, self.sheet_id)
         if key in self.size_cache:
             return self.size_cache[key]
 
-        s = self.service.spreadsheets().get(spreadsheetId=document_id).execute()
-        self.request_counts[document_id]["read"] += 1
-        sheet = self._get_sheet_by_id(s["sheets"], sheet_id)
+        s = self.client.spreadsheets().get(spreadsheetId=self.document_id).execute()
+        self.request_counts[self.document_id]["read"] += 1
+        sheet = self._get_sheet_by_id(s["sheets"], self.sheet_id)
         gridProperties = sheet["properties"]["gridProperties"]
         rowCount = gridProperties["rowCount"]
 
@@ -94,50 +120,47 @@ class SheetQueries:
         self.size_cache[key] = result
         return result
 
-    def _get_sheet_name_from_sheet_id(self, document_id: str, sheet_id: str) -> str:
-        key = (document_id, sheet_id)
+    def _get_sheet_name_from_sheet_id(self) -> str:
+        key = (self.document_id, self.sheet_id)
         if key in self.sheet_name_cache:
             return self.sheet_name_cache[key]
 
-        s = self.service.spreadsheets().get(spreadsheetId=document_id).execute()
-        self.request_counts[document_id]["read"] += 1
-        sheet = self._get_sheet_by_id(s["sheets"], sheet_id)
+        s = self.client.spreadsheets().get(spreadsheetId=self.document_id).execute()
+        self.request_counts[self.document_id]["read"] += 1
+        sheet = self._get_sheet_by_id(s["sheets"], self.sheet_id)
         result = sheet["properties"]["title"]
         self.sheet_name_cache[key] = result
         return result
 
-    def read_sheet(self, document_id, sheet_id) -> List[List[str]]:
-        key = f"doc:{document_id} sheet:{sheet_id}"
+    def read_sheet(self) -> List[List[str]]:
+        key = f"doc:{self.document_id} sheet:{self.sheet_id}"
         cache = self.cache
         if key in cache:
-            log(f"Cache hit for document {document_id}, sheet {sheet_id}")
             sheet = cache[key]
         else:
-            log(f"Cache miss for document {document_id}, sheet {sheet_id}")
-            assert "`" not in sheet_id
-            sheet_name = self._get_sheet_name_from_sheet_id(document_id, sheet_id)
+            assert "`" not in self.sheet_id
+            sheet_name = self._get_sheet_name_from_sheet_id()
             result = (
-                self.service.spreadsheets()
+                self.client.spreadsheets()
                 .values()
-                .get(spreadsheetId=document_id, range=f"{sheet_name}")
+                .get(spreadsheetId=self.document_id, range=f"{sheet_name}")
                 .execute()
             )
-            self.request_counts[document_id]["read"] += 1
+            self.request_counts[self.document_id]["read"] += 1
             sheet = result["values"]
-            log(f"Caching {document_id} {sheet_id}")
             # maybe do ragged processing here?
             cache[key] = sheet
         return sheet
 
-    def read_row(self, document_id, sheet_id, row_index, start_column, end_column):
-        sheet = self.read_sheet(document_id, sheet_id)
+    def read_row(self, row_index, start_column, end_column):
+        sheet = self.read_sheet()
         row = sheet[row_index][start_column: end_column + 1]
         row.extend([""] * (end_column - len(row)))
         assert len(row) == end_column - start_column
         return row
 
-    def read_column(self, document_id, sheet_id, column_index, start_row, end_row):
-        sheet = self.read_sheet(document_id, sheet_id)
+    def read_column(self, column_index, start_row, end_row):
+        sheet = self.read_sheet()
         rows = sheet[start_row:end_row]
         column = []
         for i in range(end_row - start_row):
@@ -152,12 +175,12 @@ class SheetQueries:
         return column
 
     def write_column(
-        self, document_id, sheet_id, column_index, start_row, values,
+        self, column_index, start_row, values,
     ):
         assert isinstance(
             values, List
         ), f"values is of type {type(values)} but expected List"
-        sheet_name = self._get_sheet_name_from_sheet_id(document_id, sheet_id)
+        sheet_name = self._get_sheet_name_from_sheet_id()
         end_row = start_row + len(values)
         cell_range = "{sheet_name}!{column}{start_row}:{column}{end_row}".format(
             sheet_name=sheet_name,
@@ -173,22 +196,21 @@ class SheetQueries:
         }
 
         request = (
-            self.service.spreadsheets()
+            self.client.spreadsheets()
             .values()
             .update(
-                spreadsheetId=document_id,
+                spreadsheetId=self.document_id,
                 range=cell_range,
                 valueInputOption="RAW",
                 body=value_range_body,
             )
         )
-        self.request_counts[document_id]["write"] += 1
+        self.request_counts[self.document_id]["write"] += 1
 
         response = request.execute()
-        log(str(response))
 
     # Commenting out since don't have google drive api access to master file
-    # def get_owners(self, document_id: str) -> List[Tuple[str, str]]:
-    #     request = self.drive_service.files().get(fileId=document_id, fields="owners")
+    # def get_owners(self, self.document_id: str) -> List[Tuple[str, str]]:
+    #     request = self.drive_service.files().get(fileId=self.document_id, fields="owners")
     #     response = request.execute()
     #     return [(o["displayName"], o["emailAddress"]) for o in response["owners"]]

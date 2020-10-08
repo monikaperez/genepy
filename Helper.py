@@ -1024,7 +1024,8 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
   return norm, mapped,  # unique_mapped
 
 
-def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
+def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], filetypes=None, catchdup=False,
+                   test=True):
   """
   moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
 
@@ -1044,17 +1045,28 @@ def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
   # to do the download to the new dataspace
   for i, val in samples.iterrows():
     ran = randomString(6, 'underscore', withdigits=False)
-    for ntype in values:
-      name = val[ntype].split('/')[-1] if catchdup else ran + '_' + val[ntype].split('/')[-1]
-      if not gcp.exists(gsfolderto + val[ntype].split('/')[-1]) or not catchdup:
+    for j, ntype in enumerate(values):
+      # TODO try:catch
+      filetype = '.'.join(val[ntype].split('/')[-1].split('.')[1:]) if filetypes is None else filetypes[j]
+      if name_col is None:
+        name = val[ntype[0]].split('/')[-1].split('.')[0]
+      elif name_col == "index":
+        name = val.name
+      else:
+        name = val[name_col]
+      name = name + '.' + filetype if catchdup else name + '_' + ran + '.' + filetype
+      if not gcp.exists(gsfolderto + name) or not catchdup:
         cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
-        res = subprocess.run(cmd, shell=True, capture_output=True)
-        if res.returncode != 0:
-          raise ValueError(str(res.stderr))
+        if test:
+          print(cmd)
+        else:
+          res = subprocess.run(cmd, shell=True, capture_output=True)
+          if res.returncode != 0:
+            raise ValueError(str(res.stderr))
+          samples.loc[i, ntype] = gsfolderto + name
       else:
         print(name + ' already exists in the folder: ' + gsfolderto)
         print(gcp.lsFiles([gsfolderto + name], '-la'))
-      samples.loc[i, ntype] = gsfolderto + name
   return samples
 
 
