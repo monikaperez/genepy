@@ -27,6 +27,7 @@ import re
 from JKBio import GCPFunction as gcp
 import subprocess
 from IPython import get_ipython
+from JKBio.helper import pyDESeq2
 
 import pdb
 import ipdb
@@ -1425,6 +1426,15 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_unique=[]):
 
 def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
                      minvar_toremove=0, mincount_toremove=5):
+    """
+    
+    Args:
+    -----
+
+    Returns:
+    --------
+
+    """
     files = os.listdir(loc)
     files = [file for file in files if file.endswith('.tsv')]
     data = {}
@@ -1492,3 +1502,49 @@ def dups(lst):
     seen_twice = set(x for x in lst if x in seen or seen.add(x))
     # turn the set into a list (as requested)
     return list(seen_twice)
+
+
+def DeseqSamples(data, experiments, scaling=None, keep=True, rescaling=None, results={}, controlcontain='RNP_AAVS1',
+spikecontrolscontain="ERCC-", threshforscaling=2):
+    """
+    Args:
+    ----
+
+    Returns:
+    ------
+    
+    """
+    if "gene_id" not in list(data.columns):
+        print("using index as gene_id")
+        data['gene_id'] = data.index
+    for val in experiments:
+        print(val)
+        cond = [1 if val+'-' in i else 0 for i in data.columns[:-1]]
+        contr = [1 if controlcontain in i else 0 for i in data.columns[:-1]]
+        design = pd.DataFrame(index=data.columns[:-1], columns=['DMSO', 'Target'],
+                            data=np.array([contr, cond]).T)
+        design.index = design.index.astype(str).str.replace('-', '.')
+        deseq = pyDESeq2.pyDESeq2(count_matrix=data, design_matrix=design,
+                                design_formula='~DMSO + Target', gene_column="gene_id")
+        if scaling is not None:
+            if val in scaling:
+                if abs(scaling[val][0]) > threshforscaling*scaling[val][1]:
+                    print("estimating sizeFactors for this one")
+                    deseq.run_estimate_size_factors(
+                        controlGenes=data.gene_id.str.contains(spikecontrolscontain))
+                    if rescaling is not None:
+                        if val in rescaling:
+                            sizeFact = deseq.getSizeFactors()
+                            sizeFact[np.where(cond)[0]] *= rescaling[val.split('_')[1]]
+                            deseq.setSizeFactors(sizeFact)
+            else:
+                print(val +" not in scaling dict")
+        elif val in results and keep:
+            continue
+        deseq.run_deseq()
+        deseq.get_deseq_result()
+        r = deseq.deseq_result
+        r.pvalue = np.nan_to_num(np.array(r.pvalue), 1)
+        r.log2FoldChange = np.nan_to_num(np.array(r.log2FoldChange), 0)
+        results[val] = r
+    return results

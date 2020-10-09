@@ -967,6 +967,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
         enrichment = np.zeros((dat.shape[1],dat.shape[1]))
     overlap = np.zeros((dat.shape[1],dat.shape[1]))
     for i, col in enumerate(dat.T):
+        #pdb.set_trace()
         overlapping = np.delete(dat,i,axis=1)[col!=0]
         col = col[col!=0]
         add=0
@@ -985,13 +986,12 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
                     tmp = np.corrcoef(val,col)[0,1]
                     if np.isnan(tmp) and correct:
                         # one contains only the same value everywhere
-                        col[-1]-=1
-                        val[-1]-=1
-
+                        col[-1]-=max(0.01,abs(mean(col)))
+                        val[-1]-=max(0.01,abs(mean(val)))
                         tmp = np.corrcoef(val,col)[0,1]
                     correlation[i,j+add] = tmp if val.sum()!=-1 else 0
             if doenrichment:
-                enrichment[i,j+add] = np.log2((len(val[val!=0])/len(col))/prob[j+add])
+                enrichment[i,j+add] = np.log2(len(val[val != 0])/len(val))/prob[j+add])
             overlap[i,j+add]=len(val[val!=0])/len(col)
     overlap[i,i]=1
     if docorrelation:
