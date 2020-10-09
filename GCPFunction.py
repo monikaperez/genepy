@@ -8,6 +8,7 @@ import dalmatian as dm
 import numpy as np
 import os
 import ipdb
+import pdb
 import subprocess
 import signal
 import re
@@ -152,7 +153,7 @@ def catFiles(files, group=50, split=False, cut=False):
     return res
 
 
-def rmFiles(files, group=50, add=''):
+def rmFiles(files, group=50, add='', dryrun=True):
     """
     remove a set of files in parallel (when the set is huge)
 
@@ -169,10 +170,13 @@ def rmFiles(files, group=50, add=''):
             a += ' ' + val
         if add:
             add = ' ' + add
-        code = os.system("gsutil -m rm" + add + a)
-        if code != 0:
-            print('pressed ctrl+c or command failed')
-            break
+        if dryrun:
+            print("gsutil -m rm" + add + a)
+        else:
+            code = os.system("gsutil -m rm" + add + a)
+            if code != 0:
+                print('pressed ctrl+c or command failed')
+                break
 
 
 def recoverFiles(files):
@@ -269,7 +273,8 @@ def exists(val):
     """
     tells if a gcp path exists
     """
-    return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
+    if type(val) is str:
+        return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
 
 
 def extractSize(val):

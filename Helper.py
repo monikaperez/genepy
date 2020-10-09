@@ -1060,39 +1060,50 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
     return norm, mapped,  # unique_mapped
 
 
-def changeToBucket(samples, gsfolderto, values=['bam', 'bai'], catchdup=False):
-    """
-    moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
+def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], filetypes=None, catchdup=False,
+                   test=True):
+  """
+  moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
 
-    will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
+  will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
 
-    Args:
-    ----
-      samples: pandas.dataframe with columns to move
-      gsfolderto: the bucket path to move the data to
-      values: list of the cols in the dataframe containing the gs object path to be moved 
-      catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
+  Args:
+  ----
+    samples: pandas.dataframe with columns to move
+    gsfolderto: the bucket path to move the data to
+    values: list of the cols in the dataframe containing the gs object path to be moved 
+    catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
 
-    Returns:
-    --------
-      the updated sample pandas.dataframe
-    """
-    # to do the download to the new dataspace
-    for i, val in samples.iterrows():
-        ran = randomString(6, 'underscore', withdigits=False)
-        for ntype in values:
-            name = val[ntype].split(
-                '/')[-1] if catchdup else ran + '_' + val[ntype].split('/')[-1]
-            if not gcp.exists(gsfolderto + val[ntype].split('/')[-1]) or not catchdup:
-                cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
-                res = subprocess.run(cmd, shell=True, capture_output=True)
-                if res.returncode != 0:
-                    raise ValueError(str(res.stderr))
-            else:
-                print(name + ' already exists in the folder: ' + gsfolderto)
-                print(gcp.lsFiles([gsfolderto + name], '-la'))
-            samples.loc[i, ntype] = gsfolderto + name
-    return samples
+  Returns:
+  --------
+    the updated sample pandas.dataframe
+  """
+  # to do the download to the new dataspace
+  for i, val in samples.iterrows():
+    ran = randomString(6, 'underscore', withdigits=False)
+    for j, ntype in enumerate(values):
+      # TODO try:catch
+      filetype = '.'.join(val[ntype].split('/')[-1].split('.')[1:]) if filetypes is None else filetypes[j]
+      if name_col is None:
+        name = val[ntype[0]].split('/')[-1].split('.')[0]
+      elif name_col == "index":
+        name = val.name
+      else:
+        name = val[name_col]
+      name = name + '.' + filetype if catchdup else name + '_' + ran + '.' + filetype
+      if not gcp.exists(gsfolderto + name) or not catchdup:
+        cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
+        if test:
+          print(cmd)
+        else:
+          res = subprocess.run(cmd, shell=True, capture_output=True)
+          if res.returncode != 0:
+            raise ValueError(str(res.stderr))
+          samples.loc[i, ntype] = gsfolderto + name
+      else:
+        print(name + ' already exists in the folder: ' + gsfolderto)
+        print(gcp.lsFiles([gsfolderto + name], '-la'))
+  return samples
 
 
 def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
@@ -1548,3 +1559,14 @@ spikecontrolscontain="ERCC-", threshforscaling=2):
         r.log2FoldChange = np.nan_to_num(np.array(r.log2FoldChange), 0)
         results[val] = r
     return results
+
+
+def gsva(data, geneset_file, pathtoJKBio, method='ssgsea'):
+  data.to_csv('/tmp/data_JKBIOhelper_gsva.csv',index_col=0)
+  cmd = "Rscript "+pathtoJKBio+"/helper/ssGSEA.R /tmp/data_JKBIOhelper_gsva.csv " + geneset_file + " " + ssgsea
+  res = subprocess.run(cmd, shell=True, capture_output=True)
+  if res.returncode != 0:
+    raise ValueError('issue with the command: ' + str(res.stderr))
+  print(res)
+  res = pd.read_csv("/tmp/res_JKBIO_ssGSEA.csv")
+  return res

@@ -377,7 +377,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
 
 
 def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], index_func=None,
-                     flag_non_matching=False, onlycol=[], entity='samples', droplists=True, keeppath=True, dry_run=True, par=20):
+                     flag_non_matching=False, onlysamples=[], onlycol=[], entity='samples', droplists=True, keeppath=True, dry_run=True, par=20):
   """
   Function to move data around from one workspace to a bucket or to another workspace. 
 
@@ -408,6 +408,8 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
   flaglist = []
   wmfrom = dm.WorkspaceManager(workspacefrom)
   a = wmfrom.get_entities(entity)
+  if len(onlysamples) > 0:
+    a = a[a.index.isin(onlysamples)]
   print("using the data from " + workspacefrom + " " + entity + " list")
   if len(a) == 0:
     raise ValueError('no ' + entity)
@@ -468,7 +470,7 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
     wmto = wmfrom
   else:
     wmto = dm.WorkspaceManager(workspaceto)
-  torename = pd.DataFrame(data=torename, index=a.index.tolist())
+  torename = pd.DataFrame(data=torename, index=[i for i in a.index.tolist() if i != 'nan'])
   if not dry_run:
     wmto.disable_hound().update_entity_attributes(entity, torename)
   return torename, flaglist
@@ -727,8 +729,8 @@ def saveConfigs(workspace, filepath):
   h.dictToFile(params, filepath + '.json')
 
 
-def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts', 
-  'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
+def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts',
+                                                                     'notebooks', 'files', 'data', 'hound', 'references', 'name', 'folder']):
   """
   removes all processing folder in a terra workspace easily
 
@@ -744,7 +746,7 @@ def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace'
     raise ValueError(str(res.stderr))
   res = str(res.stdout)[2:-1].split('\\n')[:-1]
   toremove = [val for val in res if val.split('/')[-2] not in toleave]
-  if only: #you were here
+  if only:  # you were here
     toremove = [val for val in res if val.split('/')[-2] in only]
   if h.askif('we are going to remove ' + str(len(toremove)) + " files/folders:\n" + str(toremove) + "\nare you sure?"):
     gcp.rmFiles(toremove, add='-r')
