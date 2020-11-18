@@ -836,9 +836,20 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
     if < 20% don't flag for merge bam
     f B is big and now mean non overlap < 40%, take union and flag for mergeBam else, throw B.
 
+    Args:
+    -----
+        peaks
+        tolookfor
+        filepath
+        sampling
+        mincov
+        window
+        cov
+        minKL
+        use
     returns:
     -------
-    peaks: np.array(bool) for each peaks in peakset, returns a binary
+        np.array(bool) for each peaks in peakset, returns a binary
     """
     # def poisson(k, lamb, scale): return scale * (lamb**k / factorial(k)) * np.exp(-lamb)
 
@@ -1158,6 +1169,9 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
     scaling
     """
     print("doing diff from " + bam1 + " and " + bam2)
+    if scaling is not None:
+        if max(scaling) > 1:
+            raise ValueError("scalings need to be between 0-1")
     name1 = bam1.split('/')[-1].split('.')[0]
     name2 = bam2.split('/')[-1].split('.')[0]
     if size is None:
@@ -1221,6 +1235,25 @@ def AssignToClosestExpressed(bed,countFile,genelocFile):
 def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE_main.py", 
     stitching_distance=None, TSS_EXCLUSION_ZONE_SIZE="2500", assembly="hg38",controlBam=None,controlBai=None):
     """
+    Calls super enhancer from H3K27ac with the ROSE algorithm
+
+    Args:
+    ----
+        MACS2GFF
+        bamFile
+        outdir
+        baiFile
+        rosePath
+        stitching_distance
+        TSS_EXCLUSION_ZONE_SIZE
+        assembly
+        controlBam
+        controlBai
+
+    Returns:
+    --------
+        a bed-like dataframe with the superenhancers
+
     outdir has to be an absolute path or a ~/path
     """
     print("we are going to move your input files to "+rosePath)
@@ -1265,6 +1298,16 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
         outdir str: an existing dir where the results should be saved 
         data: a df[cellname,markname,markbed|bam|bigwig, ?controlbed|bam|bigwig]
         folderpath
+        numstates
+        datatype
+        folderPath
+        chromHMMFolderpath
+        assembly
+        control_bam_dir
+
+    Returns:
+    -------
+        A dict of bed like dataframes containing the regions of the different states
     """
     print("you need to have ChromHMM")
     chromHMM = "java -mx8000M -jar "+chromHMMFolderpath+"ChromHMM.jar "
@@ -1353,11 +1396,17 @@ def simpleMergeMotifs(motifs, window=0):
 
 def substractPeaksTo(peaks,loci, bp=50):
     """
+    removes all peaks that are not within a bp distance to a set of loci
 
     Args:
     ----
         peaks: a bed file df with a chrom,start, end column at least
         loci: a df witth a chrom & loci column
+        bp: the max allowed distance to the loci 
+    
+    Returns:
+    -------
+        all the peaks that are within this distance
     """
     i=0
     j=0
