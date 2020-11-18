@@ -106,7 +106,7 @@ def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
             raise Exception("Leave command pressed or command failed")
 
 
-def batchRename(dt, folder='', add=''):
+def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
     """
     Given a dict renames corresponding files in a folder
 
@@ -116,21 +116,40 @@ def batchRename(dt, folder='', add=''):
       folder: folder to look into
       add: some additional mv parameters
     """
-    files = os.popen('ls ' + folder).read().split('\n')
+    cmd = 'ls -R ' + folder if doAll else 'ls ' + folder
+    files = os.popen(cmd).read().split('\n')
+    if doAll:
+        prep=''
+        f = []
+        for val in files:
+            if len(val)==0:
+                prep=''
+                continue
+            if val[0]=='.' and len(val)>3:
+                prep=val[:-1]
+                continue
+            if "." in val:
+                f.append(prep+"/"+val)
+        files = f
     for k, val in dt.items():
         for f in files:
             if k in f:
-                cmd = 'mv '
+                cmd = 'sudo mv ' if sudo else 'mv '
                 if add:
                     cmd += add + ' '
-                cmd += folder
+                if not doAll:
+                    cmd += folder 
                 cmd += f
                 cmd += ' '
-                cmd += folder
+                if not doAll:
+                    cmd += folder
                 cmd += f.replace(k, val)
-                res = os.system(cmd)
-                if res != 0:
-                    raise Exception("Leave command pressed or command failed")
+                if dryrun:
+                    print(cmd)
+                else:
+                    res = os.system(cmd)
+                    if res != 0:
+                        raise Exception("Leave command pressed or command failed")
 
 
 def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):

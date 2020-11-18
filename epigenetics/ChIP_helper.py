@@ -13,7 +13,7 @@ import pdb
 import signal
 from scipy.optimize import curve_fit,minimize
 from sklearn.preprocessing import normalize
-from scipy.stats import poisson, zscore, boxcox
+from scipy.stats import poisson, zscore, boxcox, binom
 from scipy.special import factorial
 import subprocess
 from pandas.io.parsers import ParserError, EmptyDataError
@@ -215,10 +215,14 @@ def loadPeaks(peakFile=None,peakfolder=None, isMacs=True, CTFlist=[], skiprows=0
     bindings = bindings.sort_values(by=["chrom", "start", "end"], axis=0)
     bindings.start = bindings.start.astype('int')
     bindings.end = bindings.end.astype('int')
-    bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype('int') if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
+    bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype(
+        float) if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
     bindings.foldchange = bindings.foldchange.astype('float')
     bindings["-log10pvalue"] = bindings["-log10pvalue"].astype('float')
     bindings['-log10qvalue'] = bindings['-log10qvalue'].astype('float')
+    loc = bindings['relative_summit_pos'].isna()
+    bindings.loc[bindings[loc].index, 'relative_summit_pos'] = bindings[loc].end - bindings[loc].start
+    bindings.relative_summit_pos = bindings.relative_summit_pos.astype(int)
     return bindings.reset_index(drop=True)
 
 
@@ -362,12 +366,13 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
                 pe += ' ' + i
             peaknames = pe
             cmd += " --regionsLabel" + peaknames
-        if len(bigwignames) > 0:
-            pe = ''
-            for i in bigwignames:
-                pe += ' ' + i
-            bigwignames = pe
-            cmd += " --samplesLabel" + bigwignames
+        if type(bigwigs) is list:
+            if len(bigwignames) > 0:
+                pe = ''
+                for i in bigwignames:
+                    pe += ' ' + i
+                bigwignames = pe
+                cmd += " --samplesLabel" + bigwignames
         if title:
             cmd += " --plotTitle " + title
         data = subprocess.run(cmd, shell=True, capture_output=True)
@@ -444,7 +449,13 @@ def substractPeaks(peaks1, to):
 
 
 def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="mean"):
-    peaks = peaks.sort_values(by=['chrom', 'start'])
+    """
+    simply merges bedfiles from peak callers. providing a concaneted dataframe of bed-like tables
+
+    will recompute pvalues and foldchange from that.
+
+    """
+    peaks = peaks.sort_values(by=['chrom', 'start','end'])
     tfs = list(set(peaks['name']))
     mergedpeaksdict = {}
     remove = []
@@ -523,10 +534,13 @@ def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="me
     return pd.concat([merged_bed, tfmerged], axis=1, sort=False)
 
 
-def findpeakpath(folder, peakname):
+def findpeakpath(folder, proteiname):
+    """
+    given a folder of bigwigs and a protein name, finds the right bigwig
+    """
     res = None
     for val in os.listdir(folder):
-        if str(peakname) in val:
+        if str(proteiname) in val:
             if res:
                 raise ValueError('more than 1 bigwig file found')
             res= val
@@ -591,6 +605,19 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
     bamtomerge: [[bam1,bam2]]
 
     """
+    def col_nan_scatter(x, y, **kwargs):
+        df = pd.DataFrame({'x': x[:], 'y': y[:]})
+        df = df[df.sum(0) != 0]
+        x = df['x']
+        y = df['y']
+        plt.gca()
+        plt.scatter(x, y)
+    def col_nan_kde_histo(x, **kwargs):
+        df = pd.DataFrame({'x':x[:]})
+        df = df[df['x']!=0]
+        x = df['x']
+        plt.gca()
+        sns.kdeplot(x)
     print("/!/ should only be passed peaks with at least one good replicate")
     # for a df containing a set of peaks in bed format and an additional column of different TF
     tfs = list(set(peaks['tf']))
@@ -599,10 +626,12 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
     remove = []
     tomergebam = []
     ratiosofunique = {}
+    h.createFoldersFor(saveloc)
     for tf in tfs:
         if only and tf!=only:
             continue
         cpeaks = peaks[peaks.tf==tf]
+        print('_____________________________________________________')
         if len(set(cpeaks['replicate'])) == 1:
             if cpeaks.name.tolist()[0] in markedasbad:
                 print('the only replicate is considered bad!')
@@ -614,7 +643,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             mergedpeaksdict.update({tf: cpeaks})
             continue
         print("merging " + tf + " peaks")
-        merged = simpleMergedPeaks(cpeaks, window=window, maxp=False)
+        merged = simpleMergePeaks(cpeaks, window=window, maxp=False)
         merged_bed = merged[merged.columns[8:]]
         finalpeaks = merged[merged.columns[:8]]
         print('finish first overlaps lookup')
@@ -644,30 +673,17 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                 break
         if not foundgood:
             print('no peaks were good enough quality')
-            print('wrong TF: '+tf)
+            print('bad TF: '+tf)
             remove.append(tf)
         # distplot
         # correlation plot
         if doPlot:
-            sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
-            def col_nan_scatter(x,y, **kwargs):
-                df = pd.DataFrame({'x':x[:],'y':y[:]})
-                df = df[df.sum(0)!=0]
-                x = df['x']
-                y = df['y']
-                plt.gca()
-                plt.scatter(x,y)
-            def col_nan_kde_histo(x, **kwargs):
-                df = pd.DataFrame({'x':x[:]})
-                df = df[df['x']!=0]
-                x = df['x']
-                plt.gca()
-                sns.kdeplot(x)
-            fig = fig.map_upper(col_nan_scatter)
-            fig = fig.map_upper(col_nan_kde_histo)
+            fig = sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
+            #fig = fig.map_upper(col_nan_scatter)
+            #fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation of peaks in each replicate", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_before_pairplot.pdf")
+                fig.savefig(saveloc+tf+"_before_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=1).sum(1).astype(bool)==0, peakmatrix[:,i])
@@ -770,24 +786,11 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         ratiosofunique[tf] = len(np.argwhere(peakmatrix.sum(0)==1))/peakmatrix.shape[1]
         if doPlot:
             sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
-            def col_nan_scatter(x,y, **kwargs):
-                df = pd.DataFrame({'x':x[:],'y':y[:]})
-                df = df[df.sum(0)!=0]
-                x = df['x']
-                y = df['y']
-                plt.gca()
-                plt.scatter(x,y)
-            def col_nan_kde_histo(x, **kwargs):
-                df = pd.DataFrame({'x':x[:]})
-                df = df[df['x']!=0]
-                x = df['x']
-                plt.gca()
-                sns.kdeplot(x)
-            fig = fig.map_upper(col_nan_scatter)
-            fig = fig.map_upper(col_nan_kde_histo)
+            #fig = fig.map_upper(col_nan_scatter)
+            #fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation and distribution of peaks after recovery", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_after_pairplot.pdf")
+                fig.savefig(saveloc+tf+"_after_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=0).sum(0).astype(bool)==0, peakmatrix[i])
@@ -796,24 +799,26 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if saveloc:
                 plt.savefig(saveloc+tf+"_after_unique_kdeplot.pdf")
             plt.show()
-        if len(peakmatrix.shape) > 1 and doPlot and tf not in remove:
+        if len(peakmatrix.shape) > 1 and doPlot:
             if peakmatrix.shape[0] < 7:
                 presence = []
                 for peakpres in peakmatrix:  # https://github.com/tctianchi/pyvenn
                     presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=tf+'_recovered',folder=save)
+                title = tf + \
+                    '_recovered (TOREMOVE)'if tf in remove else tf+'_recovered'
+                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=title if ,folder=saveloc)
                 plt.show()
             else:
                 print('too many replicates for Venn')    
-        if tf not in remove:
-            finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
-            finalpeaks['name'] = biggest
-            finalpeaks['tf'] = tf
-            mergedpeaksdict.update({tf: finalpeaks})
-            print(tf,len(finalpeaks))
+        finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
+        finalpeaks['name'] = biggest
+        finalpeaks['tf'] = tf
+        mergedpeaksdict.update({tf: finalpeaks})
+        print(tf,len(finalpeaks))
     mergedpeak = pd.concat([peaks for _, peaks in mergedpeaksdict.items()]).reset_index(drop=True)
     if doPlot:
-        fig = sns.barplot(pd.DataFrame(ratiosofunique),index=['percentage of unique'])
+        pdb.set_trace()
+        fig = sns.barplot(pd.DataFrame(data=ratiosofunique,index=['percentage of unique']))
         fig.title("ratios of unique in replicates across experiments")
         if saveloc:
             fig.savefig(saveloc+"All_ratios_unique.pdf")
@@ -858,6 +863,7 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
                     cov[val.chrom] = bw.stats(str(val.chrom))[0]
                     prevchrom = val.chrom
                     if use == 'poisson':
+                        #TODO: compute on INPUT file instead
                         samples = np.zeros(window * sampling)
                         sam = np.random.rand(sampling)
                         sam = sam * (bw.chroms(str(val.chrom))-window)
@@ -962,10 +968,11 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
     dat = bedfile[bedfile.columns[bedcol:]].values
     prob = dat.astype(bool).sum(0)/len(dat)
     if docorrelation:
-        correlation = np.zeros((dat.shape[1],dat.shape[1]))
+        correlation = np.ones((dat.shape[1],dat.shape[1]))
     if doenrichment:
         enrichment = np.zeros((dat.shape[1],dat.shape[1]))
-    overlap = np.zeros((dat.shape[1],dat.shape[1]))
+        pvals = np.zeros((dat.shape[1],dat.shape[1]))
+    overlap = np.ones((dat.shape[1],dat.shape[1]))
     for i, col in enumerate(dat.T):
         #pdb.set_trace()
         overlapping = np.delete(dat,i,axis=1)[col!=0]
@@ -974,11 +981,6 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
         for j, val in enumerate(overlapping.T):
             if j==i:
                 add=1
-                if docorrelation:
-                    correlation[i,i]=1
-                if doenrichment:
-                    enrichment[i,i]=0
-                overlap[i,i]=1
             if docorrelation:
                 if norm and not np.isnan(zscore(col).sum()) and not np.isnan(zscore(val).sum()) or not correct:
                     correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1]
@@ -991,17 +993,20 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
                         tmp = np.corrcoef(val,col)[0,1]
                     correlation[i,j+add] = tmp if val.sum()!=-1 else 0
             if doenrichment:
-                enrichment[i,j+add] = np.log2(len(val[val != 0])/len(val))/prob[j+add])
+                #enrichment[i,j+add] = np.log2((len(val[val != 0])/len(val))/prob[j+add])
+                e, p = stats.fisher_exact([[len(val[val != 0]), len(val[val == 0])], [
+                                          prob[j+add]*len(dat), (1-prob[j+add])*len(dat)]])
+                enrichment[i,j+add] = np.log2(e)
+                pvals[i,j+add] = p
             overlap[i,j+add]=len(val[val!=0])/len(col)
-    overlap[i,i]=1
     if docorrelation:
-        correlation[i,i]=1
         correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     if doenrichment:
-        enrichment[i,i]=0
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+        pvals = pd.DataFrame(
+            data=pvals.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-    return overlap, correlation if docorrelation else None, enrichment.replace(-np.inf,-100) if doenrichment else None 
+    return overlap, correlation if docorrelation else None, pvals, enrichment.replace(-np.inf, -100) if doenrichment else None
 
 
 def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
@@ -1013,6 +1018,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
     dat = bedfile[bedfile.columns[bedcol:]].values
     # pdb.set_trace()
     prob = dat.astype(bool).sum(0)/len(dat)
+    binom
     if docorrelation:
         if groups is not None:
             raise ValueError("can't do correlation on groups")
@@ -1139,7 +1145,9 @@ def refineGroupsWithHiC():
 def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, directory='diffData/',
                  res_directory="diffPeaks/", isTF=False, compute_size=True, pairedend=True):
     """
-    will use macs2 to call differential peak binding
+    will use macs2 to call differential peak binding from two bam files and their control
+
+    one can also provide some spike in scaling information 
 
     Args:
     -----
@@ -1173,17 +1181,17 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
     print('computing the scaling values')
     ret = subprocess.run(cmd1, capture_output=True, shell=True)
     print(ret.stderr)
-    scaling1a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
-    scaling1b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling1a = int(re.findall(" after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling1b = int(re.findall(" after filtering in control: (\d+)", str(ret.stderr))[0])
     scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
     ret = subprocess.run(cmd2, capture_output=True, shell=True)
     print(ret.stderr)
-    scaling2a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
-    scaling2b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling2a = int(re.findall(" after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling2b = int(re.findall(" after filtering in control: (\d+)", str(ret.stderr))[0])
     scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
     if scaling is not None:
-        scaling1 = int(scaling1*scaling[0])
-        scaling2 = int(scaling2*scaling[1])
+        scaling1 = int(scaling1/scaling[0])
+        scaling2 = int(scaling2/scaling[1])
     print(scaling1, scaling2)
     return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg", 
         directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg", 
@@ -1191,6 +1199,9 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
 
 
 def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2, size):
+    """
+    calls MACS2 bdgdiff given the parameters
+    """
     print("doing differential peak binding")
     cmd = "macs2 bdgdiff --t1 " + name1 + " --c1 "
     cmd += control1+" --t2 " + name2 +" --c2 " + control2
@@ -1338,3 +1349,35 @@ def simpleMergeMotifs(motifs, window=0):
     motifs = motifs.drop(index=toremove).reset_index(drop=True)
     issues = pd.concat(issues)
     return motifs, issues
+
+
+def substractPeaksTo(peaks,loci, bp=50):
+    """
+
+    Args:
+    ----
+        peaks: a bed file df with a chrom,start, end column at least
+        loci: a df witth a chrom & loci column
+    """
+    i=0
+    j=0
+    keep=[]
+    bp=50
+    while j<len(peaks) and i<len(loci):
+        h.showcount(j,len(peaks))
+        if peaks.loc[j].chrom > loci.loc[i].chrom:
+            i+=1
+            continue
+        if peaks.loc[j].chrom < loci.loc[i].chrom:
+            j+=1
+            continue
+        if peaks.loc[j].start - bp > loci.loc[i].loci:
+            i+=1
+            continue
+        if peaks.loc[j].end + bp< loci.loc[i].loci:
+            j+=1
+            continue
+        if peaks.loc[j].end + bp >= loci.loc[i].loci and peaks.loc[j].start - bp <= loci.loc[i].loci:
+            keep.append(j)
+            j+=1
+    return peaks.loc[set(keep)]

@@ -194,7 +194,7 @@ def recoverFiles(files):
     h.parrun(cmd, cores=cores)
 
 
-def patternRN(rename_dict, location, wildcards, types=[], test=True, check_dependencies=True, cores=1):
+def patternRN(rename_dict, location, wildcards, types=[], dryrun=True, check_dependencies=True, cores=1):
     """
     rename/move a bunch of GCP objects found in some specific places
 
@@ -232,7 +232,7 @@ def patternRN(rename_dict, location, wildcards, types=[], test=True, check_depen
             cmd = ["gsutil mv " + val + " " + '/'.join(val.split('/')[:-1]) + '/' + v + '.' + '.'.join(val.split('/')[-1].split('.')[1:]) for val in res]
         else:
             cmd = ["gsutil mv " + val + " " + val.replace(k, v) for val in res]
-        if test:
+        if dryrun:
             print(cmd)
         else:
             h.parrun(cmd, cores=cores)
