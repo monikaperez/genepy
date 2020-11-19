@@ -41,12 +41,12 @@ c-run() {
 function convert2gif() {
   echo 'Converting';
   mkdir frames;
-  ffmpeg -i $1 -r 5 'frames/frame-%03d.jpg';
+  ffmpeg -i $1 -r 24 'frames/frame-%03d.jpg';
   cd frames;
-  convert -delay 20 -loop 0 *.jpg $1.gif;
+  convert -delay 24 -loop 0 *.jpg $1.gif;
   mv $1.gif ..;
   cd ..;
-  rm frames;
+  rm -rf frames;
 }
 
 
