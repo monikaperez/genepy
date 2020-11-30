@@ -111,7 +111,7 @@ def removeSamples(workspace, samples):
   except:
     print('we had pairs.')
     pairs = wm.get_pairs()
-    pairid = pairs[pairs.case_sample.isin(toremove)].index.tolist()
+    pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
     for k, val in wm.get_pair_sets().iterrows():
       wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
     wm.delete_pair(pairid)

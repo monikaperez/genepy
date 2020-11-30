@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -43,11 +43,6 @@ def get_credentials():
         credentials = run_flow(flow, STORAGE, http=http)
     return credentials
     credentials = authorize_credentials()
-
-
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
 
 class GSheet:
     def __init__(self, creds: str, document_id: str, sheet_id: str):
