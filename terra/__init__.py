@@ -72,7 +72,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
       failed = 0
       finished = True
       submission = wm.get_submission(submission_id)["workflows"]
-      for wcount, i in enumerate(submission):
+      for _, i in enumerate(submission):
         if i['status'] not in {'Done', 'Aborted', 'Failed', 'Succeeded'}:
           finished = False
         elif i["status"] in {'Failed', 'Aborted'}:
@@ -752,3 +752,50 @@ def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace'
     gcp.rmFiles(toremove, add='-r')
   else:
     print("aborting")
+
+
+def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], filetypes=None, catchdup=False,
+                   test=True):
+  """
+  moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
+
+  will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
+
+  Args:
+  ----
+    samples: pandas.dataframe with columns to move
+    gsfolderto: the bucket path to move the data to
+    values: list of the cols in the dataframe containing the gs object path to be moved 
+    catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
+
+  Returns:
+  --------
+    the updated sample pandas.dataframe
+  """
+  # to do the download to the new dataspace
+  for i, val in samples.iterrows():
+    ran = randomString(6, 'underscore', withdigits=False)
+    for j, ntype in enumerate(values):
+      # TODO try:catch
+      filetype = '.'.join(val[ntype].split(
+          '/')[-1].split('.')[1:]) if filetypes is None else filetypes[j]
+      if name_col is None:
+        name = val[ntype[0]].split('/')[-1].split('.')[0]
+      elif name_col == "index":
+        name = val.name
+      else:
+        name = val[name_col]
+      name = name + '.' + filetype if catchdup else name + '_' + ran + '.' + filetype
+      if not gcp.exists(gsfolderto + name) or not catchdup:
+        cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
+        if test:
+          print(cmd)
+        else:
+          res = subprocess.run(cmd, shell=True, capture_output=True)
+          if res.returncode != 0:
+            raise ValueError(str(res.stderr))
+          samples.loc[i, ntype] = gsfolderto + name
+      else:
+        print(name + ' already exists in the folder: ' + gsfolderto)
+        print(gcp.lsFiles([gsfolderto + name], '-la'))
+  return samples

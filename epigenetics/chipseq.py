@@ -3,7 +3,8 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-from JKBio import Helper as h
+from JKBio.utils import helper as h
+from JKBio.utils import plot
 import re
 from pybedtools import BedTool
 import seaborn as sns
@@ -13,12 +14,12 @@ import pdb
 import signal
 from scipy.optimize import curve_fit,minimize
 from sklearn.preprocessing import normalize
-from scipy.stats import poisson, zscore, boxcox
+from scipy.stats import poisson, zscore, boxcox, binom, fisher_exact
 from scipy.special import factorial
 import subprocess
 from pandas.io.parsers import ParserError, EmptyDataError
 import warnings
-
+import itertools
 
 size = {"GRCh37": 2864785220,
         "GRCh38": 2913022398}
@@ -195,11 +196,13 @@ def loadPeaks(peakFile=None,peakfolder=None, isMacs=True, CTFlist=[], skiprows=0
             else:
                 file = folder
                 if file[-10:] in ["narrowPeak",".broadPeak"] and (any(tf in file for tf in CTFlist) or not CTFlist):
+                    print('reading: '+file)
                     binding = pd.read_csv(peakfolder + file, sep='\t', header=None, skiprows=skiprows)
                     binding['name'] = file.replace('.narrowPeak', '').replace('.broadPeak','')
                     bindings = bindings.append(binding)
     elif peakFile:
         bindings = pd.read_csv(peakFile, sep='\t', header=None, skiprows=skiprows)
+        bindings['name'] = peakFile.split('/')[-1].split('.')[0]
     else:
         raise ValueError("need to provide one of peakFile or peakfolder")
     bindings = bindings.drop(5, 1).drop(4, 1)
@@ -215,11 +218,16 @@ def loadPeaks(peakFile=None,peakfolder=None, isMacs=True, CTFlist=[], skiprows=0
     bindings = bindings.sort_values(by=["chrom", "start", "end"], axis=0)
     bindings.start = bindings.start.astype('int')
     bindings.end = bindings.end.astype('int')
-    bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype('int') if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
+    bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype(
+        float) if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
     bindings.foldchange = bindings.foldchange.astype('float')
     bindings["-log10pvalue"] = bindings["-log10pvalue"].astype('float')
     bindings['-log10qvalue'] = bindings['-log10qvalue'].astype('float')
-    return bindings.reset_index(drop=True)
+    bindings = bindings.reset_index(drop=True)
+    loc = bindings['relative_summit_pos'].isna()
+    bindings.loc[bindings[loc].index, 'relative_summit_pos'] = bindings[loc].end - bindings[loc].start
+    bindings.relative_summit_pos = bindings.relative_summit_pos.astype(int)
+    return bindings
 
 
 def pysam_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=1000, numthreads=8):
@@ -287,7 +295,36 @@ def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=
     return None, fig
 
 
-
+def makeProfiles(matx=[], folder='', matnames=[], title='',
+                   name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
+                   sort=False, withDeeptools=True, cluster=1, vmax=None, vmin=None, overlap=False,
+                   legendLoc=None):
+    if withDeeptools:
+        if not (len(matnames) == 2 and len(matx) == 2):
+            raise ValueError('you need two mat.gz files and two names')
+        h.createFoldersFor(name)
+        cmd = 'computeMatrixOperations relabel -m '
+        cmd += matx[0] + ' -o '+matx[0]+' --groupLabels '+matnames[0]
+        cmd += ' && computeMatrixOperations relabel -m '
+        cmd += matx[1] + ' -o '+matx[1]+' --groupLabels '+matnames[1]
+        cmd += ' && computeMatrixOperations rbind -m '
+        cmd += matx[0] + ' ' + matx[1] + " -o " + '.'.join(name.split('.')[:-1]) + ".gz"
+        cmd += ' && plotProfile'
+        cmd += " --matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
+        cmd += " --outFileName " + name
+        cmd += " --refPointLabel " + refpoint
+        if vmax is not None:
+            cmd += " -max "+str(vmax)
+        if vmin is not None:
+            cmd += " -min "+str(vmin)
+        if cluster >1:
+            cmd += " --perGroup --kmeans "+str(cluster)
+        if legendLoc:
+            cmd += " --legendLocation "+legendLoc
+        if title:
+            cmd += " --plotTitle " + title
+        data = subprocess.run(cmd, shell=True, capture_output=True)
+        print(data)
 
 def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
                    width=5, length=10,torecompute=False, name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
@@ -332,7 +369,7 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
             cmd += bigwigs
             cmd += " --referencePoint "+refpoint
             cmd += " --regionsFileName " + peaks
-            cmd += "--missingDataAsZero"
+            cmd += " --missingDataAsZero"
             cmd += " --outFileName " + '.'.join(name.split('.')[:-1]) + ".gz"
             cmd += " --upstream " + str(window) + " --downstream " + str(window)
             cmd += " --numberOfProcessors " + str(numthreads) + ' && '
@@ -362,12 +399,13 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
                 pe += ' ' + i
             peaknames = pe
             cmd += " --regionsLabel" + peaknames
-        if len(bigwignames) > 0:
-            pe = ''
-            for i in bigwignames:
-                pe += ' ' + i
-            bigwignames = pe
-            cmd += " --samplesLabel" + bigwignames
+        if type(bigwigs) is list:
+            if len(bigwignames) > 0:
+                pe = ''
+                for i in bigwignames:
+                    pe += ' ' + i
+                bigwignames = pe
+                cmd += " --samplesLabel" + bigwignames
         if title:
             cmd += " --plotTitle " + title
         data = subprocess.run(cmd, shell=True, capture_output=True)
@@ -428,7 +466,7 @@ def substractPeaks(peaks1, to):
     while i < len(peaks2):
         if peaks1.iloc[j].chrom == peaks2.iloc[j].chrom:
             else
-        intersection = helper.intersection([peaks2.iloc[i]['start'], peaks2.iloc[i]['end']],
+        intersection = h.intersection([peaks2.iloc[i]['start'], peaks2.iloc[i]['end']],
                                            [peaks1.iloc[j]['start'], peaks1.iloc[j]['start']])
         if intersection:
 
@@ -444,7 +482,13 @@ def substractPeaks(peaks1, to):
 
 
 def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="mean"):
-    peaks = peaks.sort_values(by=['chrom', 'start'])
+    """
+    simply merges bedfiles from peak callers. providing a concaneted dataframe of bed-like tables
+
+    will recompute pvalues and foldchange from that.
+
+    """
+    peaks = peaks.sort_values(by=['chrom', 'start','end'])
     tfs = list(set(peaks['name']))
     mergedpeaksdict = {}
     remove = []
@@ -523,16 +567,37 @@ def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="me
     return pd.concat([merged_bed, tfmerged], axis=1, sort=False)
 
 
-def findpeakpath(folder, peakname):
+def findpeakpath(folder, proteiname):
+    """
+    given a folder of bigwigs and a protein name, finds the right bigwig
+    """
     res = None
     for val in os.listdir(folder):
-        if str(peakname) in val:
+        if str(proteiname) in val:
             if res:
                 raise ValueError('more than 1 bigwig file found')
             res= val
     if res:
         return res
     raise ValueError('no bigwig file found')
+
+
+def findBestPeak(presence):
+    """
+    given a list of -sets of peak locations for each replicate- will return the best replicate given a simple metric
+    """
+    tot = []
+    for ind, el in enumerate(presence):
+        val = len(el)
+        pres = [x for j,x in enumerate(presence) if j!=ind]
+        for jnd in range(1, len(pres)+1):
+            for comb in itertools.combinations(pres, jnd):
+                ov = el
+                for knd in range(jnd):
+                    ov = ov & comb[knd]
+                val += len(ov)*(jnd+1)
+        tot.append(val)
+    return np.argsort(tot)[::-1]
 
 
 def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
@@ -591,6 +656,19 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
     bamtomerge: [[bam1,bam2]]
 
     """
+    def col_nan_scatter(x, y, **kwargs):
+        df = pd.DataFrame({'x': x[:], 'y': y[:]})
+        df = df[df.sum(0) != 0]
+        x = df['x']
+        y = df['y']
+        plt.gca()
+        plt.scatter(x, y)
+    def col_nan_kde_histo(x, **kwargs):
+        df = pd.DataFrame({'x':x[:]})
+        df = df[df['x']!=0]
+        x = df['x']
+        plt.gca()
+        sns.kdeplot(x)
     print("/!/ should only be passed peaks with at least one good replicate")
     # for a df containing a set of peaks in bed format and an additional column of different TF
     tfs = list(set(peaks['tf']))
@@ -599,75 +677,59 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
     remove = []
     tomergebam = []
     ratiosofunique = {}
+    h.createFoldersFor(saveloc)
+    f = open(saveloc+'results.txt', 'w')
+    warnings.simplefilter("ignore")
     for tf in tfs:
         if only and tf!=only:
             continue
         cpeaks = peaks[peaks.tf==tf]
+        print('_____________________________________________________')
+        f.write('_____________________________________________________' + '\n')
         if len(set(cpeaks['replicate'])) == 1:
             if cpeaks.name.tolist()[0] in markedasbad:
                 print('the only replicate is considered bad!')
+                f.write('the only replicate is considered bad!'+"\n")
                 print('wrong TF: '+tf)
+                f.write('wrong TF: '+tf+"\n")
                 mergedpeaksdict.update({tf: cpeaks})
                 remove.append(tf)
                 continue
             print("we only have one replicate for " + tf + " .. pass")
+            f.write("we only have one replicate for " + tf + " .. pass"+"\n")
             mergedpeaksdict.update({tf: cpeaks})
             continue
         print("merging " + tf + " peaks")
-        merged = simpleMergedPeaks(cpeaks, window=window, maxp=False)
+        f.write("merging " + tf + " peaks"+"\n")
+        merged = simpleMergePeaks(cpeaks, window=window, maxp=False)
         merged_bed = merged[merged.columns[8:]]
         finalpeaks = merged[merged.columns[:8]]
-        print('finish first overlaps lookup')
+        print('--> finish first overlaps lookup')
+        f.write('--> finish first overlaps lookup'+"\n")
         # flag when  biggest is <1000 peaks
         if len(finalpeaks) < 1000:
             print('!TF has less than 1000 PEAKS!')
+            f.write('!TF has less than 1000 PEAKS!'+"\n")
         # for each TF (replicates), compute number of peaks
         peakmatrix = merged_bed.values.astype(bool)
 
+        presence = []
+        for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
+            presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
         # compute overlap matrix (venn?)
         if peakmatrix.shape[1] < 7 and doPlot:
-            presence = []
-            for peakpres in peakmatrix.T:  # https://github.com/tctianchi/pyvenn
-                presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-            h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=tf+"_before_venn", folder=saveloc)
+            plot.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=tf+"_before_venn", folder=saveloc)
             plt.show()
         else:
             print('too many replicates for Venn: '+str(peakmatrix.shape[1]))
-        bigwigs = os.listdir(bigwigfolder)
-        totpeak = np.sum(peakmatrix, 0)
-        sort = np.argsort(totpeak)[::-1]
-        print("found total peak for this replicate set: "+str(totpeak))
-        foundgood=False
-        for ib,sb in enumerate(sort):
-            if merged_bed.columns[sb].split('-')[0] not in markedasbad:
-                foundgood=True
-                break
-        if not foundgood:
-            print('no peaks were good enough quality')
-            print('wrong TF: '+tf)
-            remove.append(tf)
-        # distplot
-        # correlation plot
+            f.write('too many replicates for Venn: '+str(peakmatrix.shape[1])+"\n")
         if doPlot:
-            sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
-            def col_nan_scatter(x,y, **kwargs):
-                df = pd.DataFrame({'x':x[:],'y':y[:]})
-                df = df[df.sum(0)!=0]
-                x = df['x']
-                y = df['y']
-                plt.gca()
-                plt.scatter(x,y)
-            def col_nan_kde_histo(x, **kwargs):
-                df = pd.DataFrame({'x':x[:]})
-                df = df[df['x']!=0]
-                x = df['x']
-                plt.gca()
-                sns.kdeplot(x)
-            fig = fig.map_upper(col_nan_scatter)
-            fig = fig.map_upper(col_nan_kde_histo)
+            fig = sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
+            #fig = fig.map_upper(col_nan_scatter)
+            #fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation of peaks in each replicate", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_before_pairplot.pdf")
+                fig.savefig(saveloc+tf+"_before_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=1).sum(1).astype(bool)==0, peakmatrix[:,i])
@@ -676,10 +738,31 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if saveloc:
                 plt.savefig(saveloc+tf+"_before_unique_kdeplot.pdf")
             plt.show()
+        
+        bigwigs = os.listdir(bigwigfolder)
+
+        foundgood=False
+        sort = findBestPeak(presence)
+        for ib,sb in enumerate(sort):
+            if merged_bed.columns[sb].split('-')[0] not in markedasbad:
+                foundgood=True
+                break
+        if not foundgood:
+            print('no peaks were good enough quality')
+            f.write('no peaks were good enough quality'+"\n")
+            print('bad TF: '+tf)
+            f.write('bad TF: '+tf+"\n")
+            remove.append(tf)
+            ib = 0
+        # distplot
+        # correlation plot
+
+        
         biggest_ind = sort[ib]
         peakmatrix = peakmatrix.T
         biggest = merged_bed.columns[biggest_ind]
-        print('main rep is: '+str(biggest))
+        print('-> main rep is: '+str(biggest))
+        f.write('-> main rep is: '+str(biggest)+'\n')
         tot = peakmatrix[biggest_ind].copy().astype(int)
         # starts with highest similarity and go descending
         j = 0
@@ -692,19 +775,24 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             # if avg non overlap > 60%, and first, and none small flag TF as unreliable.
             overlap = len(presence[biggest_ind] & presence[val]) / len(presence[biggest_ind])
             peakname = merged_bed.columns[val]
-            print(peakname)
-            print('overlap: ' + str(overlap*100)+"%")
+            print('- '+peakname)
+            f.write('- '+peakname+'\n')
+            print('  overlap: ' + str(overlap*100)+"%")
+            f.write('  overlap: ' + str(overlap*100)+"%"+'\n')
             if overlap < MINOVERLAP:
                 smallsupport = len(presence[biggest_ind] & presence[val]) / len(presence[val])
-                print('not enough overlap')
+                print(' --> not enough overlap')
+                f.write(' --> not enough overlap'+'\n')
                 if smallsupport < MINOVERLAP:
                     # if the secondary does not have itself the required support
                     if j == 1 and merged_bed.columns[val].split('-')[0] not in markedasbad:
-                        print("Wrong TF: "+tf)
+                        print("  Wrong TF: "+tf)
+                        f.write("  Wrong TF: "+tf+'\n')
                         remove.append(tf)
                         break
                     # if not first, throw the other replicate and continue
-                    print("not using this replicate from the peakmatrix")
+                    print("  not using this replicate from the peakmatrix")
+                    f.write("  not using this replicate from the peakmatrix"+'\n')
                     continue
             if lookeverywhere:
                 tolookfor = peakmatrix[val] == 0
@@ -714,25 +802,30 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             additionalpeaksinsec = findAdditionalPeaks(finalpeaks, tolookfor, bigwigfolder + findpeakpath(bigwigfolder, peakname), sampling=sampling, mincov=mincov, window=window, minKL=minKL, use=use)
             if len(additionalpeaksinsec[additionalpeaksinsec>0])>0:
                 sns.kdeplot(additionalpeaksinsec[additionalpeaksinsec>0],label=peakname, legend=True).set(xlim=(0,None))
-                print(additionalpeaksinsec[additionalpeaksinsec>0].min(),additionalpeaksinsec[additionalpeaksinsec>0].max(),additionalpeaksinsec[additionalpeaksinsec<0])
+                print('  min,max from newly found peaks: '+str((additionalpeaksinsec[additionalpeaksinsec>0].min(),additionalpeaksinsec[additionalpeaksinsec>0].max())))
+                f.write('  min,max from newly found peaks: '+str((additionalpeaksinsec[additionalpeaksinsec>0].min(),additionalpeaksinsec[additionalpeaksinsec>0].max()))+'\n')
             # for testing purposes mainly
             finalpeaks[additionalpeaksinsec.astype(bool)].to_csv('additionalpeaksinsec_mp'+merged_bed.columns[val]+'.bed',sep='\t',index=None,header=False)
             peakmatrix[val] = np.logical_or(peakmatrix[val], additionalpeaksinsec.astype(bool))
             overlap = np.sum(np.logical_and(peakmatrix[val],peakmatrix[biggest_ind]))/np.sum(peakmatrix[biggest_ind])
             if overlap < MINOVERLAP:
                 newsmalloverlap = np.sum(np.logical_and(peakmatrix[val],peakmatrix[biggest_ind]))/np.sum(peakmatrix[val])
-                print("we did not had enough initial overlap.")
+                print("  we did not had enough initial overlap.")
+                f.write("  we did not had enough initial overlap."+'\n')
                 if newsmalloverlap < MINOVERLAP:
                     if merged_bed.columns[val].split('-')[0] in markedasbad:
-                        print('replicate ' + merged_bed.columns[val] + ' was too bad and had not enough overlap')
+                        print('  replicate ' + merged_bed.columns[val] + ' was too bad and had not enough overlap')
+                        f.write('  replicate ' + merged_bed.columns[val] + ' was too bad and had not enough overlap'+'\n')
                         continue
                     elif h.askif("we have two good quality peaks that don't merge well at all: "+merged_bed.columns[val] +\
-                            " and " +merged_bed.columns[biggest_ind]+ " can the first one be removed?:\n\
-                            overlap: "+str(overlap*100)+'%\nsmalloverlap: '+str(smalloverlap*100)+'%\nnew smalloverlap: '+str(newsmalloverlap*100)+"%"):
+                            " and " +merged_bed.columns[biggest_ind]+ " can the first one be removed?:\n  \
+                            overlap: "+str(overlap*100)+'%\n  smalloverlap: '+str(smalloverlap*100)+'%\n  new smalloverlap: '+str(newsmalloverlap*100)+"%"):
                         continue
                     else:
-                        print("enough from small overlaps")
-            print('enough overlap')
+                        print("  enough from small overlaps")
+                        f.write("  enough from small overlaps"+'\n')
+            print(' --> enough overlap')
+            f.write(' --> enough overlap'+'\n')
             recovered += np.sum(additionalpeaksinsec.astype(bool))
             if merged_bed.columns[val].split('-')[0] not in markedasbad:
                 tot += peakmatrix[val].astype(int) 
@@ -742,25 +835,34 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                 additionalpeaksinbig = findAdditionalPeaks(finalpeaks, tolookfor, bigwigfolder + findpeakpath(bigwigfolder, biggest), sampling=sampling, mincov=mincov, window=window, minKL=minKL, use=use)
                 if len(additionalpeaksinbig[additionalpeaksinbig>0])>0:
                     sns.kdeplot(additionalpeaksinbig[additionalpeaksinbig>0],label=biggest, legend=True).set(xlim=(0,None))
-                    print(additionalpeaksinbig[additionalpeaksinbig>0].min(),additionalpeaksinbig[additionalpeaksinbig>0].max())
+                    print('  min,max from newly found peaks: '+str((additionalpeaksinbig[additionalpeaksinbig>0].min(),additionalpeaksinbig[additionalpeaksinbig>0].max())))
+                    f.write('  min,max from newly found peaks: '+str((additionalpeaksinbig[additionalpeaksinbig>0].min(),additionalpeaksinbig[additionalpeaksinbig>0].max()))+'\n')
 
                 peakmatrix[biggest_ind] = np.logical_or(peakmatrix[biggest_ind], additionalpeaksinbig)        
                 tot += additionalpeaksinbig.astype(bool).astype(int)
                 recovered += np.sum(additionalpeaksinbig.astype(bool))
-            print('we have recovered ' + str(recovered)+' peaks, equal to '+ str(100*recovered/np.sum(peakmatrix[biggest_ind]))+\
+            print('  we have recovered ' + str(recovered)+' peaks, equal to '+ str(100*recovered/np.sum(peakmatrix[biggest_ind]))+\
                 '% of the peaks in main replicate')
+            f.write('  we have recovered ' + str(recovered)+' peaks, equal to '+ str(100*recovered/np.sum(peakmatrix[biggest_ind]))+\
+                '% of the peaks in main replicate'+'\n')
             if overlap < (MINOVERLAP+0.2)/1.2:
                 # we recompute to see if the overlap changed
                 newoverlap = np.sum(np.logical_and(peakmatrix[val],peakmatrix[biggest_ind]))/np.sum(peakmatrix[biggest_ind])
                 smalloverlap = np.sum(np.logical_and(peakmatrix[val],peakmatrix[biggest_ind]))/np.sum(peakmatrix[val])
                 if newoverlap < (MINOVERLAP+0.2)/1.2:
                     if smalloverlap < (2+MINOVERLAP)/3:
-                        print("not enough overlap to advice to merge the bams.\noldnew overlap: "+str(overlap*100)+'%\n\
+                        print("  not enough overlap to advice to merge the bams.\n  oldnew overlap: "+str(overlap*100)+'%\n  \
                             new overlap: '+str(newoverlap*100)+"%")
+                        f.write("  not enough overlap to advice to merge the bams.\n  oldnew overlap: "+str(overlap*100)+'%\n  \
+                            new overlap: '+str(newoverlap*100)+"%"+'\n')
                         continue
                     else:
-                        print('enough from small overlap to advice to merge the peaks')
+                        print('  enough from small overlap to advice to merge the peaks')
+                        f.write('  enough from small overlap to advice to merge the peaks'+'\n')
             tomergebam.append([biggest, peakname])
+            #the quality is good enough in the end we can pop from the list if it exists
+            if tf in remove:
+                remove.remove(tf)
         plt.title('distribution of new found peaks')
         if saveloc:
             plt.savefig(saveloc+tf+"_new_found_peaks_kdeplot.pdf")
@@ -770,24 +872,11 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         ratiosofunique[tf] = len(np.argwhere(peakmatrix.sum(0)==1))/peakmatrix.shape[1]
         if doPlot:
             sns.pairplot(merged_bed,corner=True, diag_kind="kde", kind="reg", plot_kws={"scatter_kws":{"alpha":.05}})
-            def col_nan_scatter(x,y, **kwargs):
-                df = pd.DataFrame({'x':x[:],'y':y[:]})
-                df = df[df.sum(0)!=0]
-                x = df['x']
-                y = df['y']
-                plt.gca()
-                plt.scatter(x,y)
-            def col_nan_kde_histo(x, **kwargs):
-                df = pd.DataFrame({'x':x[:]})
-                df = df[df['x']!=0]
-                x = df['x']
-                plt.gca()
-                sns.kdeplot(x)
-            fig = fig.map_upper(col_nan_scatter)
-            fig = fig.map_upper(col_nan_kde_histo)
+            #fig = fig.map_upper(col_nan_scatter)
+            #fig = fig.map_upper(col_nan_kde_histo)
             plt.suptitle("correlation and distribution of peaks after recovery", y=1.08)
             if saveloc:
-                plt.savefig(saveloc+tf+"_after_pairplot.pdf")
+                fig.savefig(saveloc+tf+"_after_pairplot.pdf")
             plt.show()
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(np.delete(peakmatrix,i,axis=0).sum(0).astype(bool)==0, peakmatrix[i])
@@ -796,29 +885,36 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if saveloc:
                 plt.savefig(saveloc+tf+"_after_unique_kdeplot.pdf")
             plt.show()
-        if len(peakmatrix.shape) > 1 and doPlot and tf not in remove:
+        if len(peakmatrix.shape) > 1 and doPlot:
             if peakmatrix.shape[0] < 7:
                 presence = []
                 for peakpres in peakmatrix:  # https://github.com/tctianchi/pyvenn
                     presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=tf+'_recovered',folder=save)
+                title = tf + '_recovered (TOREMOVE)'if tf in remove else tf+'_recovered'
+                plot.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=title, folder=saveloc)
                 plt.show()
             else:
-                print('too many replicates for Venn')    
-        if tf not in remove:
-            finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
-            finalpeaks['name'] = biggest
-            finalpeaks['tf'] = tf
-            mergedpeaksdict.update({tf: finalpeaks})
-            print(tf,len(finalpeaks))
+                print('(too many replicates for Venn)')
+                f.write('(too many replicates for Venn)'+'\n')    
+        finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
+        finalpeaks['name'] = biggest
+        finalpeaks['tf'] = tf
+        mergedpeaksdict.update({tf: finalpeaks})
+        print(str((tf,len(finalpeaks))))
+        f.write(str((tf,len(finalpeaks)))+'\n')
     mergedpeak = pd.concat([peaks for _, peaks in mergedpeaksdict.items()]).reset_index(drop=True)
     if doPlot:
-        fig = sns.barplot(pd.DataFrame(ratiosofunique),index=['percentage of unique'])
-        fig.title("ratios of unique in replicates across experiments")
+        df= pd.DataFrame(data=ratiosofunique,index=['percentage of unique'])
+        df['proteins'] = df.index
+        fig = sns.barplot(data=df)
+        plt.xticks(rotation=60,ha='right')
+        plt.title("ratios of unique in replicates across experiments")
         if saveloc:
-            fig.savefig(saveloc+"All_ratios_unique.pdf")
+            plt.savefig(saveloc+"All_ratios_unique.pdf")
         plt.show()
-    return mergedpeak, tomergebam, remove,ratiosofunique
+    f.close()
+    mergedpeak['name'] = mergedpeak.tf
+    return mergedpeak, tomergebam, remove, ratiosofunique
 
 
 def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
@@ -831,9 +927,20 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
     if < 20% don't flag for merge bam
     f B is big and now mean non overlap < 40%, take union and flag for mergeBam else, throw B.
 
+    Args:
+    -----
+        peaks
+        tolookfor
+        filepath
+        sampling
+        mincov
+        window
+        cov
+        minKL
+        use
     returns:
     -------
-    peaks: np.array(bool) for each peaks in peakset, returns a binary
+        np.array(bool) for each peaks in peakset, returns a binary
     """
     # def poisson(k, lamb, scale): return scale * (lamb**k / factorial(k)) * np.exp(-lamb)
 
@@ -858,6 +965,7 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
                     cov[val.chrom] = bw.stats(str(val.chrom))[0]
                     prevchrom = val.chrom
                     if use == 'poisson':
+                        #TODO: compute on INPUT file instead
                         samples = np.zeros(window * sampling)
                         sam = np.random.rand(sampling)
                         sam = sam * (bw.chroms(str(val.chrom))-window)
@@ -883,7 +991,7 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
     return res
 
 
-def putInConscensus(conscensus, value, window=10, mergetype='mean'):
+def putInBed(conscensus, value, window=10, mergetype='mean'):
     """ given ordered dataframes
     
     conscensus df[start,end,chrom]
@@ -961,11 +1069,10 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
         print("we will be correcting for fully similar lines/ columns by removing 1 on their last value")
     dat = bedfile[bedfile.columns[bedcol:]].values
     prob = dat.astype(bool).sum(0)/len(dat)
-    if docorrelation:
-        correlation = np.zeros((dat.shape[1],dat.shape[1]))
-    if doenrichment:
-        enrichment = np.zeros((dat.shape[1],dat.shape[1]))
-    overlap = np.zeros((dat.shape[1],dat.shape[1]))
+    correlation = np.ones((dat.shape[1],dat.shape[1]))
+    enrichment = np.zeros((dat.shape[1],dat.shape[1]))
+    pvals = np.zeros((dat.shape[1],dat.shape[1]))
+    overlap = np.ones((dat.shape[1],dat.shape[1]))
     for i, col in enumerate(dat.T):
         #pdb.set_trace()
         overlapping = np.delete(dat,i,axis=1)[col!=0]
@@ -974,34 +1081,38 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
         for j, val in enumerate(overlapping.T):
             if j==i:
                 add=1
-                if docorrelation:
-                    correlation[i,i]=1
-                if doenrichment:
-                    enrichment[i,i]=0
-                overlap[i,i]=1
             if docorrelation:
-                if norm and not np.isnan(zscore(col).sum()) and not np.isnan(zscore(val).sum()) or not correct:
-                    correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1]
+                if norm and not np.isnan(zscore(col[val!=0]).sum()) and not np.isnan(zscore(val[val!=0]).sum()) or not correct:
+                    correlation[i,j+add] = np.corrcoef(zscore(val[val!=0]),zscore(col)[val!=0])[0,1]
                 else:
-                    tmp = np.corrcoef(val,col)[0,1]
+                    tmp = np.corrcoef(val[val != 0], col[val != 0])[0, 1]
                     if np.isnan(tmp) and correct:
-                        # one contains only the same value everywhere
-                        col[-1]-=max(0.01,abs(mean(col)))
-                        val[-1]-=max(0.01,abs(mean(val)))
-                        tmp = np.corrcoef(val,col)[0,1]
-                    correlation[i,j+add] = tmp if val.sum()!=-1 else 0
+                        if len(col[val!=0]) == 0 or len(val[val!=0]) == 0:
+                        # one has no overlap 
+                            correlation[i,j+add] =  0
+                        else:
+                            # one contains only the same value everywhere
+                            col[-1]-=max(0.01,abs(np.mean(col)))
+                            val[-1]-=max(0.01,abs(np.mean(val)))
+                            correlation[i,j+add] = np.corrcoef(val,col)[0,1]
             if doenrichment:
-                enrichment[i,j+add] = np.log2(len(val[val != 0])/len(val))/prob[j+add])
+                #enrichment[i,j+add] = np.log2((len(val[val != 0])/len(val))/prob[j+add])
+                e, p = fisher_exact([[len(val[val != 0]), len(val[val == 0])], [
+                                          prob[j+add]*len(dat), (1-prob[j+add])*len(dat)]])
+                enrichment[i,j+add] = np.log2(e)
+                pvals[i,j+add] = p
             overlap[i,j+add]=len(val[val!=0])/len(col)
-    overlap[i,i]=1
     if docorrelation:
-        correlation[i,i]=1
         correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     if doenrichment:
-        enrichment[i,i]=0
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+        enrichment[enrichment==-np.inf] = -1000
+        enrichment[enrichment.isna()] = 0
+        enrichment[enrichment == np.inf] = 1000
+        pvals = pd.DataFrame(
+            data=pvals.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-    return overlap, correlation if docorrelation else None, enrichment.replace(-np.inf,-100) if doenrichment else None 
+    return overlap, correlation if docorrelation else None, pvals, enrichment.replace(-np.inf, -100) if doenrichment else None
 
 
 def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
@@ -1013,16 +1124,24 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
     dat = bedfile[bedfile.columns[bedcol:]].values
     # pdb.set_trace()
     prob = dat.astype(bool).sum(0)/len(dat)
+    binom
     if docorrelation:
         if groups is not None:
             raise ValueError("can't do correlation on groups")
         correlation = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
     enrichment = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
+    pvals = np.zeros(
+        (dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
     if groups is not None:
         for i in set(groups):
             overlapping = dat[groups==i]
             for j,val in enumerate(overlapping.T):
-                enrichment[i,j] = np.log2((len(val[val!=0])/len(overlapping))/prob[j])
+                # enrichment of j in i
+                e, p = fisher_exact([
+                    [len(val[val != 0]), len(val[val == 0])], 
+                    [prob[j]*len(dat), (1-prob[j])*len(dat)]])
+                enrichment[i, j] = np.log2(e)
+                pvals[i, j] = p
     else:
         for i, col in enumerate(dat.T):
             overlapping = np.delete(dat,i,axis=1)[col!=0]
@@ -1036,13 +1155,22 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
                     enrichment[i,i]=1
                 if docorrelation:
                     correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1] if norm else np.corrcoef(val,col)[0,1]
-                enrichment[i,j+add] = np.log2((len(val[val!=0])/len(col))/prob[j+add])
+                e, p = fisher_exact([[len(val[val != 0]), len(val[val == 0])], [
+                    prob[j+add]*len(dat), (1-prob[j+add])*len(dat)]])
+                enrichment[i, j+add] = np.log2(e)
+                pvals[i, j+add] = p
         if docorrelation:
             correlation[i,i]=1
-            correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+            correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:] if groups is None else set(
+                groups), columns=bedfile.columns[bedcol:])
         enrichment[i,i]=1 
     enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
-    return enrichment, correlation if docorrelation else None
+    enrichment[enrichment==-np.inf] = -1000
+    enrichment[enrichment.isna()] = 0
+    enrichment[enrichment == np.inf] = 1000
+    pvals = pd.DataFrame(
+        data=pvals, index=bedfile.columns[bedcol:]  if groups is None else set(groups), columns=bedfile.columns[bedcol:])
+    return enrichment, pvals, correlation if docorrelation else None
 
 
 def findAdditionalCobindingSignal(conscensus, known=None, bigwigs=[], window=100):
@@ -1139,7 +1267,9 @@ def refineGroupsWithHiC():
 def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, directory='diffData/',
                  res_directory="diffPeaks/", isTF=False, compute_size=True, pairedend=True):
     """
-    will use macs2 to call differential peak binding
+    will use macs2 to call differential peak binding from two bam files and their control
+
+    one can also provide some spike in scaling information 
 
     Args:
     -----
@@ -1150,6 +1280,9 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
     scaling
     """
     print("doing diff from " + bam1 + " and " + bam2)
+    if scaling is not None:
+        if max(scaling) > 1:
+            raise ValueError("scalings need to be between 0-1")
     name1 = bam1.split('/')[-1].split('.')[0]
     name2 = bam2.split('/')[-1].split('.')[0]
     if size is None:
@@ -1173,17 +1306,17 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
     print('computing the scaling values')
     ret = subprocess.run(cmd1, capture_output=True, shell=True)
     print(ret.stderr)
-    scaling1a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
-    scaling1b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling1a = int(re.findall(" after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling1b = int(re.findall(" after filtering in control: (\d+)", str(ret.stderr))[0])
     scaling1 = scaling1a if scaling1a <= scaling1b else scaling1b
     ret = subprocess.run(cmd2, capture_output=True, shell=True)
     print(ret.stderr)
-    scaling2a = int(re.findall("fragments after filtering in treatment: (\d+)", str(ret.stderr))[0])
-    scaling2b = int(re.findall("fragments after filtering in control: (\d+)", str(ret.stderr))[0])
+    scaling2a = int(re.findall(" after filtering in treatment: (\d+)", str(ret.stderr))[0])
+    scaling2b = int(re.findall(" after filtering in control: (\d+)", str(ret.stderr))[0])
     scaling2 = scaling2a if scaling2a <= scaling2b else scaling2b
     if scaling is not None:
-        scaling1 = int(scaling1*scaling[0])
-        scaling2 = int(scaling2*scaling[1])
+        scaling1 = int(scaling1/scaling[0])
+        scaling2 = int(scaling2/scaling[1])
     print(scaling1, scaling2)
     return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg", 
         directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg", 
@@ -1191,6 +1324,9 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
 
 
 def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2, size):
+    """
+    calls MACS2 bdgdiff given the parameters
+    """
     print("doing differential peak binding")
     cmd = "macs2 bdgdiff --t1 " + name1 + " --c1 "
     cmd += control1+" --t2 " + name2 +" --c2 " + control2
@@ -1203,21 +1339,43 @@ def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2
 
 def AssignToClosestExpressed(bed,countFile,genelocFile):
     print("the bed file and genelocFile should use the same assembly")
-    genelocFile = pd.read_csv(genelocFile,sep="\t", compression="", columns=['chr','start','end',"name"])
+    genelocFile = pd.read_csv(genelocFile,sep="\t", compression="", columns=['chrom','start','end',"name"])
     #for val in bed.iterrows():
 
 
-def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE_main.py", 
+def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".", 
     stitching_distance=None, TSS_EXCLUSION_ZONE_SIZE="2500", assembly="hg38",controlBam=None,controlBai=None):
     """
+    Calls super enhancer from H3K27ac with the ROSE algorithm
+
+    Args:
+    ----
+        MACS2GFF
+        bamFile
+        outdir
+        baiFile
+        rosePath
+        stitching_distance
+        TSS_EXCLUSION_ZONE_SIZE
+        assembly
+        controlBam
+        controlBai
+
+    Returns:
+    --------
+        a bed-like dataframe with the superenhancers
+
     outdir has to be an absolute path or a ~/path
     """
     print("we are going to move your input files to "+rosePath)
-    os.system('mv '+MACS2GFF+' '+rosePath)
-    os.system('mv '+bamFile+' '+rosePath)
+    cmd = 'mv '+MACS2bed+' '+rosePath+MACS2bed.split('/')[-1]+'.bed'
+    cmd += ' && mv '+bamFile+' '+rosePath
     baiFile = baiFile if baiFile else bamFile[:-1]+'i'
-    os.system('mv '+baiFile +' '+rosePath)
-    cmd = "cd "+rosePath+" && python ROSE_main.py -g "+assembly+" -i "+MACS2GFF.split('/')[-1] +" -r " + bamFile.split('/')[-1] +" -o "+ outdir 
+    cmd += ' && mv '+baiFile +' '+rosePath
+    res = subprocess.run(cmd, capture_output=True, shell=True)
+    if res.returncode != 0:
+        raise SystemError('failed moving files: '+str(res))
+    cmd = "cd "+rosePath+" && python ROSE_main.py -g "+assembly+" -i "+MACS2bed.split('/')[-1]+'.bed' + " -r " + bamFile.split('/')[-1] + " -o " + outdir
     if TSS_EXCLUSION_ZONE_SIZE:
         cmd+=" -t "+TSS_EXCLUSION_ZONE_SIZE
     if controlBam:
@@ -1227,25 +1385,31 @@ def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE
         cmd+=" -c "+controlBam.split('/')[-1]
     if stitching_distance:
         cmd+=" -s "+ stitching_distance
-    res = subprocess.run(cmd, capture_output=False, shell=True)
+    
+    res = subprocess.run(cmd, capture_output=True, shell=True)
+    fail = False
+    if res.returncode != 0:
+        v = 'ROSE failed:' +str(res)
+        fail = True
     print('finished.. moving them back to their original folder')
-    os.system('mv '+rosePath+MACS2GFF.split('/')[-1]+' '+'/'.join(MACS2GFF.split('/')[:-1])+"/")
-    os.system('mv '+rosePath+bamFile.split('/')[-1]+' '+'/'.join(bamFile.split('/')[:-1])+"/")
-    os.system('mv '+rosePath+baiFile.split('/')[-1]+' '+'/'.join(baiFile.split('/')[:-1])+"/")
+    cmd = 'mv '+rosePath+MACS2bed.split('/')[-1]+'.bed ' + MACS2bed
+    cmd += ' && mv '+rosePath+bamFile.split('/')[-1]+' '+bamFile
+    cmd+= ' && mv '+rosePath+baiFile.split('/')[-1]+' '+baiFile
     if controlBam:
-        os.system('mv '+rosePath+controlBam.split('/')[-1]+' '+'/'.join(controlBam.split('/')[:-1])+"/")
-        os.system('mv '+rosePath+controlBai.split('/')[-1]+' '+'/'.join(controlBai.split('/')[:-1])+"/")
-    if res['returnCode']=='0':
-        print('worked')
-        output = ReadRoseSuperEnhancers(outdir ,bool(controlBam))
-        return output
-    else:
-        print(res)
-        print('failed')
-        return false
+        cmd += ' && mv '+rosePath+controlBam.split('/')[-1]+' '+controlBam
+        cmd += ' && mv '+rosePath+controlBai.split('/')[-1]+' '+controlBai
+    res = subprocess.run(cmd, capture_output=True, shell=True)
+    if res.returncode != 0:
+        raise SystemError('failed moving files: '+str(res))
+    if fail:
+        raise SystemError(v) 
+    print('worked')
+    print(res)
+    return ReadRoseSuperEnhancers(outdir ,bool(controlBam))
 
 
-def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chromHMMFolderpath="~/ChromHMM/", assembly="hg38",control_bam_dir=None):
+
+def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath=".", chromHMMFolderpath="~/ChromHMM/", assembly="hg38",control_bam_dir=None):
     """
     runs chromHMM algorithm
 
@@ -1254,11 +1418,21 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
         outdir str: an existing dir where the results should be saved 
         data: a df[cellname,markname,markbed|bam|bigwig, ?controlbed|bam|bigwig]
         folderpath
+        numstates
+        datatype
+        folderPath
+        chromHMMFolderpath
+        assembly
+        control_bam_dir
+
+    Returns:
+    -------
+        A dict of bed like dataframes containing the regions of the different states
     """
     print("you need to have ChromHMM")
     chromHMM = "java -mx8000M -jar "+chromHMMFolderpath+"ChromHMM.jar "
+    h.createFoldersFor(outdir+'binarized/')
     data.to_csv(outdir+"input_data.tsv", sep='\t',index=None,header=None)
-    os.system('mkdir '+outdir+"binarized/")
     cmd = chromHMM
     if datatype=="bed":
         cmd+="BinarizeBed "
@@ -1282,9 +1456,9 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
         raise ValueError(res2.stderr)
     ret = {}
     for v in set(data[0]):
-        ret[v] = pd.read_csv('~/AMLproject/data/chromHMM/'+v+'_'+str(numstates)+'_dense.bed',sep='\t',header=None, 
+        ret[v] = pd.read_csv(outdir+v+'_'+str(numstates)+'_dense.bed', sep='\t', header=None,
             skiprows=1).drop(columns=[4,5,6,7]).rename(columns=
-            {0:'chr',1:'start',2:'end',3:'state',8:"color"})
+            {0:'chrom',1:'start',2:'end',3:'state',8:"color"})
     return ret
 
 def loadMEMEmotifs(file, tfsubset=[],motifspecies='HUMAN'):
@@ -1338,3 +1512,41 @@ def simpleMergeMotifs(motifs, window=0):
     motifs = motifs.drop(index=toremove).reset_index(drop=True)
     issues = pd.concat(issues)
     return motifs, issues
+
+
+def substractPeaksTo(peaks,loci, bp=50):
+    """
+    removes all peaks that are not within a bp distance to a set of loci
+
+    Args:
+    ----
+        peaks: a bed file df with a chrom,start, end column at least
+        loci: a df witth a chrom & loci column
+        bp: the max allowed distance to the loci 
+    
+    Returns:
+    -------
+        all the peaks that are within this distance
+    """
+    i=0
+    j=0
+    keep=[]
+    bp=50
+    while j<len(peaks) and i<len(loci):
+        h.showcount(j,len(peaks))
+        if peaks.loc[j].chrom > loci.loc[i].chrom:
+            i+=1
+            continue
+        if peaks.loc[j].chrom < loci.loc[i].chrom:
+            j+=1
+            continue
+        if peaks.loc[j].start - bp > loci.loc[i].loci:
+            i+=1
+            continue
+        if peaks.loc[j].end + bp< loci.loc[i].loci:
+            j+=1
+            continue
+        if peaks.loc[j].end + bp >= loci.loc[i].loci and peaks.loc[j].start - bp <= loci.loc[i].loci:
+            keep.append(j)
+            j+=1
+    return peaks.loc[set(keep)]
