@@ -12,7 +12,7 @@ import pdb
 import subprocess
 import signal
 import re
-from JKBio import Helper as h
+from JKBio.utils import helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -275,6 +275,9 @@ def exists(val):
     """
     if type(val) is str:
         return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
+    elif type(val) is list:
+        rest = set(val) - set(lsFiles(val))
+        return len(rest)==0 , rest
 
 
 def extractSize(val):

@@ -1,9 +1,10 @@
-### epigenomics/ChipHelper
+# epigenomics
 
-ChipHelper is especially targeted to functions related to the analysis of epigenomics data. It has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
+Especially targeted to functions related to the analysis of epigenomics data. It has functions to read, merge, denoise, ChIP seq data. It contains a lot of functions required for the [AML paper](github.com/JKBio/AMLproject).
 
-#### Available functions:
+## Available functions:
 
+_in ./chipseq.py_
 
 - dropWeirdChromosomes: 
 - extractPairedSingleEndFrom: 
@@ -24,3 +25,12 @@ ChipHelper is especially targeted to functions related to the analysis of epigen
 - findAdditionalCobindingSignal: 
 - fullDiffPeak: 
 - diffPeak: 
+
+## highly recommended packages
+
+- Bedtools
+- deepTools
+- MACS2
+- ROSE
+- MEME
+- ChromHMM

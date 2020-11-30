@@ -1,13 +1,9 @@
-### Terra
+# terra
 
-
-
-a file containing a set of functions that uses [dalmatian]() to interact with the [GCP]() powered genomics HPC platform: [Terra](). 
+a file containing a set of functions that uses [dalmatian](github.com/broadinstitute/dalmatian) to interact with the [GCP](https://cloud.google.com/storage/docs/gsutil) powered genomics HPC platform: [Terra](www.terra.bio). 
 They contain a list of additional functions to do more than what is available in dalmatian
 
 #### Available functions:
-
-_in ./TerraFunction.py_
 
 - createManySubmissions: 
 - waitForSubmission: 
@@ -23,3 +19,10 @@ _in ./TerraFunction.py_
 - cleanWorkspace: 
 - saveOmicsOutput: 
 - shareCCLEbams: 
+- changeToBucket:
+
+## highly recommanded
+
+- firecloud-dalmatian (python)
+- gsutil
+- nextflow (better than terra)
