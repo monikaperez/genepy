@@ -10,8 +10,8 @@ import numpy as np
 import os
 import re
 import signal
-from JKBio import Helper as h
-from JKBio import GCPFunction as gcp
+from JKBio.utils import helper as h
+from JKBio.google import gcp
 import pdb
 import subprocess
 from gsheets import Sheets
@@ -799,3 +799,124 @@ def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], fi
         print(name + ' already exists in the folder: ' + gsfolderto)
         print(gcp.lsFiles([gsfolderto + name], '-la'))
   return samples
+
+
+  #delete submissions
+def delete_job(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
+    wm = dm.WorkspaceManager(workspaceid)
+    bucket = wm.get_bucket_id()
+    data= []
+    if DeleteCurrent:
+      if dryrun:
+          print('gsutil -m rm gs://'+bucket+'/'+subid+'/*/'+taskid+'/**')
+      else:
+          res = subprocess.run('gsutil -m rm gs://'+bucket+'/'+subid+'/*/'+taskid+'/**', shell=True, capture_output=True)
+          if res.returncode != 0:
+              raise ValueError(str(res.stderr))
+    else:
+      res = subprocess.run('gsutil -m ls gs://'+bucket+'/'+subid+'/*/'+taskid+'/**', shell=True, capture_output=True)
+      if res.returncode != 0 or len(str(res.stdout)) < 4:
+          raise ValueError(str(res.stderr))
+      data += str(res.stdout)[2:-1].split('\\n')[:-1]
+      if "TOTAL:" in data[-1]:
+          data = data[:-1]
+      pdb.set_trace()
+      sam = pd.concat([wm.get_samples(), wm.get_pairs(), wm.get_sample_sets()])
+      tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
+      torm = set(data) - tokeep
+      if dryrun:
+        print(torm)
+      else:
+        h.parrun(['gsutil rm '+i for i in torm], cores=12)
+
+
+#removing things from old failed workflows
+def removeFromFailedWorkflows(workspaceid, maxtime = '2020-06-10', everythingFor=[], dryrun=False):
+    wm = dm.WorkspaceManager(workspaceid)
+    for k, val in wm.get_submission_status(filter_active=False).iterrows():
+        if (val.Failed > 0 or val.configuration in everythingFor) and val.date.date() > pd.to_datetime(maxtime):
+            for w in wm.get_submission(val.submission_id)['workflows']:
+                if w['status']=='Failed' or val.configuration in everythingFor:
+                    try:
+                        a = w['workflowId']
+                    #else it was not even run
+                    except:
+                        continue
+                    delete_job(workspaceid,val.submission_id,a,dryrun=dryrun)
+
+
+def listHeavyFiles(workspaceid, unusedOnly=True):
+    wm = dm.WorkspaceManager(workspaceid)
+    bucket = wm.get_bucket_id()
+    sizes = gcp.get_all_sizes('gs://'+bucket+'/')
+    print('we got '+str(len(sizes))+' files')
+    a  = list(sizes.keys())
+    a.sort()
+    ma = 100
+    torm = []
+    tot = 0
+    for i in a[::-1]:
+        if i>1000000*ma:
+            tot += i
+            for val in sizes[i]:
+                torm.append(val)
+    print('we might remove more than '+str(tot/1000000000)+'GB')
+    if unusedOnly:
+      sam = pd.concat([wm.get_samples(),wm.get_pairs(),wm.get_sample_sets()])
+      tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
+      torm = set(torm) - tokeep
+    return torm
+
+
+def findFilesInWorkspaces(names=0, lookup=['**', '*.', '.*']):
+    ws = dm.list_workspaces()
+    print('listing workspacs')
+    file = []
+    res = []
+    for val in ws:
+        val = val['workspace']
+        print(val['namespace']+"/"+val['name'])
+        buck = 'gs://'+val['bucketName']+"/"
+        if subprocess.run('gsutil ls '+buck, capture_output=True, shell=True).returncode != 0:
+            print("cannot access this bucket")
+            continue
+        if len(names) == 0:
+            file.append(buck)
+        if '**' in lookup:
+            buck += '**'
+        if not '*.' in lookup:
+            buck += '/'
+        for name in names:
+            val = buck+name
+            if '.*' in lookup:
+                val += '*'
+            data = subprocess.run("gsutil -m ls " + val,
+                                  capture_output=True, shell=True)
+            if data.returncode != 0:
+                if "One or more URLs matched no objects" not in str(data.stderr):
+                    raise ValueError(
+                        'issue with the command: ' + str(data.stderr))
+            if len(str(data.stdout)) < 4:
+                continue
+            res += str(data.stdout)[2:-1].split('\\n')[:-1]
+            if "TOTAL:" in res[-1]:
+                res = res[:-1]
+    return res
+
+def updateWorkflows(workflowIDs, path):
+    """
+    will download the latest version of workflows (from a list of workflowIDs) to a folder paths
+    """
+
+def uploadWorkflows(workspaceID, workflows, path=None):
+    """
+    updates the workflows on Terra and upgrades the workflow values on our workspace
+    
+    Args:
+    -----
+        workflows: dict(workflowID,location) or list(workflowID) if path
+        path: folder path where files with same name as workflows' name are stored
+    """
+    method_folder="src/"
+    methods = ['']
+    dm.update_method()
