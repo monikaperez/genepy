@@ -20,6 +20,7 @@ import subprocess
 from pandas.io.parsers import ParserError, EmptyDataError
 import warnings
 import itertools
+from statsmodels.stats.multitest import multipletests
 
 size = {"GRCh37": 2864785220,
         "GRCh38": 2913022398}
@@ -1109,6 +1110,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
         enrichment[enrichment==-np.inf] = -1000
         enrichment[enrichment.isna()] = 0
         enrichment[enrichment == np.inf] = 1000
+        pvals = np.reshape(multipletests(pvals.ravel(), 0.1, method="bonferroni")[1], pvals.shape)
         pvals = pd.DataFrame(
             data=pvals.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
     overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
@@ -1168,6 +1170,8 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
     enrichment[enrichment==-np.inf] = -1000
     enrichment[enrichment.isna()] = 0
     enrichment[enrichment == np.inf] = 1000
+    pvals = np.reshape(multipletests(pvals.ravel(),
+                                     0.1, method="bonferroni")[1], pvals.shape)
     pvals = pd.DataFrame(
         data=pvals, index=bedfile.columns[bedcol:]  if groups is None else set(groups), columns=bedfile.columns[bedcol:])
     return enrichment, pvals, correlation if docorrelation else None
@@ -1409,7 +1413,7 @@ def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".",
 
 
 
-def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath=".", chromHMMFolderpath="~/ChromHMM/", assembly="hg38",control_bam_dir=None):
+def runChromHMM(outdir, data, numstates=15, datatype='bed', folderPath=".", chromHMMFolderpath="~/ChromHMM/", assembly="hg38",control_bam_dir=None):
     """
     runs chromHMM algorithm
 
@@ -1449,7 +1453,10 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath=".", chro
     print(res1)
     if res1.returncode!=0:
         raise ValueError(str(res1.stderr))
-    cmd = chromHMM + "LearnModel -printposterior -noautoopen "+outdir+"binarized "+outdir+" "+str(numstates)+" "+assembly
+    cmd = chromHMM + "LearnModel -printposterior -noautoopen "
+    if len(data)<10:
+        cmd += '-init load -m '+chromHMMFolderpath+'model_15_coreMarks.txt '
+    cmd += outdir+"binarized "+outdir+" "+str(numstates)+" "+assembly
     res2 = subprocess.run(cmd, capture_output=True, shell=True)
     print(res2)
     if res2.returncode!=0:

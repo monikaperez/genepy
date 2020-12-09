@@ -386,3 +386,26 @@ def dups(lst):
     seen_twice = set(x for x in lst if x in seen or seen.add(x))
     # turn the set into a list (as requested)
     return list(seen_twice)
+
+def makeCombinations(size, proba):
+    """
+    produces probability of X event happening at the same time given binomial proba of event occuring
+    
+    pretty usefull for cobinding analysis
+    """
+    sums = {i:0 for i in range(1,size)}
+    for i in range(size-1,0,-1):
+        print(i)
+        if sums[i]> 0:
+            continue
+        print(combin(size+3,i))
+        v=0
+        for j in itertools.combinations(proba, i):
+            v+=np.prod(j)
+        sums[i] = v
+    for i in range(size-1,0,-1):
+        for j in range(i+1,size):
+            icomb = combin(j,i)
+            sums[i] -= icomb*sums[j]
+    sums[0] = 1-sum(list(sums.values()))
+    return sums
