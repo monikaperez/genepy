@@ -349,7 +349,7 @@ def datetoint(dt, split='-', unknown='U', order="des"):
     if len(dt) > 1:
         for val in dt[1:]:
             arr = np.vstack(
-                (arr, np.array(val.split(split) if val != unknown else [0, 0, 0]).astype(int)))
+                (arr, np.array(val.split(split) if val != unknown and val.count(split) == 2 else [0, 0, 0]).astype(int)))
         arr = arr.T
     res = arr[2] * 365 + arr[1] * 31 + \
         arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
@@ -409,3 +409,6 @@ def makeCombinations(size, proba):
             sums[i] -= icomb*sums[j]
     sums[0] = 1-sum(list(sums.values()))
     return sums
+
+def closest(lst, K):
+    return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))] 
