@@ -331,8 +331,8 @@ def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, 
 # What pops up on hover?
 
 
-def correlationMatrix(data, names, colors=None, importance=None, sec_importance=None, title="correlation Matrix", dataIsCorr=False,
-                          invert=False, size=40, folder='', interactive=False, rangeto=None):
+def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, other=None, title="correlation Matrix", dataIsCorr=False,
+                          invert=False, size=40, folder='', interactive=False, rangeto=None, add=None, maxval=None, minval=None):
     """
     Make an interactive correlation matrix from an array using bokeh
 
@@ -353,9 +353,16 @@ def correlationMatrix(data, names, colors=None, importance=None, sec_importance=
 
     """
     if not dataIsCorr:
+        print("computing correlations")
         data = np.corrcoef(np.array(data) if not invert else np.array(data).T)
     else:
         data = np.array(data)
+    regdata = data.copy()
+    if minval is not None:
+        data[data<minval]=minval
+    if maxval is not None:
+        data[data > maxval] = maxval
+    data=data/data.max()
     TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save"
     xname = []
     yname = []
@@ -365,10 +372,15 @@ def correlationMatrix(data, names, colors=None, importance=None, sec_importance=
     width = []
     if type(colors) is list:
         print('we are assuming you want to display clusters with colors')
-    elif importance is not None:
-        print('we are assuming you want to display the importance of your correlation with opacity')
-    if sec_importance is not None:
-        print('we are assuming you want to display the importance of your correlation with size')
+    elif other is not None:
+        print('we are assuming you want to display the other of your correlation with opacity')
+    if pvals is not None:
+        print('we are assuming you want to display the pvals of your correlation with size')
+        regpvals = pvals.copy()
+        u = pvals<maxokpval
+        pvals[~u] = np.log10(1/pvals[~u])
+        pvals = pvals/pvals.max()
+        pvals[u]=1
     if interactive:
         xname = []
         yname = []
@@ -379,13 +391,13 @@ def correlationMatrix(data, names, colors=None, importance=None, sec_importance=
             for j, name2 in enumerate(names):
                 xname.append(name1)
                 yname.append(name2)
-                if sec_importance is not None:
-                    height.append(max(0.1, min(0.9, sec_importance[i, j])))
+                if pvals is not None:
+                    height.append(max(0.1, min(0.9, pvals[i, j])))
                     color.append(cc.coolwarm[int((data[i, j]*128)+127)])
                     alpha.append(min(abs(data[i, j]), 0.9))
-                elif importance is not None:
+                elif other is not None:
                     color.append(cc.coolwarm[int((data[i, j]*128)+127)])
-                    alpha.append(max(min(importance[i, j], 0.9),0.1) if importance[i, j]!=0 else 0)
+                    alpha.append(max(min(other[i, j], 0.9),0.1) if other[i, j]!=0 else 0)
                 else:
                     alpha.append(min(abs(data[i, j]), 0.9))
                 if colors is not None:
@@ -396,17 +408,19 @@ def correlationMatrix(data, names, colors=None, importance=None, sec_importance=
                         else:
                             color.append('lightgrey')                        
                 
-                elif importance is None and sec_importance is None:
+                elif pvals is None and other is None:
                     color.append('grey' if data[i, j]
                                  > 0 else Category20[3][2])
-        if sec_importance is not None:
+        print(regdata.max())
+        if pvals is not None:
             width = height.copy()
             data = dict(
                 xname=xname,
                 yname=yname,
                 colors=color,
                 alphas=alpha,
-                data=data.ravel(),
+                data=regdata.ravel(),
+                pvals=regpvals.ravel(),
                 width=width,
                 height=height
             )
@@ -418,12 +432,13 @@ def correlationMatrix(data, names, colors=None, importance=None, sec_importance=
                 alphas=alpha,
                 data=data.ravel()
             )
-        pdb.set_trace()
-        hover = HoverTool(tooltips=[('names ', '@yname, @xname')])
+        tt = [('names', '@yname, @xname'), ('value', '@data')]
+        if pvals is not None:
+            tt.append(('pvals','@pvals'))
         p = figure(title=title if title is not None else "Correlation Matrix",
                    x_axis_location="above", tools=TOOLS,
                    x_range=list(reversed(names)), y_range=names,
-                   tooltips=[('names', '@yname, @xname'), ('corr', '@data')])
+                   tooltips=tt)
 
         p.plot_width = 800
         p.plot_height = 800
@@ -527,3 +542,25 @@ def addTextToImage(image, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize
     font = ImageFont.truetype("/Library/Fonts/Arial.ttf", fontSize)
     draw.text(xy, text, color, font=font)
     img.save(outputpath)
+
+
+def SOMPlot(net,size, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
+    """
+    makes an interactive plot from a SOM from the SimpSOM package
+    """
+    diffs = net.diff_graph(show=False, returns=True)
+    somnodes = {'r':[],'q':[],'c':diffs,'features':[]} 
+    for i, node in enumerate(net.nodeList):
+        somnodes['q'].append(node.pos[0]+(i%size)*distq1+(i//size)*distq2)
+        somnodes['r'].append(-node.pos[1]-(i%size)*distr)
+        somnodes['features'].append([cols[i] for i in np.argsort(node.weights) if abs(node.weights[i])>0.4])
+    somnodes=pd.DataFrame(somnodes)
+    for i, v in somnodes.iterrows():
+        tot=""
+        for e, j in enumerate(v.features):
+            if e%5==4:
+                tot+='\n'
+            tot += " "+str(j)
+        somnodes.loc[i, 'features'] = tot
+    #interactive SOM with features with highest importance to the nodes, displayed when hovering
+    helper.bigScatter(somnodes, precomputed=True, features=True, binsize=1, title='Cobinding SOM cluster of '+str(size), folder=folder)
