@@ -774,7 +774,7 @@ def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], fi
   """
   # to do the download to the new dataspace
   for i, val in samples.iterrows():
-    ran = randomString(6, 'underscore', withdigits=False)
+    ran = h.randomString(6, 'underscore', withdigits=False)
     for j, ntype in enumerate(values):
       # TODO try:catch
       filetype = '.'.join(val[ntype].split(
@@ -820,7 +820,6 @@ def delete_job(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
       data += str(res.stdout)[2:-1].split('\\n')[:-1]
       if "TOTAL:" in data[-1]:
           data = data[:-1]
-      pdb.set_trace()
       sam = pd.concat([wm.get_samples(), wm.get_pairs(), wm.get_sample_sets()])
       tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
       torm = set(data) - tokeep

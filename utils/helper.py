@@ -390,3 +390,24 @@ def dups(lst):
 
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))] 
+
+
+def compareDfs(df1, df2):
+    """
+    compares df1 to df2
+    """
+    missmatchCols = (set(df1.columns)-set(df2.columns)
+                     ) | (set(df2.columns)-set(df1.columns))
+    missmatchInds = (set(df1.index)-set(df2.index)
+                     ) | (set(df2.index)-set(df1.index))
+    newNAs = df1.isna().sum().sum() - df2.isna().sum().sum()
+    new0s = (df1 == 0).sum().sum() - (df2 == 0).sum().sum()
+    if len(missmatchCols) > 0:
+        print('FOUND:' + str(missmatchCols)+' to be missmatchCols in df1')
+    if len(missmatchInds) > 0:
+        print('FOUND:' + str(missmatchInds)+' to be missmatchInds in df1')
+    if newNAs:
+        print('FOUND:' + str(newNAs)+' to be newNAs in df1')
+    if new0s:
+        print('FOUND:' + str(new0s)+' to be new0s in df1')
+    return missmatchCols, missmatchInds, newNAs, new0s
