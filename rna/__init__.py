@@ -7,11 +7,15 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
-
+from JKBio.utils import helper as h
+from JKBio.rna import pyDESeq2
 import pdb
-
+import os 
+import seaborn as sns
+import gseapy
 import pandas as pd
 import numpy as np
+import subprocess
 
 from taigapy import TaigaClient
 tc = TaigaClient()
@@ -125,7 +129,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
         fastqs.sort()
         if pairedEnd and (tomap or totrim):
             print("need to be name_*1, name_*2")
-            fastqs = [i for i in grouped(fastqs, 2)]
+            fastqs = [i for i in h.grouped(fastqs, 2)]
     elif fastq is None:
         raise Error('you need input files')
     else:
@@ -137,7 +141,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
             else:
                 print("need to be name_*1, name_*2")
                 fastqs = [[f[0].split('/')[-1], f[1].split('/')[-1]]
-                          for f in grouped(fastq, 2)]
+                          for f in h.grouped(fastq, 2)]
         else:
             fastQfolder = '/'.join(fastq.split('/')[:-1]) + '/'
             fastqs = [fastq.split('/')[-1]]
@@ -157,7 +161,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
                               file[0] + ' ' + fastQfolder + file[1])
                 cmds.append(cmd)
             print(cmds)
-            parrun(cmds, cores, add=rm)
+            h.parrun(cmds, cores, add=rm)
             fastqs = [[file[0].split('.')[
                 0] + '_val_1.fq.gz', file[1].split('.')[0] + '_val_2.fq.gz'] for file in fastqs]
     if tomap:
@@ -173,18 +177,18 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
                     rm.append('rm ' + results +
                               file[0] + ' ' + results + file[1])
                 cmds.append(cmd)
-            parrun(cmds, cores, add=rm)
+            h.parrun(cmds, cores, add=rm)
             fastqs = [file[0].split('.')[0] + '.sorted.bam' for file in fastqs]
 
     if tofilter:
         print("\n\nfiltering\n\n")
         cmds = []
         rm = []
-        parrun([pathtosam + ' index ' + results + file.split('.')
+        h.parrun([pathtosam + ' index ' + results + file.split('.')
                 [0] + '.sorted.bam' for file in fastqs], cores)
-        parrun([pathtosam + ' flagstat ' + results + file.split('.')[0] + '.sorted.bam > ' +
+        h.parrun([pathtosam + ' flagstat ' + results + file.split('.')[0] + '.sorted.bam > ' +
                 results + file.split('.')[0] + '.sorted.bam.flagstat' for file in fastqs], cores)
-        parrun([pathtosam + ' idxstats ' + results + file.split('.')[0] + '.sorted.bam > ' +
+        h.parrun([pathtosam + ' idxstats ' + results + file.split('.')[0] + '.sorted.bam > ' +
                 results + file.split('.')[0] + '.sorted.bam.idxstat' for file in fastqs], cores)
         fastqs = [file.split('.')[0] + '.sorted.bam' for file in fastqs]
     else:
@@ -387,7 +391,7 @@ def mergeSplicingVariants(df, defined='.'):
     torename = {}
     todrop = []
     for i, v in enumerate(df.index.tolist()):
-        showcount(i, len(df))
+        h.showcount(i, len(df))
         if foundpoint:
             if foundpoint in v:
                 tomerge.append(v)
@@ -534,12 +538,139 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
 
 
 def gsva(data, geneset_file, pathtoJKBio, method='ssgsea'):
-  data.to_csv('/tmp/data_JKBIOhelper_gsva.csv', index_col=0)
+  data.to_csv('/tmp/data_JKBIOhelper_gsva.csv')
   cmd = "Rscript "+pathtoJKBio + \
-      "/helper/ssGSEA.R /tmp/data_JKBIOhelper_gsva.csv " + geneset_file + " " + ssgsea
+      "/rna/ssGSEA.R /tmp/data_JKBIOhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
-    raise ValueError('issue with the command: ' + str(res.stderr))
+    raise ValueError('issue with the command: ' + str(res))
   print(res)
-  res = pd.read_csv("/tmp/res_JKBIO_ssGSEA.csv")
+  res = pd.read_csv("/tmp/res_JKBIO_ssGSEA.tsv", sep='\t')
   return res
+
+
+def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3=0.93, thresholds={}):
+    thresh = {'minmapping': 0.8,  # Mapping Rate
+              'minendmapping': 0.75,
+              'minefficiency': 0.6,  # Expression Profiling Efficiency
+              'maxendmismatch': 0.025,  # Base Mismatch end wise
+              'maxmismatch': 0.02,  # Base Mismatch
+              'minhighqual': 0.6,  # High Quality Rate
+              'minexon': 0.6,  # Exonic Rate
+              "maxambiguous": 0.2,  # Ambiguous Alignment Rate
+              "maxsplits": 0.1,  # Avg. Splits per Read
+              "maxalt": 0.65,  # Alternative Alignments rate
+              "maxchim": 0.3,  # Chimeric Alignment Rate
+              "minreads": 20000000,
+              "minlength": 80,  # Read Length
+              "maxgenes": 35000,
+              "mingenes": 10000,
+              }
+    thresh.update(thresholds)
+
+    qcs = rnaqc.T
+    tot = []
+    a = qcs[(qcs["Mapping Rate"] < thresh['minmapping']) | (qcs["Base Mismatch"] > thresh['maxmismatch']) |
+            (qcs["End 1 Mapping Rate"] < thresh['minendmapping']) | (qcs["End 2 Mapping Rate"] < thresh['minendmapping']) |
+            (qcs["End 1 Mismatch Rate"] > thresh['maxendmismatch']) | (qcs["End 2 Mismatch Rate"] > thresh['maxendmismatch']) |
+            (qcs["Expression Profiling Efficiency"] < thresh['minefficiency']) | (qcs["High Quality Rate"] < thresh['minhighqual']) |
+            (qcs["Exonic Rate"] < thresh['minexon']) | (qcs["Ambiguous Alignment Rate"] > thresh['maxambiguous']) |
+            (qcs["Avg. Splits per Read"] < thresh['maxsplits']) | (qcs["Alternative Alignments"] > thresh['maxalt']*qcs["Total Reads"]) |
+            (qcs["Chimeric Alignment Rate"] > thresh['maxchim']) | (qcs["Total Reads"] < thresh['minreads']) |
+            (qcs["Read Length"] < thresh['minlength']) | (thresh['maxgenes'] < qcs["Genes Detected"]) |
+            (qcs["Genes Detected"] < thresh['mingenes'])].index.tolist()
+
+    tot.append([1 if i in qcs[(qcs["Mapping Rate"] <
+                               thresh['minmapping'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Base Mismatch"] >
+                               thresh['maxmismatch'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["End 1 Mapping Rate"] <
+                               thresh['minendmapping'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["End 2 Mapping Rate"] <
+                               thresh['minendmapping'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["End 1 Mismatch Rate"] >
+                               thresh['maxendmismatch'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["End 2 Mismatch Rate"] >
+                               thresh['maxendmismatch'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Expression Profiling Efficiency"]
+                               < thresh['minefficiency'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["High Quality Rate"] <
+                               thresh['minhighqual'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Exonic Rate"] < thresh['minexon'])
+                              ].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Ambiguous Alignment Rate"] >
+                               thresh['maxambiguous'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Avg. Splits per Read"] <
+                               thresh['maxsplits'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Alternative Alignments"] > thresh['maxalt']
+                               * qcs["Total Reads"])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Chimeric Alignment Rate"] >
+                               thresh['maxchim'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Total Reads"] < thresh['minreads'])
+                              ].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Read Length"] <
+                               thresh['minlength'])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(thresh['maxgenes'] <
+                               qcs["Genes Detected"])].index.tolist() else 0 for i in a])
+    tot.append([1 if i in qcs[(qcs["Genes Detected"] <
+                               thresh['mingenes'])].index.tolist() else 0 for i in a])
+
+    res = pd.DataFrame(index=a, columns=["Mapping Rate",
+                                         "Base Mismatch",
+                                         "End 1 Mapping Rate",
+                                         "End 2 Mapping Rate",
+                                         "End 1 Mismatch Rate",
+                                         "End 2 Mismatch Rate",
+                                         "Expression Profiling Efficiency",
+                                         "High Quality Rate",
+                                         "Exonic Rate",
+                                         "Ambiguous Alignment Efficiency",
+                                         "Avg. Splits per Read",
+                                         "Alternative Alignments",
+                                         "Chimeric Alignment Rate",
+                                         "Total Reads",
+                                         "Read Length",
+                                         "Min Genes Detected",
+                                         "Max Genes Detected"], data=np.array(tot).astype(bool).T)
+
+    print(a)
+    h.createFoldersFor(folder)
+    res.to_csv(folder+'_qc_results.csv')
+    if plot and len(res)>0:
+        h.createFoldersFor(folder)
+        _, ax = plt.subplots(figsize=(10, 10))
+        plot = sns.heatmap(res, ax=ax)
+        plt.show()
+        plot.get_figure().savefig(folder+'failed_qc.pdf')
+
+        for val in rnaqc.index:
+            qc = rnaqc.loc[val]
+            boxplot = sns.violinplot(y=qc)
+            q1 = qc.quantile(qant1)
+            q3 = qc.quantile(qant3)
+            outlier_top_lim = q3 + 1.5 * (q3 - q1)
+            outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
+            for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
+                plt.text(0.05, v, k, ha='left', va='center',
+                         color='red' if k in a else 'black')
+            plt.show()
+            plt.savefig(folder +
+                        val.replace(' ', '_').replace('/', '_')+'.pdf')
+    return res
+
+
+def getDifferencesFromCorrelations(df1, df2, minsimi=0.99999999999999):
+    res = []
+    overlap = set(df1.columns) & set(df2.columns)
+    print(str(len(overlap))+" overlap")
+    df1 = df1[overlap].copy()
+    df2 = df2[overlap].copy()
+    for k, val in df1.iterrows():
+        if k in df2.index:
+            corr = np.corrcoef(df1.loc[k], df2.loc[k])
+            if corr[0, 1] < minsimi:
+                res.append((k, corr[0, 1]))
+        else:
+            print(k+" not in second df")
+    print("found "+str(len(res))+" samples that did not match")
+    return res

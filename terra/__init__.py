@@ -466,6 +466,11 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
         h.parrun(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)], cores=20)
       else:
         gcp.mvFiles(a[col].tolist(), newgs)
+    else:
+      if keeppath:
+        print(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)])
+      else:
+        print("mv "+str(a[col].tolist()) +" "+newgs)
   if workspaceto is None:
     wmto = wmfrom
   else:
@@ -677,7 +682,7 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
   sheets = Sheets.from_files('~/.client_secret.json', '~/.storage.json')
   print("You need to have gsheet installed and you '~/.client_secret.json', '~/.storage.json' set up")
   privacy = sheets.get(privacy_sheeturl).sheets[6].to_frame()
-  refdata = sheets.get(refsheet_url).sheets[0].to_frame().set_index('cds_sample_id', drop=True)
+  refdata = sheets.get(refsheet_url).sheets[0].to_frame(index_col=0)
   blacklist = [i for i in privacy['blacklist'].values.tolist() if i is not np.nan]
   blacklisted = set(blacklist) & set(samples)
   print("we have " + str(len(blacklist)) + ' blacklisted files')
