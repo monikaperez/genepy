@@ -412,3 +412,22 @@ def makeCombinations(size, proba):
 
 def closest(lst, K):
     return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))] 
+
+
+def compareDfs(df1, df2):
+    """
+    compares df1 to df2
+    """
+    nmissmatchCols = set(df1.columns)-set(df2.columns)
+    omissmatchCols = set(df2.columns)-set(df1.columns)
+    nmissmatchInds = set(df1.index)-set(df2.index)
+    omissmatchInds = set(df2.index)-set(df1.index)
+    newNAs = df1.isna().sum().sum() - df2.isna().sum().sum()
+    new0s = (df1 == 0).sum().sum() - (df2 == 0).sum().sum()
+    print('FOUND missmatch Columns IN df1: ' + str(nmissmatchCols))
+    print('FOUND missmatch Columns NOT IN df1: ' + str(omissmatchCols))
+    print('FOUND missmatch Index IN df1: ' + str(nmissmatchInds))
+    print('FOUND missmatch Index NOT IN df1: ' + str(omissmatchInds))
+    print('FOUND new NAs in df1: ' + str(newNAs))
+    print('FOUND new 0s in df1: ' + str(new0s))
+    return nmissmatchCols, omissmatchCols, nmissmatchInds, omissmatchInds, newNAs, new0s

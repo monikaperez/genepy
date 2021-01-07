@@ -466,6 +466,11 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
         h.parrun(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)], cores=20)
       else:
         gcp.mvFiles(a[col].tolist(), newgs)
+    else:
+      if keeppath:
+        print(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)])
+      else:
+        print("mv "+str(a[col].tolist()) +" "+newgs)
   if workspaceto is None:
     wmto = wmfrom
   else:
@@ -677,7 +682,7 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
   sheets = Sheets.from_files('~/.client_secret.json', '~/.storage.json')
   print("You need to have gsheet installed and you '~/.client_secret.json', '~/.storage.json' set up")
   privacy = sheets.get(privacy_sheeturl).sheets[6].to_frame()
-  refdata = sheets.get(refsheet_url).sheets[0].to_frame().set_index('cds_sample_id', drop=True)
+  refdata = sheets.get(refsheet_url).sheets[0].to_frame(index_col=0)
   blacklist = [i for i in privacy['blacklist'].values.tolist() if i is not np.nan]
   blacklisted = set(blacklist) & set(samples)
   print("we have " + str(len(blacklist)) + ' blacklisted files')
@@ -774,7 +779,7 @@ def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], fi
   """
   # to do the download to the new dataspace
   for i, val in samples.iterrows():
-    ran = randomString(6, 'underscore', withdigits=False)
+    ran = h.randomString(6, 'underscore', withdigits=False)
     for j, ntype in enumerate(values):
       # TODO try:catch
       filetype = '.'.join(val[ntype].split(
@@ -820,7 +825,6 @@ def delete_job(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
       data += str(res.stdout)[2:-1].split('\\n')[:-1]
       if "TOTAL:" in data[-1]:
           data = data[:-1]
-      pdb.set_trace()
       sam = pd.concat([wm.get_samples(), wm.get_pairs(), wm.get_sample_sets()])
       tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
       torm = set(data) - tokeep

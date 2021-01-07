@@ -93,3 +93,15 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
         else:
             DTs.append(unknown)
     return DTs
+
+
+def indexBams(bucketpath, cores=4):
+    """
+    given a bucket path, will index all .bam files without an associated index and return their paths
+    """
+    files = gcp.lsFiles([bucketpath])
+    bams = [val for val in files if '.bam' in val[-4:]]
+    unindexed = [val for val in bams if val[:-4]+'.bai' not in files and val[:4] +'.bam.bai' not in files]
+    print("found "+str(len(unindexed))+" files to reindex")
+    h.parrun(["export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` && samtools index "+val for val in unindexed], cores)
+    return {val: val[:-4]+".bam.bai" for val in unindexed}
