@@ -658,7 +658,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
   return togiveaccess
 
 
-def shareCCLEbams(users, samples, raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+def shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
@@ -669,6 +669,7 @@ def shareCCLEbams(users, samples, raise_error=True, arg_max_length=100000, bamco
   Args:
   ----
     users: list[str] of users' google accounts
+    groups: list[str] of groups' google accounts
     samples list[str] of samples cds_ids for which you want to share data
     bamcols: list[str] list of column names where bams/bais are
     raise_error: whether or not to raise an error if we find blacklisted lines
@@ -695,6 +696,8 @@ def shareCCLEbams(users, samples, raise_error=True, arg_max_length=100000, bamco
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
+  for group in groups:
+    usrs += " -g " + group + ":R"
   for user in users:
     usrs += " -u " + user + ":R"
   cmd_prefix = "gsutil -m acl ch " + usrs
