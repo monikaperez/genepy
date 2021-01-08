@@ -696,7 +696,7 @@ def shareCCLEbams(users, samples, raise_error=True, arg_max_length=100000, bamco
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
   for user in users:
-    usrs += " " + user + ":R"
+    usrs += " -u " + user + ":R"
   cmd_prefix = "gsutil -m acl ch " + usrs
   cmd = cmd_prefix
   for n, filename in enumerate(togiveaccess):
