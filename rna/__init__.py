@@ -7,8 +7,8 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
-from JKBio.utils import helper as h
 from JKBio.rna import pyDESeq2
+from JKBio.utils import helper as h
 import pdb
 import os 
 import seaborn as sns
@@ -273,7 +273,7 @@ def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], genese
 
 
 def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1 / 100,
-            name="RNPv2", spikevol=1, control="AAAVS1", fdr=0.1, totalrnamass=0.5):
+            name="RNPv2", spikevol=1, control="AAVS1", fdr=0.1, totalrnamass=0.5):
     """
     Runs the ERCC dashboard Rpackage on your notebook
 
@@ -316,7 +316,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
     ipython.magic("R -i control sample2Name = control")
     # name of ERCC mixture design, "RatioPair" is default
     ipython.magic(
-        "R -i issingle erccmix < - if(issingle) 'Single' else 'RatioPair'")
+        "R -i issingle erccmix <- if(issingle) 'Single' else 'RatioPair'")
     # dilution factor used for Ambion spike-in mixtures
     ipython.magic("R -i dilution erccdilution = dilution")
     # volume (in microliters) of diluted spike-in mixture added to total RNA mass
@@ -324,7 +324,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
     # user defined false discovery rate (FDR), default is 0.05
     ipython.magic("R -i fdr choseFDR = fdr")
     ipython.magic("R exDat = ''")
-    ipython.magic("R - i totalrnamass totalRNAmass < - totalrnamass")
+    ipython.magic("R -i totalrnamass totalRNAmass <- totalrnamass")
 
     cols = list(ERCC.columns)
     cols.sort()
@@ -336,7 +336,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
         d.update({
             featurename: 'Feature'
         })
-        for i in cols[:-1]:
+        for i in cols:
             if val + '-' in i:
                 e += 1
                 d.update({i: val.split('_')[-1] + '_' + str(e)})
@@ -355,7 +355,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
 
         try:
 
-            ipython.magic("R - i val exDat = initDat(datType=datType, isNorm=isNorm, exTable=a,\
+            ipython.magic("R -i val exDat = initDat(datType=datType, isNorm=isNorm, exTable=a,\
                                  filenameRoot=filenameRoot, sample1Name=val,\
                                  sample2Name=sample2Name, erccmix=erccmix,\
                                  erccdilution=erccdilution, spikeVol=spikeVol,\
@@ -376,8 +376,10 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
 
         ipython.magic("R -o rm rm <- exDat$Results$r_m.res$r_m.mn")
         ipython.magic("R -o se se <- exDat$Results$r_m.res$r_m.mnse")
-
-        res[val] = (rm[0], se[0])
+        ipython.magic("R write.csv(c(rm,se), file = '/tmp/JKBIO_ercc.csv')")
+        ipython.magic("R print(se,rm)")
+        l = h.fileToList("/tmp/JKBIO_ercc.csv")
+        res[val] = (float(l[1][4:]), float(l[2][4:]))
     for i, v in res.items():
         if abs(v[0]) > v[1]:
             print(i, v[0])
@@ -502,17 +504,28 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
         print("using index as gene_id")
         data['gene_id'] = data.index
     warnings.simplefilter("ignore")
-    for val in experiments:
+    if type(controlcontain) is str:
+        controlcontain = [controlcontain]*len(experiments)
+    for j, val in enumerate(experiments):
         print(val)
         cond = [1 if val+'-' in i else 0 for i in data.columns[:-1]]
-        contr = [1 if controlcontain in i else 0 for i in data.columns[:-1]]
+        contr = [1 if controlcontain[j] in i else 0 for i in data.columns[:-1]]
         design = pd.DataFrame(index=data.columns[:-1], columns=['DMSO', 'Target'],
                               data=np.array([contr, cond]).T)
         design.index = design.index.astype(str).str.replace('-', '.')
         deseq = pyDESeq2.pyDESeq2(count_matrix=data, design_matrix=design,
                                   design_formula='~DMSO + Target', gene_column="gene_id")
-        if scaling is not None:
+        if type(scaling) is bool:
+            print("scaling using ERCC")
+            if scaling:
+                deseq.run_estimate_size_factors(
+                    controlGenes=data.gene_id.str.contains(spikecontrolscontain))
+        elif type(scaling) is list or type(scaling) is set:
+            print("scaling using a gene set")
+            deseq.run_estimate_size_factors(controlGenes=data.gene_id.isin(scaling))
+        elif type(scaling) is dict:
             if val in scaling:
+                print("auto scaling from ERCCdashboard mean/std values")
                 if abs(scaling[val][0]) > threshforscaling*scaling[val][1]:
                     print("  estimating sizeFactors for this one")
                     deseq.run_estimate_size_factors(

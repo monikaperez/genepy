@@ -658,7 +658,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
   return togiveaccess
 
 
-def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+def shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
@@ -669,6 +669,7 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
   Args:
   ----
     users: list[str] of users' google accounts
+    groups: list[str] of groups' google accounts
     samples list[str] of samples cds_ids for which you want to share data
     bamcols: list[str] list of column names where bams/bais are
     raise_error: whether or not to raise an error if we find blacklisted lines
@@ -695,15 +696,27 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
+  for group in groups:
+    usrs += " -g " + group + ":R"
   for user in users:
-    usrs += " " + user + ":R"
-  files = ''
-  for i in togiveaccess:
-    files += ' ' + i
-  code = os.system("gsutil -m acl ch -ru" + usrs + files)
-  if code == signal.SIGINT:
-    print('Awakened')
-    return
+    usrs += " -u " + user + ":R"
+  cmd_prefix = "gsutil -m acl ch " + usrs
+  cmd = cmd_prefix
+  for n, filename in enumerate(togiveaccess):
+    oldcmd = cmd
+    cmd += ' ' + filename
+    if (len(cmd) > arg_max_length) | (n==len(togiveaccess)-1):
+        if n < len(togiveaccess)-1:
+            cmd = oldcmd
+        print('granting access to {:d} files'.format(n))
+        with open('/tmp/grantaccess{:d}.sh'.format(n), 'w') as f:
+          f.write(cmd)
+        code = os.system(cmd)
+        cmd = cmd_prefix + ' ' + filename
+        if code == signal.SIGINT:
+          print('Awakened')
+          return
+
   print('the files are stored here:\n\n' + refsheet_url)
   print('\n\njust install and use gsutil to copy them')
   print('https://cloud.google.com/storage/docs/gsutil_install')
