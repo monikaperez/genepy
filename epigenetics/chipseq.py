@@ -294,7 +294,7 @@ def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=
 
 
 def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1000, title='', numpeaks=4000, numthreads=8,
-                   width=5, length=10,torecompute=False, name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
+                   width=5, length=10,torecompute=False, name='temp/peaksat.pdf', refpoint="TSS", scale=None,
                    sort=False, withDeeptools=True, onlyProfile=False, cluster=1, vmax=None, vmin=None, overlap=False,
                    legendLoc=None):
     """
@@ -340,7 +340,7 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
             cmd += " --outFileName " + '.'.join(name.split('.')[:-1]) + ".gz"
             cmd += " --upstream " + str(window) + " --downstream " + str(window)
             cmd += " --numberOfProcessors " + str(numthreads) + ' && '
-        if type(name) is list: 
+        if type(name) is list:
             cmd+= " --matrixFile " + '.gz '.join(name) + ".gz"
         cmd += "plotHeatmap" if not onlyProfile else 'plotProfile'
         cmd += " --matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
@@ -488,7 +488,7 @@ def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="me
             foldchange.append(peak.get('foldchange', 1))
             log10pvalue.append(peak.get('-log10pvalue', 0))
             log10qvalue.append(peak.get('-log10qvalue', 0))
-            
+
         else:
             # newpeak
             for k, val in tfmerged.items():
@@ -596,7 +596,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         window:
         mincov:
 
-    if use=='max':  
+    if use=='max':
 
 
     returns:
@@ -751,7 +751,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             print('enough overlap')
             recovered += np.sum(additionalpeaksinsec.astype(bool))
             if merged_bed.columns[val].split('-')[0] not in markedasbad:
-                tot += peakmatrix[val].astype(int) 
+                tot += peakmatrix[val].astype(int)
             # ones that we have in the Primary but not in the secondary
             if not lookeverywhere or len(additionalpeaksinbig)==0:
                 tolookfor = peakmatrix[biggest_ind] == 0 if lookeverywhere else np.logical_and(peakmatrix[biggest_ind]==0, peakmatrix[val])
@@ -760,7 +760,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                     sns.kdeplot(additionalpeaksinbig[additionalpeaksinbig>0],label=biggest, legend=True).set(xlim=(0,None))
                     print(additionalpeaksinbig[additionalpeaksinbig>0].min(),additionalpeaksinbig[additionalpeaksinbig>0].max())
 
-                peakmatrix[biggest_ind] = np.logical_or(peakmatrix[biggest_ind], additionalpeaksinbig)        
+                peakmatrix[biggest_ind] = np.logical_or(peakmatrix[biggest_ind], additionalpeaksinbig)
                 tot += additionalpeaksinbig.astype(bool).astype(int)
                 recovered += np.sum(additionalpeaksinbig.astype(bool))
             print('we have recovered ' + str(recovered)+' peaks, equal to '+ str(100*recovered/np.sum(peakmatrix[biggest_ind]))+\
@@ -804,12 +804,11 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                 presence = []
                 for peakpres in peakmatrix:  # https://github.com/tctianchi/pyvenn
                     presence.append(set([i for i, val in enumerate(peakpres) if val == 1]))
-                title = tf + \
-                    '_recovered (TOREMOVE)'if tf in remove else tf+'_recovered'
-                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns],title=title if ,folder=saveloc)
+                title = tf + '_recovered (TOREMOVE)' if tf in remove else tf+'_recovered'
+                h.venn(presence, [i+'_BAD' if i.split('-')[0] in markedasbad else i for i in merged_bed.columns], title=title, folder=saveloc)
                 plt.show()
             else:
-                print('too many replicates for Venn')    
+                print('too many replicates for Venn')
         finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
         finalpeaks['name'] = biggest
         finalpeaks['tf'] = tf
@@ -902,7 +901,7 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
 
 def putInConscensus(conscensus, value, window=10, mergetype='mean'):
     """ given ordered dataframes
-    
+
     conscensus df[start,end,chrom]
     value df[start, end, chrom,foldchange]
 
@@ -910,7 +909,7 @@ def putInConscensus(conscensus, value, window=10, mergetype='mean'):
     """
     conscensus = conscensus.sort_values(by=['chrom','start','end']).reset_index(drop=True)
     value = value.sort_values(by=['chrom','start','end']).reset_index(drop=True)
-    locinvalue=0        
+    locinvalue=0
     loc=0
     tot=0
     num = []
@@ -930,7 +929,7 @@ def putInConscensus(conscensus, value, window=10, mergetype='mean'):
         loc+=1
         if loc == len(conscensus):
             not_end=False
-        return res, num, not_end,loc 
+        return res, num, not_end,loc
     while not_end:
         print(loc/len(conscensus),end="\r")
         a = conscensus.iloc[loc]
@@ -1057,7 +1056,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
         if docorrelation:
             correlation[i,i]=1
             correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-        enrichment[i,i]=1 
+        enrichment[i,i]=1
     enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
     return enrichment, correlation if docorrelation else None
 
@@ -1105,7 +1104,7 @@ def findAdditionalCobindingSignal(conscensus, known=None, bigwigs=[], window=100
             res[i][k] = bw.stats(str(val.chrom), start, end)[0]
     res = np.nan_to_num(res, 0)
     return conscensus.join(pd.Dataframe(data=(res.T / res.max(1)).T, columns=bigwigs if not known else known.columns))
-    
+
 
 
 def annotatePeaks():
@@ -1158,7 +1157,7 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
     """
     will use macs2 to call differential peak binding from two bam files and their control
 
-    one can also provide some spike in scaling information 
+    one can also provide some spike in scaling information
 
     Args:
     -----
@@ -1207,8 +1206,8 @@ def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, d
         scaling1 = int(scaling1/scaling[0])
         scaling2 = int(scaling2/scaling[1])
     print(scaling1, scaling2)
-    return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg", 
-        directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg", 
+    return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg",
+        directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg",
         res_directory, scaling1, scaling2, size)
 
 
@@ -1220,7 +1219,7 @@ def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2
     cmd = "macs2 bdgdiff --t1 " + name1 + " --c1 "
     cmd += control1+" --t2 " + name2 +" --c2 " + control2
     cmd += " --d1 " + str(scaling1) + " --d2 " + str(scaling2) + " -g 60 "
-    cmd += "-l " + str(size) + " --o-prefix " + name1.split('/')[-1].split('.')[0] + "_vs_" 
+    cmd += "-l " + str(size) + " --o-prefix " + name1.split('/')[-1].split('.')[0] + "_vs_"
     cmd += name2.split('/')[-1].split('.')[0] + " --outdir " + res_directory
     res = subprocess.run(cmd, capture_output=True, shell=True)
     return res
@@ -1232,7 +1231,7 @@ def AssignToClosestExpressed(bed,countFile,genelocFile):
     #for val in bed.iterrows():
 
 
-def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE_main.py", 
+def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE_main.py",
     stitching_distance=None, TSS_EXCLUSION_ZONE_SIZE="2500", assembly="hg38",controlBam=None,controlBai=None):
     """
     Calls super enhancer from H3K27ac with the ROSE algorithm
@@ -1261,7 +1260,7 @@ def MakeSuperEnhancers(MACS2GFF, bamFile, outdir, baiFile=None, rosePath="./ROSE
     os.system('mv '+bamFile+' '+rosePath)
     baiFile = baiFile if baiFile else bamFile[:-1]+'i'
     os.system('mv '+baiFile +' '+rosePath)
-    cmd = "cd "+rosePath+" && python ROSE_main.py -g "+assembly+" -i "+MACS2GFF.split('/')[-1] +" -r " + bamFile.split('/')[-1] +" -o "+ outdir 
+    cmd = "cd "+rosePath+" && python ROSE_main.py -g "+assembly+" -i "+MACS2GFF.split('/')[-1] +" -r " + bamFile.split('/')[-1] +" -o "+ outdir
     if TSS_EXCLUSION_ZONE_SIZE:
         cmd+=" -t "+TSS_EXCLUSION_ZONE_SIZE
     if controlBam:
@@ -1295,7 +1294,7 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
 
     Args:
     -----
-        outdir str: an existing dir where the results should be saved 
+        outdir str: an existing dir where the results should be saved
         data: a df[cellname,markname,markbed|bam|bigwig, ?controlbed|bam|bigwig]
         folderpath
         numstates
@@ -1336,7 +1335,7 @@ def runChromHMM(outdir, data, numstates=18, datatype='bed', folderPath="", chrom
         raise ValueError(res2.stderr)
     ret = {}
     for v in set(data[0]):
-        ret[v] = pd.read_csv('~/AMLproject/data/chromHMM/'+v+'_'+str(numstates)+'_dense.bed',sep='\t',header=None, 
+        ret[v] = pd.read_csv('~/AMLproject/data/chromHMM/'+v+'_'+str(numstates)+'_dense.bed',sep='\t',header=None,
             skiprows=1).drop(columns=[4,5,6,7]).rename(columns=
             {0:'chr',1:'start',2:'end',3:'state',8:"color"})
     return ret
@@ -1352,11 +1351,11 @@ def loadMEMEmotifs(file, tfsubset=[],motifspecies='HUMAN'):
         else:
             print(res.stdout.decode("utf-8"))
     ## What are the motifs of our CRC members in ATACseq but not in our matrix
-    merged_motif = pd.read_csv(file, sep='\t',skiprows=0,index_col=None, names=['pos',"fimo", 
+    merged_motif = pd.read_csv(file, sep='\t',skiprows=0,index_col=None, names=['pos',"fimo",
         "nucleotide_motif","relStart","relEnd","pval","strand",".","data"])
     merged_motif['tf']=[i[5:].split("_"+motifspecies)[0] for i in merged_motif.data]
     if tfsubset:
-        merged_motif = merged_motif[merged_motif.tf.isin(tfsubset)] 
+        merged_motif = merged_motif[merged_motif.tf.isin(tfsubset)]
     merged_motif['chrom'] = [i.split(':')[0][3:] for i in merged_motif.index]
     merged_motif['start'] = [i.split(':')[1].split('-')[0] for i in merged_motif.index]
     merged_motif['end'] = [i.split(':')[1].split('-')[1] for i in merged_motif.index]
@@ -1402,8 +1401,8 @@ def substractPeaksTo(peaks,loci, bp=50):
     ----
         peaks: a bed file df with a chrom,start, end column at least
         loci: a df witth a chrom & loci column
-        bp: the max allowed distance to the loci 
-    
+        bp: the max allowed distance to the loci
+
     Returns:
     -------
         all the peaks that are within this distance
