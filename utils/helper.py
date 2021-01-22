@@ -17,9 +17,6 @@ import numpy as np
 import itertools
 import random
 
-from taigapy import TaigaClient
-tc = TaigaClient()
-
 
 rename_mut = {'contig': 'chr', 'position': 'pos', 'Reference_Allele': 'ref', 'ref_allele': 'ref', 'alt_allele': 'alt',
               'Chromosome': 'chr', 'End_postition': 'end', 'Start_position': 'pos', 'Tumor_Seq_Allele1': "alt"}
