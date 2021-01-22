@@ -10,8 +10,8 @@ import numpy as np
 import os
 import re
 import signal
-from JKBio import Helper as h
-from JKBio import GCPFunction as gcp
+from JKBio.utils import helper as h
+from JKBio.google import gcp
 import pdb
 import subprocess
 from gsheets import Sheets
@@ -72,7 +72,7 @@ def waitForSubmission(workspace, submissions, raise_errors=True):
       failed = 0
       finished = True
       submission = wm.get_submission(submission_id)["workflows"]
-      for wcount, i in enumerate(submission):
+      for _, i in enumerate(submission):
         if i['status'] not in {'Done', 'Aborted', 'Failed', 'Succeeded'}:
           finished = False
         elif i["status"] in {'Failed', 'Aborted'}:
@@ -111,7 +111,7 @@ def removeSamples(workspace, samples):
   except:
     print('we had pairs.')
     pairs = wm.get_pairs()
-    pairid = pairs[pairs.case_sample.isin(toremove)].index.tolist()
+    pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
     for k, val in wm.get_pair_sets().iterrows():
       wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
     wm.delete_pair(pairid)
@@ -466,6 +466,11 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
         h.parrun(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)], cores=20)
       else:
         gcp.mvFiles(a[col].tolist(), newgs)
+    else:
+      if keeppath:
+        print(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)])
+      else:
+        print("mv "+str(a[col].tolist()) +" "+newgs)
   if workspaceto is None:
     wmto = wmfrom
   else:
@@ -653,7 +658,7 @@ def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", 
   return togiveaccess
 
 
-def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+def shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
@@ -664,6 +669,7 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
   Args:
   ----
     users: list[str] of users' google accounts
+    groups: list[str] of groups' google accounts
     samples list[str] of samples cds_ids for which you want to share data
     bamcols: list[str] list of column names where bams/bais are
     raise_error: whether or not to raise an error if we find blacklisted lines
@@ -677,7 +683,7 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
   sheets = Sheets.from_files('~/.client_secret.json', '~/.storage.json')
   print("You need to have gsheet installed and you '~/.client_secret.json', '~/.storage.json' set up")
   privacy = sheets.get(privacy_sheeturl).sheets[6].to_frame()
-  refdata = sheets.get(refsheet_url).sheets[0].to_frame().set_index('cds_sample_id', drop=True)
+  refdata = sheets.get(refsheet_url).sheets[0].to_frame(index_col=0)
   blacklist = [i for i in privacy['blacklist'].values.tolist() if i is not np.nan]
   blacklisted = set(blacklist) & set(samples)
   print("we have " + str(len(blacklist)) + ' blacklisted files')
@@ -690,15 +696,27 @@ def shareCCLEbams(users, samples, raise_error=True, bamcols=["internal_bam_filep
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
+  for group in groups:
+    usrs += " -g " + group + ":R"
   for user in users:
-    usrs += " " + user + ":R"
-  files = ''
-  for i in togiveaccess:
-    files += ' ' + i
-  code = os.system("gsutil -m acl ch -ru" + usrs + files)
-  if code == signal.SIGINT:
-    print('Awakened')
-    return
+    usrs += " -u " + user + ":R"
+  cmd_prefix = "gsutil -m acl ch " + usrs
+  cmd = cmd_prefix
+  for n, filename in enumerate(togiveaccess):
+    oldcmd = cmd
+    cmd += ' ' + filename
+    if (len(cmd) > arg_max_length) | (n==len(togiveaccess)-1):
+        if n < len(togiveaccess)-1:
+            cmd = oldcmd
+        print('granting access to {:d} files'.format(n))
+        with open('/tmp/grantaccess{:d}.sh'.format(n), 'w') as f:
+          f.write(cmd)
+        code = os.system(cmd)
+        cmd = cmd_prefix + ' ' + filename
+        if code == signal.SIGINT:
+          print('Awakened')
+          return
+
   print('the files are stored here:\n\n' + refsheet_url)
   print('\n\njust install and use gsutil to copy them')
   print('https://cloud.google.com/storage/docs/gsutil_install')
@@ -752,3 +770,170 @@ def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace'
     gcp.rmFiles(toremove, add='-r')
   else:
     print("aborting")
+
+
+def changeToBucket(samples, gsfolderto, name_col=None, values=['bam', 'bai'], filetypes=None, catchdup=False,
+                   test=True):
+  """
+  moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
+
+  will prevent erasing a duplicate sample by adding a random string or by flagging them and not copying them
+
+  Args:
+  ----
+    samples: pandas.dataframe with columns to move
+    gsfolderto: the bucket path to move the data to
+    values: list of the cols in the dataframe containing the gs object path to be moved 
+    catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
+
+  Returns:
+  --------
+    the updated sample pandas.dataframe
+  """
+  # to do the download to the new dataspace
+  for i, val in samples.iterrows():
+    ran = h.randomString(6, 'underscore', withdigits=False)
+    for j, ntype in enumerate(values):
+      # TODO try:catch
+      filetype = '.'.join(val[ntype].split(
+          '/')[-1].split('.')[1:]) if filetypes is None else filetypes[j]
+      if name_col is None:
+        name = val[ntype[0]].split('/')[-1].split('.')[0]
+      elif name_col == "index":
+        name = val.name
+      else:
+        name = val[name_col]
+      name = name + '.' + filetype if catchdup else name + '_' + ran + '.' + filetype
+      if not gcp.exists(gsfolderto + name) or not catchdup:
+        cmd = 'gsutil cp ' + val[ntype] + ' ' + gsfolderto + name
+        if test:
+          print(cmd)
+        else:
+          res = subprocess.run(cmd, shell=True, capture_output=True)
+          if res.returncode != 0:
+            raise ValueError(str(res.stderr))
+          samples.loc[i, ntype] = gsfolderto + name
+      else:
+        print(name + ' already exists in the folder: ' + gsfolderto)
+        print(gcp.lsFiles([gsfolderto + name], '-la'))
+  return samples
+
+
+  #delete submissions
+def delete_job(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
+    wm = dm.WorkspaceManager(workspaceid)
+    bucket = wm.get_bucket_id()
+    data= []
+    if DeleteCurrent:
+      if dryrun:
+          print('gsutil -m rm gs://'+bucket+'/'+subid+'/*/'+taskid+'/**')
+      else:
+          res = subprocess.run('gsutil -m rm gs://'+bucket+'/'+subid+'/*/'+taskid+'/**', shell=True, capture_output=True)
+          if res.returncode != 0:
+              raise ValueError(str(res.stderr))
+    else:
+      res = subprocess.run('gsutil -m ls gs://'+bucket+'/'+subid+'/*/'+taskid+'/**', shell=True, capture_output=True)
+      if res.returncode != 0 or len(str(res.stdout)) < 4:
+          raise ValueError(str(res.stderr))
+      data += str(res.stdout)[2:-1].split('\\n')[:-1]
+      if "TOTAL:" in data[-1]:
+          data = data[:-1]
+      sam = pd.concat([wm.get_samples(), wm.get_pairs(), wm.get_sample_sets()])
+      tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
+      torm = set(data) - tokeep
+      if dryrun:
+        print(torm)
+      else:
+        h.parrun(['gsutil rm '+i for i in torm], cores=12)
+
+
+#removing things from old failed workflows
+def removeFromFailedWorkflows(workspaceid, maxtime = '2020-06-10', everythingFor=[], dryrun=False):
+    wm = dm.WorkspaceManager(workspaceid)
+    for k, val in wm.get_submission_status(filter_active=False).iterrows():
+        if (val.Failed > 0 or val.configuration in everythingFor) and val.date.date() > pd.to_datetime(maxtime):
+            for w in wm.get_submission(val.submission_id)['workflows']:
+                if w['status']=='Failed' or val.configuration in everythingFor:
+                    try:
+                        a = w['workflowId']
+                    #else it was not even run
+                    except:
+                        continue
+                    delete_job(workspaceid,val.submission_id,a,dryrun=dryrun)
+
+
+def listHeavyFiles(workspaceid, unusedOnly=True):
+    wm = dm.WorkspaceManager(workspaceid)
+    bucket = wm.get_bucket_id()
+    sizes = gcp.get_all_sizes('gs://'+bucket+'/')
+    print('we got '+str(len(sizes))+' files')
+    a  = list(sizes.keys())
+    a.sort()
+    ma = 100
+    torm = []
+    tot = 0
+    for i in a[::-1]:
+        if i>1000000*ma:
+            tot += i
+            for val in sizes[i]:
+                torm.append(val)
+    print('we might remove more than '+str(tot/1000000000)+'GB')
+    if unusedOnly:
+      sam = pd.concat([wm.get_samples(),wm.get_pairs(),wm.get_sample_sets()])
+      tokeep = set([val for val in sam.values.ravel() if type(val) is str and val[:5]=='gs://'])
+      torm = set(torm) - tokeep
+    return torm
+
+
+def findFilesInWorkspaces(names=0, lookup=['**', '*.', '.*']):
+    ws = dm.list_workspaces()
+    print('listing workspacs')
+    file = []
+    res = []
+    for val in ws:
+        val = val['workspace']
+        print(val['namespace']+"/"+val['name'])
+        buck = 'gs://'+val['bucketName']+"/"
+        if subprocess.run('gsutil ls '+buck, capture_output=True, shell=True).returncode != 0:
+            print("cannot access this bucket")
+            continue
+        if len(names) == 0:
+            file.append(buck)
+        if '**' in lookup:
+            buck += '**'
+        if not '*.' in lookup:
+            buck += '/'
+        for name in names:
+            val = buck+name
+            if '.*' in lookup:
+                val += '*'
+            data = subprocess.run("gsutil -m ls " + val,
+                                  capture_output=True, shell=True)
+            if data.returncode != 0:
+                if "One or more URLs matched no objects" not in str(data.stderr):
+                    raise ValueError(
+                        'issue with the command: ' + str(data.stderr))
+            if len(str(data.stdout)) < 4:
+                continue
+            res += str(data.stdout)[2:-1].split('\\n')[:-1]
+            if "TOTAL:" in res[-1]:
+                res = res[:-1]
+    return res
+
+def updateWorkflows(workflowIDs, path):
+    """
+    will download the latest version of workflows (from a list of workflowIDs) to a folder paths
+    """
+
+def uploadWorkflows(workspaceID, workflows, path=None):
+    """
+    updates the workflows on Terra and upgrades the workflow values on our workspace
+    
+    Args:
+    -----
+        workflows: dict(workflowID,location) or list(workflowID) if path
+        path: folder path where files with same name as workflows' name are stored
+    """
+    method_folder="src/"
+    methods = ['']
+    dm.update_method()
