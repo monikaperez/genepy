@@ -17,6 +17,7 @@ import numpy as np
 import itertools
 import random
 
+
 from taigapy import TaigaClient
 tc = TaigaClient()
 

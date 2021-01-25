@@ -1105,6 +1105,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
             overlap[i,j+add]=len(val[val!=0])/len(col)
     if docorrelation:
         correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+        correlation[correlation.isna()] = 0
     if doenrichment:
         enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
         enrichment[enrichment==-np.inf] = -1000
@@ -1117,7 +1118,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
     return overlap, correlation if docorrelation else None, pvals, enrichment.replace(-np.inf, -100) if doenrichment else None
 
 
-def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
+def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False, okpval=10**-3):
     """
     considering a befile representing a conscensus set of peaks
     with each columns after the 7th one representing the signal of a given ChIP experiment
@@ -1165,6 +1166,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
             correlation[i,i]=1
             correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:] if groups is None else set(
                 groups), columns=bedfile.columns[bedcol:])
+            correlation[correlation.isna()] = 0
         enrichment[i,i]=1 
     enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
     enrichment[enrichment==-np.inf] = -1000
@@ -1172,8 +1174,10 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
     enrichment[enrichment == np.inf] = 1000
     pvals = np.reshape(multipletests(pvals.ravel(),
                                      0.1, method="bonferroni")[1], pvals.shape)
+    enrichment[pvals>okpval] = 0
     pvals = pd.DataFrame(
         data=pvals, index=bedfile.columns[bedcol:]  if groups is None else set(groups), columns=bedfile.columns[bedcol:])
+
     return enrichment, pvals, correlation if docorrelation else None
 
 
@@ -1557,3 +1561,5 @@ def substractPeaksTo(peaks,loci, bp=50):
             keep.append(j)
             j+=1
     return peaks.loc[set(keep)]
+
+    
