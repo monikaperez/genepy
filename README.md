@@ -1,6 +1,6 @@
 # JKBio
 
-A set of awesome functions & tools for Computational Biologists
+A set of awesome functions & tools for Computational Genomists
 ## Content
 
 - **utils**: where a bunch of helper functions and usefull general scripts are stoed
