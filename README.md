@@ -2,7 +2,7 @@
 
 A set of awesome functions & tools for Computational Genomists
 
-![long genome](genome.jpg)
+![long genome](documentation/genome.jpg)
 ## Content
 
 - **utils**: where a bunch of helper functions and usefull general scripts are stoed
