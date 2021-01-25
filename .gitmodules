@@ -1,6 +1,6 @@
 [submodule "gkugener"]
 	path = gkugener
 	url = https://github.com/broadinstitute/gkugener
-[submodule "epigenetics/rose"]
-	path = epigenetics/rose
-	url = https://bitbucket.org/young_computation/rose.git
+[submodule "epiigenetics/rose"]
+	path = epiigenetics/rose
+	url = https://github.com/jkobject/rose.git

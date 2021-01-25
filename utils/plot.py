@@ -10,7 +10,8 @@ from bokeh.palettes import *
 from bokeh.layouts import layout, widgetbox, column, row
 from bokeh.models.annotations import LabelSet
 from bokeh.models.widgets import TextInput
-from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar,
+  ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
 from bokeh.io import show
@@ -29,6 +30,7 @@ import pdb
 from taigapy import TaigaClient
 tc = TaigaClient()
 
+
 def scatter(data, labels=None, title='scatter plot', showlabels=False, folder='',
             colors=None, xname='', yname="", importance=None, radi=5, alpha=0.8, **kwargs):
     """
@@ -36,15 +38,19 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
 
     Args:
     -----
-      data: an array-like with shape [N,2]
-      labels: a list of N names for each points
-      title: the plot title
-      showlabels: if the labels should be always displayed or not (else just on hover)
-      colors: a list of N integers from 0 up to 256 for the dot's colors
-      importance: a list of N values to scale the size of the dots and their opacity by
-      radi: the size of the dots
-      alpha: the opacity of the dots
-      **args: additional bokeh.figure args
+      data: array-like with shape [N,2]
+      labels: list[str] a list of N names for each points
+      title: str the plot title
+      showlabels: bool if the labels should be always displayed or not (else just on hover)
+      colors: list[int] of N integers from 0 up to 256 for the dot's colors
+      folder: str of location where to save the plot, won't save if empty
+      xname: str the name of the x axes
+      yname: str the name of the y axes
+      importance: a list[int] of N values to scale the size of the dots and their opacity by
+      radi: int the size of the dots
+      alpha: float the opacity of the dots
+      **kwargs: additional bokeh.figure args
+
     Returns:
     ------
       the bokeh object
@@ -95,8 +101,28 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
     return p
 
 
-def bigScatter(data, precomputed=False, logscale=False, features=False, colors=None,
+def bigScatter(data, precomputed=False, logscale=False, features=False,
                title="BigScatter", binsize=0.1, folder="", showpoint=False):
+    """
+    uses a binning method to display millions of points at the same time and showcase density.
+
+    Does this in an interactive fashion
+
+    Args:
+    -----
+      data: array like. the array containing the point location x,y or their location and density of bins (q,r,c)
+      precomputed: bool whether or not the array has aleady been hexbined
+      logscale: bool, whether or not the data is logscaled
+      features: list[] if the matrix contains a feature column with feature information (names, values. for each bin/dot)
+      title: str the title of the plot
+      binsize: float the size of the bins
+      showpoint: bool whether or not to display them as points or hexes.
+      folder: str of location where to save the plot, won't save if empty
+
+    Returns:
+    ------
+      the bokeh object
+    """
     TOOLS = "wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
     names = [("count", "@c")]
     if features:
@@ -143,7 +169,8 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
 
     args:
     ----
-      df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] the df containing segment level copy number (can be subsetted to a specific region or genome-wide)
+      df: df['Sample' 'Start' 'End' 'Segment_Mean' 'size'] the df containing segment level
+        copy number (can be subsetted to a specific region or genome-wide)
       sampleorder: list[Sample] <- for all samples present in the df
       title: plot title
       width: int width
@@ -206,7 +233,7 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     return p
 
 
-def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
+def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
             title="volcano plot", xlabel='log-fold change', ylabel='-log(Q)', maxvalue=100,
             searchbox=False, logfoldtohighlight=0.15, pvaltohighlight=0.1, showlabels=False):
     """
@@ -215,18 +242,17 @@ def volcano(data, genenames=None, folder='', tohighlight=None, tooltips=[('gene'
     Args:
     -----
       data: a df with rows genes and cols [log2FoldChange, pvalue, gene_id]
-      genenames: 
-      tohighlight: a list of genes to highlight in the plot
-      tooltips: if user wants tot specify another bokeh tooltip
-      title: plot title
-      xlabel: if user wants tot specify another
-      ylabel: if user wants tot specify another
-      maxvalue: the max -log2(pvalue authorized usefull when managing inf vals)
-      searchbox: whether or not to add a searchBox to interactively highlight genes
-      minlogfold: otherwise the point is not plotted
-      minpval: otherwise the point is not plotted
-      logfoldtohighlight:
-      pvaltohighlight:
+      folder: str of location where to save the plot, won't save if empty
+      tohighlight: list[str] of genes to highlight in the plot
+      tooltips: list[tuples(str,str)] if user wants tot specify another bokeh tooltip
+      title: str plot title
+      xlabel: str if user wants to specify the title of the x axis
+      ylabel: str if user wants tot specify the title of the y axis
+      maxvalue: float the max -log2(pvalue authorized usefull when managing inf vals)
+      searchbox: bool whether or not to add a searchBox to interactively highlight genes
+      logfoldtohighlight: float min logfoldchange when to diplay points
+      pvaltohighlight: float min pvalue when to diplay points
+      showlabels: bool whether or not to show a text above each datapoint with its label information
 
     Returns:
     --------
@@ -334,23 +360,31 @@ def selector(df, valtoextract=[], logfoldtohighlight=0.15, pvaltohighlight=0.1, 
 
 
 def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, other=None, title="correlation Matrix", dataIsCorr=False,
-                          invert=False, size=40, folder='', interactive=False, rangeto=None, add=None, maxval=None, minval=None):
+                          invert=False, size=40, folder='', interactive=False, maxval=None, minval=None):
     """
     Make an interactive correlation matrix from an array using bokeh
 
     Args:
     -----
       data: arrayLike of int / float/ bool of size(names*val) or (names*names)
-      names: list of names for each rows
-      colors: list of size(names) a color for each names (good to display clusters)
-      title: the plot title
-      dataIsCorr: if not true, we will compute the corrcoef of the data array
-      invert: whether or not to invert the matrix before running corrcoef
-      size: the plot size
-      interactive: whether or not to make the plot interactive (else will use matplotlib)
-      rangeto: unused for now
+      names: list[str] of names for each rows
+      colors: list[int] of size(names) a color for each names (good to display clusters)
+      pvals: arraylike of int / float/ bool of size(names*val) or (names*names) with the corresponding pvalues
+      maxokpval: float threshold when pvalue is considered good. otherwise lowers the size of the square
+        until 10**-3 when it disappears
+      other: arrayLike of int / float/ bool of size(names*val) or (names*names), an additional information
+        matrix that you want ot display with opacity whereas correlations willl be displayed with
+      title: str the plot title
+      dataIsCorr: bool if not true, we will compute the corrcoef of the data array
+      invert: bool whether or not to invert the matrix before running corrcoef
+      size: int the plot size
+      folder: str of folder location where to save the plot, won't save if empty
+      interactive: bool whether or not to make the plot interactive (else will use matplotlib)
+      maxval: float clamping coloring up to maxval
+      minval: float clamping coloring down to minval
 
     Returns:
+    -------
       the bokeh object if interactive else None
 
     """
@@ -408,8 +442,8 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
                             color.append(
                                 Category10[10][colors[i]])
                         else:
-                            color.append('lightgrey')                        
-                
+                            color.append('lightgrey')
+
                 elif pvals is None and other is None:
                     color.append('grey' if data[i, j]
                                  > 0 else Category20[3][2])
@@ -450,8 +484,8 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
         p.axis.major_label_text_font_size = "5pt"
         p.axis.major_label_standoff = 0
         p.xaxis.major_label_orientation = np.pi / 3
-        
-        p.rect('xname', 'yname', width = 0.9 if not width else 'width', 
+
+        p.rect('xname', 'yname', width = 0.9 if not width else 'width',
                 height = 0.9 if not height else 'height', source=data,
                color='colors', alpha='alphas', line_color=None,
                hover_line_color='black', hover_color='colors')
@@ -475,9 +509,11 @@ def venn(inp, names, title="venn", folder=''):
     Plots a venn diagram using the pyvenn package
 
     Args:
-      inp: a list of sets of values (e.g. [(1,2,3,4),(2,3),(1,3,4,5)]) 
-      names: list of the name of each leaf
-      title: the plot title
+    -----
+      inp: list[set()] of sets of values (e.g. [(1,2,3,4),(2,3),(1,3,4,5)])
+      names: list[str] of the name of each leaf
+      title: str the plot title
+      folder: str of location where to save the plot, won't save if empty
     """
     labels = pyvenn.get_labels(inp, fill=['number', 'logic'])
     if len(inp) == 2:
@@ -549,9 +585,21 @@ def addTextToImage(image, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize
 def SOMPlot(net, size, colnames, minweight=0.1, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
     """
     makes an interactive plot from a SOM from the SimpSOM package
+
+    a tool that uses simpSOM's package output (which produces self organizing maps),
+    to plot its output in an interactive fashion
+
+    Args:
+    -----
+      net: SIMPSOM's net object, output from somplot
+      size: float the size of the plot
+      distq1: float a value to adjust to considering the numbe of nodes (controls spacing beween cols of nodes)
+      distq2: float a value to adjust to considering the numbe of nodes (controls spacing beween rows of nodes)
+      distr: float a value to adjust to considering the numbe of nodes (controls nodes size spacing)
+      folder: str of location where to save the plot, won't save if empty
     """
     diffs = net.diff_graph(show=False, returns=True)
-    somnodes = {'r':[],'q':[],'c':diffs,'features':[]} 
+    somnodes = {'r':[],'q':[],'c':diffs,'features':[]}
     for i, node in enumerate(net.nodeList):
         somnodes['q'].append(node.pos[0]+(i%size)*distq1+(i//size)*distq2)
         somnodes['r'].append(-node.pos[1]-(i%size)*distr)
