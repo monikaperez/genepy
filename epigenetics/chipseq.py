@@ -104,6 +104,7 @@ def singleEnd(singlend, folder="data/seqs/", numthreads=8, peaksFolder="peaks/",
     run the singleEnd pipeline
     for alignment etc, one can use pysam ready made implementation of samtools
     """
+    print("you need to have bowtie2 installed: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml")
     for val in singlend:
         out1 = folder + mappedFolder + val.split('.')[0] + ".mapped.sam"
         if not ismapped:
@@ -121,6 +122,7 @@ def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
     """
     # run the paired end pipeline
     """
+    print("you need to have bowtie2 installed: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml")
     for key, val in pairedend.items():
         out1 = folder + mappedFolder + val[0].split('.')[0] + ".mapped.sam"
         in1 = folder + val[0]
@@ -297,7 +299,7 @@ def bedtools_getPeaksAt(peaks, bams, folder='data/seqs/', window=1000, numpeaks=
 
 
 def makeProfiles(matx=[], folder='', matnames=[], title='',
-                   name='temp/peaksat.pdf', refpoint="TSS", scale=None, 
+                   name='temp/peaksat.pdf', refpoint="TSS", scale=None,
                    sort=False, withDeeptools=True, cluster=1, vmax=None, vmin=None, overlap=False,
                    legendLoc=None):
     if withDeeptools:
@@ -739,7 +741,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if saveloc:
                 plt.savefig(saveloc+tf+"_before_unique_kdeplot.pdf")
             plt.show()
-        
+
         bigwigs = os.listdir(bigwigfolder)
 
         foundgood=False
@@ -758,7 +760,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         # distplot
         # correlation plot
 
-        
+
         biggest_ind = sort[ib]
         peakmatrix = peakmatrix.T
         biggest = merged_bed.columns[biggest_ind]
@@ -896,7 +898,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                 plt.show()
             else:
                 print('too many replicates for Venn')
-                f.write('(too many replicates for Venn)'+'\n')    
+                f.write('(too many replicates for Venn)'+'\n')
 		finalpeaks = finalpeaks[np.logical_or(tot>1,peakmatrix[biggest_ind])]
         finalpeaks['name'] = biggest
         finalpeaks['tf'] = tf
@@ -1089,7 +1091,7 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
                     tmp = np.corrcoef(val[val != 0], col[val != 0])[0, 1]
                     if np.isnan(tmp) and correct:
                         if len(col[val!=0]) == 0 or len(val[val!=0]) == 0:
-                        # one has no overlap 
+                        # one has no overlap
                             correlation[i,j+add] =  0
                         else:
                             # one contains only the same value everywhere
@@ -1140,7 +1142,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
             for j,val in enumerate(overlapping.T):
                 # enrichment of j in i
                 e, p = fisher_exact([
-                    [len(val[val != 0]), len(val[val == 0])], 
+                    [len(val[val != 0]), len(val[val == 0])],
                     [prob[j]*len(dat), (1-prob[j])*len(dat)]])
                 enrichment[i, j] = np.log2(e)
                 pvals[i, j] = p
@@ -1165,7 +1167,7 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False):
             correlation[i,i]=1
             correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:] if groups is None else set(
                 groups), columns=bedfile.columns[bedcol:])
-        enrichment[i,i]=1 
+        enrichment[i,i]=1
     enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
     enrichment[enrichment==-np.inf] = -1000
     enrichment[enrichment.isna()] = 0
@@ -1347,7 +1349,7 @@ def AssignToClosestExpressed(bed,countFile,genelocFile):
     #for val in bed.iterrows():
 
 
-def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".", 
+def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".",
     stitching_distance=None, TSS_EXCLUSION_ZONE_SIZE="2500", assembly="hg38",controlBam=None,controlBai=None):
     """
     Calls super enhancer from H3K27ac with the ROSE algorithm
@@ -1389,7 +1391,7 @@ def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".",
         cmd+=" -c "+controlBam.split('/')[-1]
     if stitching_distance:
         cmd+=" -s "+ stitching_distance
-    
+
     res = subprocess.run(cmd, capture_output=True, shell=True)
     fail = False
     if res.returncode != 0:
@@ -1406,7 +1408,7 @@ def MakeSuperEnhancers(MACS2bed, bamFile, outdir, baiFile=None, rosePath=".",
     if res.returncode != 0:
         raise SystemError('failed moving files: '+str(res))
     if fail:
-        raise SystemError(v) 
+        raise SystemError(v)
     print('worked')
     print(res)
     return ReadRoseSuperEnhancers(outdir ,bool(controlBam))

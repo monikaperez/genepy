@@ -28,6 +28,7 @@ _in ./chipseq.py_
 
 ## highly recommended packages
 
+*This package won't contain anything that overlap with those and might use those packages for what it is doing.*
 - Bedtools
 - deepTools
 - MACS2
