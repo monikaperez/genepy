@@ -10,8 +10,8 @@ from bokeh.palettes import *
 from bokeh.layouts import layout, widgetbox, column, row
 from bokeh.models.annotations import LabelSet
 from bokeh.models.widgets import TextInput
-from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar,
-  ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, PrintfTickFormatter
+from bokeh.models import ColumnDataSource, LinearColorMapper, LogColorMapper
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
 from bokeh.io import show
@@ -420,8 +420,6 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
     if interactive:
         xname = []
         yname = []
-        if rangeto is None:
-            rangeto = range(len(data))
         color = []
         for i, name1 in enumerate(names):
             for j, name2 in enumerate(names):
@@ -650,5 +648,5 @@ def andrew(groups, merged, annot, enr=None, pvals=None, cols=8, precise=True, ti
     fig = sns.clustermap(a, vmin=vmin, vmax=vmax, figsize=size, z_score=0, colors_ratio=0.01, col_cluster=False,col_colors=data, xticklabels=False)
     fig.ax_col_dendrogram.set_visible(False)
     fig.fig.suptitle(title)
-    fig.savefig(folder + str(len(set(groups))) + '_clustermap_cobinding_enrichment.pdf')
+    fig.savefig(folder + str(len(set(groups))) + '_clustermap_cobinding_enrichment_andrewplot.pdf')
     plt.show()
