@@ -951,19 +951,20 @@ def putInBed(conscensus, value, window=10, mergetype='mean'):
 	return res
 
 
-def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=True, doenrichment=True):
+def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=True):
 	"""
 	considering a befile representing a conscensus set of peaks
 	with each columns after the 7th one representing the signal of a given ChIP experiment
 	over this conscensus
+
+	overlap of j in i
+	overlap of row values in col values
 	"""
 	if correct:
 		print("we will be correcting for fully similar lines/ columns by removing 1 on their last value")
 	dat = bedfile[bedfile.columns[bedcol:]].values
 	prob = dat.astype(bool).sum(0)/len(dat)
 	correlation = np.ones((dat.shape[1],dat.shape[1]))
-	enrichment = np.zeros((dat.shape[1],dat.shape[1]))
-	pvals = np.zeros((dat.shape[1],dat.shape[1]))
 	overlap = np.ones((dat.shape[1],dat.shape[1]))
 	for i, col in enumerate(dat.T):
 		#pdb.set_trace()
@@ -987,42 +988,26 @@ def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelation=Tr
 							col[-1]-=max(0.01,abs(np.mean(col)))
 							val[-1]-=max(0.01,abs(np.mean(val)))
 							correlation[i,j+add] = np.corrcoef(val,col)[0,1]
-			if doenrichment:
-				#enrichment[i,j+add] = np.log2((len(val[val != 0])/len(val))/prob[j+add])
-				e, p = fisher_exact([[len(val[val != 0]), len(val[val == 0])], [
-										  prob[j+add]*len(dat), (1-prob[j+add])*len(dat)]])
-				enrichment[i,j+add] = np.log2(e)
-				pvals[i,j+add] = p
 			overlap[i,j+add]=len(val[val!=0])/len(col)
 	if docorrelation:
-		correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
+		correlation = pd.DataFrame(data=correlation, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
 		correlation[correlation.isna()] = 0
-	if doenrichment:
-		enrichment = pd.DataFrame(data=enrichment.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-		enrichment[enrichment==-np.inf] = -1000
-		enrichment[enrichment.isna()] = 0
-		enrichment[enrichment == np.inf] = 1000
-		pvals = np.reshape(multipletests(pvals.ravel(), 0.1, method="bonferroni")[1], pvals.shape)
-		pvals = pd.DataFrame(
-			data=pvals.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-	overlap = pd.DataFrame(data=overlap.T, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:])
-	return overlap, correlation if docorrelation else None, pvals, enrichment.replace(-np.inf, -100) if doenrichment else None
+	overlap = pd.DataFrame(data=overlap, index=bedfile.columns[bedcol:], columns=bedfile.columns[bedcol:]).T
+	return overlap, correlation if docorrelation else None
 
 
-def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False, okpval=10**-3):
+def enrichment(bedfile, bedcol=8, groups=None, okpval=10**-3):
 	"""
 	considering a befile representing a conscensus set of peaks
 	with each columns after the 7th one representing the signal of a given ChIP experiment
 	over this conscensus
+
+	enrichment of j in i
+	enrichment of row values in col values
 	"""
 	dat = bedfile[bedfile.columns[bedcol:]].values
 	# pdb.set_trace()
 	prob = dat.astype(bool).sum(0)/len(dat)
-	binom
-	if docorrelation:
-		if groups is not None:
-			raise ValueError("can't do correlation on groups")
-		correlation = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
 	enrichment = np.zeros((dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
 	pvals = np.zeros(
 		(dat.shape[1] if groups is None else len(set(groups)), dat.shape[1]))
@@ -1044,32 +1029,22 @@ def enrichment(bedfile, norm=True, bedcol=8, groups=None, docorrelation=False, o
 			for j, val in enumerate(overlapping.T):
 				if j==i:
 					add=1
-					if docorrelation:
-						correlation[i,i]=1
 					enrichment[i,i]=0
-				if docorrelation:
-					correlation[i,j+add] = np.corrcoef(zscore(val),zscore(col))[0,1] if norm else np.corrcoef(val,col)[0,1]
 				e, p = fisher_exact([[len(val[val != 0]), len(val[val == 0])], [
 					prob[j+add]*len(dat), (1-prob[j+add])*len(dat)]])
 				enrichment[i, j+add] = np.log2(e)
 				pvals[i, j+add] = p
-		if docorrelation:
-			correlation[i,i]=1
-			correlation = pd.DataFrame(data=correlation.T, index=bedfile.columns[bedcol:] if groups is None else set(
-				groups), columns=bedfile.columns[bedcol:])
-			correlation[correlation.isna()] = 0
-		enrichment[i,i]=1 
-	enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:])
+		enrichment[i,i]=0
+	enrichment = pd.DataFrame(data=enrichment, index=bedfile.columns[bedcol:] if groups is None else set(groups), columns=bedfile.columns[bedcol:]).T
 	enrichment[enrichment==-np.inf] = -1000
 	enrichment[enrichment.isna()] = 0
 	enrichment[enrichment == np.inf] = 1000
 	pvals = np.reshape(multipletests(pvals.ravel(),
 									 0.1, method="bonferroni")[1], pvals.shape)
-	enrichment[pvals>okpval] = 0
 	pvals = pd.DataFrame(
-		data=pvals, index=bedfile.columns[bedcol:]  if groups is None else set(groups), columns=bedfile.columns[bedcol:])
-
-	return enrichment, pvals, correlation if docorrelation else None
+		data=pvals, index=bedfile.columns[bedcol:]  if groups is None else set(groups), columns=bedfile.columns[bedcol:]).T
+	enrichment[pvals>okpval] = 0
+	return enrichment, pvals
 
 
 def findAdditionalCobindingSignal(conscensus, known=None, bigwigs=[], window=100):

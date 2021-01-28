@@ -617,12 +617,12 @@ def SOMPlot(net, size, colnames, minweight=0.1, distq1=0.535, distq2=0.055, dist
 
 def andrew(groups, merged, annot, enr=None, pvals=None, cols=8, precise=True, title = "sorted clustermap of cobindings clustered", folder="", rangeval=4, okpval=10**-3, size=(20,15),vmax=3, vmin=0):
     if enr is None or pvals is None:
-        enr, pvals, _ = chip.enrichment(merged, groups=groups)
+        enr, pvals = chip.enrichment(merged, groups=groups)
     rand = np.random.choice(merged.index,5000)
     subgroups = groups[rand]
     sorting = np.argsort(subgroups)
     redblue = cm.get_cmap('RdBu_r',256)
-    subenr = enr[enr.columns[annot-cols:]]
+    subenr = enr.iloc[annot-cols:]
     subenr[subenr>rangeval]=rangeval
     subenr[subenr<-rangeval]=-rangeval
     subenr = subenr/rangeval
@@ -631,11 +631,11 @@ def andrew(groups, merged, annot, enr=None, pvals=None, cols=8, precise=True, ti
     impv = pvals.values
     for i in subgroups[sorting]:
         #colors.append(viridis(i))
-        a = redblue((128+(subenr.loc[i]*128)).astype(int)).tolist()
+        a = redblue((128+(subenr[i]*128)).astype(int)).tolist()
         for j in range(len(a)):
-            a[j] = [1.,1.,1.,1.] if impv[i, j] > okpval else a[j]
+            a[j] = [1.,1.,1.,1.] if impv[j,i] > okpval else a[j]
         data.append(a)
-    data = pd.DataFrame(data=data,columns=list(subenr.columns),index= rand[sorting])
+    data = pd.DataFrame(data=data,columns=list(subenr.index),index= rand[sorting])
     #data["clusters"]  = colors
     
     a = np.log2(1.01+merged[merged.columns[cols:annot]].iloc[rand].iloc[sorting].T)
