@@ -1,176 +1,83 @@
 # JKBio
 
-A list of awesome functions for every Computational Biologist
+A set of awesome functions & tools for Computational Genomists
 
-
+![long genome](documentation/genome.jpg)
 ## Content
 
-### Terra
-
-_in ./TerraFunction.py_
-
-a file containing a set of functions that uses [dalmatian]() to interact with the [GCP]() powered genomics HPC platform: [Terra](). 
-They contain a list of additional functions to do more than what is available in dalmatian
-
-#### Available functions:
-
-
-- createManySubmissions: 
-- waitForSubmission: 
-- uploadFromFolder: 
-- updateAllSampleSet: 
-- addToSampleSet: 
-- addToPairSet: 
-- changeGSlocation: 
-- renametsvs: 
-- findBackErasedDuplicaBamteFromTerraBucket: 
-- shareTerraBams: 
-- saveConfigs: 
-- cleanWorkspace: 
-- saveOmicsOutput: 
-- shareCCLEbams: 
-
-### epigenomics/ChipHelper
-
-ChipHelper is especially targeted to functions related to the analysis of epigenomics data. It has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
-
-#### Available functions:
+- **utils**: where a bunch of helper functions and usefull general scripts are stoed
+  - **plots**: a set of plotting tools based on [matplotlib]() and [bokeh]() to make volcano plots / CNV maps etc..
+  - **helper**: and additional helper functions to save data, do merging of dataframes...
+- **terra**: contains a set of functions that uses [dalmatian]() to interact with the [GCP]() powered genomics HPC platform: [Terra](). 
+- **sequencing**: contains a set of function to works with bed/bam/fastqs...
+- **rna**: contains function to work with RNAseq (and related) data.
+  - **pyDESeq2**: it is a python integration of [deseq2]() (the differential expression analyser) with [rpy2]()
+- **mutations**: a set of functions to work with maf files, vcf files etc..
+- **google**: functions and packages linked to google's apis
+  - **google_sheet**: function to upload a df as a google sheet
+  - **gcp**: sets of functions to interact with google storage (relies on gsutil)
+- **epigenetics**: where we have things related to epigenomics
+  - **rose**: where an updated version of the rose algorithm is stored (as a git submodule)
+  - **chipseq**: has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
+- **taigr**: a version of taiga that do not requires RCurl (and can save you when you have a faulty RCurl-Curl link)
+- **data**: should not contain anything when pulled but is used by any of the functions in the folder, to save some required data files
+- **cell_line_mapping**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
 
 
-- dropWeirdChromosomes: 
-- extractPairedSingleEndFrom: 
-- findReplicates: 
-- computeSingleEnd: 
-- computePairedEnd: 
-- bigWigFrom: 
-- mergeBams: 
-- loadPeaks: 
-- pysam_computePeaksAt: 
-- bedtools_computePeaksAt: 
-- computePeaksAt: 
-- simpleMergedPeaks: 
-- findpeakpath: 
-- mergeReplicatePeaks: 
-- findAdditionalPeaks: 
-- putInConscensus: 
-- findAdditionalCobindingSignal: 
-- fullDiffPeak: 
-- diffPeak: 
+## Install
 
+### with pip (WIP)
 
-### Helper
+`pip install JKBio`
+### dev mode (better for now)
 
-_in ./Helper.py_
+```bash
+git clone git://github.com/jkobject/JKBio.git
+cd JKBio
+git submodule update --init
+```
 
-a set of plotting tools based on [matplotlib]() and [bokeh]() and additional helper functions to save data, do merging of dataframes, etc.. 
-It mostly contains a list of early function that will then be respectively integrated.
+then you can import files in python with e.g:
+```python
+from JKBio import TerraFunction as terra
+```
 
-#### Available functions:
+if JKBio is not in your path, first do:
 
+```python
+import sys
+sys.path.append(RELATIVE_PATH_TO_JKBio)
+```
 
-- fileToList: convert a txt with a list of values to a python list
-- listToFile: converts a list of values to a txt
-- dictToFile: converts a dict to a json
-- fileToDict: converts a json to a dict
-- batchMove: move a lot of file in batch (can provide different locations)
-- batchRename: rename a bunch of files in batch
-- filterProteinCoding: removes all non protein coding genes from a list (you need taiga access)
-- convertGenes: converts genes from a naming to another (you need taiga access)
-- scatter: makes a hoverable/zoomable bokeh scatter plot
-- CNV_Map: makes a hoverable Copy Number plot using bokeh
-- volcano: makes a searchable volcano plot for a Differential expression experiment using bokeh
-- plotCorrelationMatrix: makes a hoverable bokeh correlation matrix
-- venn: makes a venn diagram from a list of sets
-- grouped: to use in a forloop to group values in batch
-- mergeImages: merge multiple pngs/pdfs together into one
-- addTextToImage adds a text in an image to a specific location
-- overlap: given two tuples, returns the overlap
-- union: given two tuples, returns the union
-- nans: gets nans from a panda df
-- createFoldersFor: makes the required folders for a given filepath
-- randomString: generate a random string for namings
-- parrun: runs list of commands in parallel
-- askif: ask the user a questions and returns the y/n answer
-- inttodate: converts an int to a string date.
-- datetoint: converts a date to an int
-- getBamDate: get the date of creation of a bam file
-- getSpikeInControlScales: extracts the spike in control values from a set of bam files
-- changeToBucket: move values to a bucket
-- GSEAonExperiments: perform GSEA to compare a bunch of conditions at once
-- runERCC: creates an ERCC dashboard and extract the RNA spike ins from it (need rpy2 and ipython and R's ERCCdashboard installed)
+now you can install the necessary python packages:
 
+```bash
+pip install requirements.txt
+pip install rpy2-bioconductor-extensions gseapy macs2 deeptools
+```
 
-### GCP
+or if not using the requirements.txt (computation results might change):
 
-_in ./GCPFunctions.py_
+```bash
+pip install numpy pandas
+```
 
-#### Available functions:
+```bash
+pip install bokeh dalmatian firecloud_dalmatian google_api_python_client gsheets gspread ipdb ipython matplotlib Pillow pybedtools pyBigWig pysam pytest requests rpy2 scikit_learn scipy seaborn setuptools taigapy taigapy typing venn rpy2-bioconductor-extensions gseapy macs2 deeptools
+```
 
-- mvFiles: move a set of files in parallel (when the set is huge)
-- lsFiles: list a set of files in parallel (when the set is huge)
-- cpFiles: copy a set of files in parallel (when the set is huge)
-- catFiles: copy a set of files in parallel (when the set is huge)
-- rmFiles: remove a set of files in parallel (when the set is huge)
-- recoverFiles: moves back delete files (saved with versionning) in parallel (when the set is huge)
-- patternRN: rename a bunch of files in parallel
-- get_all_sizes: will sort and list all the files by their sizes. 
-- exists: tells if a gcp path exists
-- extractSize: extract the size from the string returned by an ls -l|a command
-- extractPath: extract the path from the string returned by an ls -l|a command
-- extractHash:  extract the crc32 from the string returned by an ls -L command
+then install the following tools:
+- [htslib/samtools](http://www.htslib.org/)
+- [bwa](https://github.com/lh3/bwa)
+just used once:
+- [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)
 
+finaly you can install R packages (GSEABase, erccdashboard, GSVA, DESeq2):
 
-### pyDEseq2
-
-_in ./helper/pyDESeq2.py_
-
-it is a python integration of [deseq2]() (the differential expression analyser) with [rpy2]()
-
-
-### Datanalytic
-
-a set of function to do better data analytics (supplement of numpy, pandas etc..)
-
-
-### taigr
-
-a version of taiga that do not requires RCurl (and can save you when you have a faulty RCurl-Curl link)
-
-
-### data
-
-should not contain anything when pulled but is used by any of the functions in the folder, to save some required data files
-
-
-### cell_line_mapping
-
-a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
-
-
-you can import files in python with e.g. `from JKBio import TerraFunction as terra`
-
-
-### Bash Functions:
-
-- update_my_playlists
-- convert2gif
-- launchandco
-- retrieve_remote_file_size
-- removeFirstLineOf
-- upload_urls_to_gcp
-- gitpush
-- create_dx_urls_from
-- get_unuploadedfiles_from_dx_to_gcp
-- continue_upload
-
-- rename_bunch
-- extract
-- myinfo: prints my info (only on mac)
-- kp: kill process 
-- ssd: get ssd info (only on mac)
-
-
-## Reason
+```bash
+R -e 'if(!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager")};BiocManager::install(c("GSEABase", "erccdashboard", "GSVA", "DESeq2"));'
+```
+## About
 
 As I am working in different domains of computational genomics, I need to have a set of reusable function that will help me during my work.
 It can be functions to work with different tools that I have to use. Functions to do some plots. etc..
@@ -182,7 +89,6 @@ I hope to be able to give back to the community and maybe save a couple of hours
 
 Best.
 
-#/!\ Under construction /!\
 
 jkalfon@broadinstitute.org
 

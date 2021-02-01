@@ -12,7 +12,7 @@ import pdb
 import subprocess
 import signal
 import re
-from JKBio import Helper as h
+from JKBio.utils import helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -275,6 +275,9 @@ def exists(val):
     """
     if type(val) is str:
         return os.popen('gsutil ls ' + val).read().split('\n')[0] == val
+    elif type(val) is list:
+        rest = set(val) - set(lsFiles(val))
+        return len(rest)==0 , rest
 
 
 def extractSize(val):
@@ -282,6 +285,13 @@ def extractSize(val):
     extract the size from the string returned by an ls -l|a command
     """
     return 'gs://' + val.split('gs://')[1].split('#')[0], int(re.split("\d{4}-\d{2}-\d{2}", val)[0])
+
+
+def extractTime(val):
+    """
+    extract the size from the string returned by an ls -l|a command
+    """
+    return val.split('  ')[1].split('T')[0]
 
 
 def extractPath(val):
