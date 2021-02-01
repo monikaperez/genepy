@@ -4,30 +4,30 @@
 
 from __future__ import print_function
 
-import pdb
-import ipdb
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 from taigapy import TaigaClient
+from JKBio.utils import helper as h
+import seaborn as sns
+
 tc = TaigaClient()
 
 def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
-  """
-  transforms a vcf file into a dataframe file as best as it can
+    """
+    transforms a vcf file into a dataframe file as best as it can
 
-  Args:
-  -----
-    path: str filepath to the vcf file
-    hasfilter: bool whether or not the vcf has a filter column
-    samples: list[str] colnames of the sample names.
-    additional_cols: list[str] of additional colnames in the vcf already looks for 'DB', 'SOMATIC', 'GERMLINE', "OVERLAP", "IN_PON", "STR", "ReverseComplementedAlleles"
+    Args:
+    -----
+      path: str filepath to the vcf file
+      hasfilter: bool whether or not the vcf has a filter column
+      samples: list[str] colnames of the sample names.
+      additional_cols: list[str] of additional colnames in the vcf already looks for 'DB', 'SOMATIC', 'GERMLINE', "OVERLAP", "IN_PON", "STR", "ReverseComplementedAlleles"
 
-  Returns:
-  --------
-    a dataframe fo the vcf
-    a dict associating each column with its description (gathered from the vcf header)
-  """
+    Returns:
+    --------
+      a dataframe fo the vcf
+      a dict associating each column with its description (gathered from the vcf header)
+    """
     uniqueargs = ['DB', 'SOMATIC', 'GERMLINE', "OVERLAP", "IN_PON",
                   "STR", "ReverseComplementedAlleles"] + additional_cols
 
@@ -372,3 +372,16 @@ def checkGeneChangeAccrossAll(genecn, thresh=0.2):
     thresh: threshold in logfold change accross all of them
   """
   return genecn.columns[genecn.var()<thresh].tolist()
+
+def renameColumns(df):
+  """
+  rename some of the main columns names from RSEM, GATK.. to more readable column names
+  Args:
+  -----
+    df: the df to rename
+  Returns:
+  ------
+    df the renamed df
+  """
+  return(df.rename(columns={'Sample': 'DepMap_ID', 'CONTIG': 'Chromosome', 'START': 'Start',
+                            'END': 'End', 'seqnames': 'Chromosome', 'start': 'Start', 'end': 'End'}))
