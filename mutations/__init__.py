@@ -346,7 +346,6 @@ def checkAmountOfSegments(segmentcn, thresh=850, samplecol="DepMap_ID"):
     thresh: max ok amount
   """
   failed = []
-  segmentcn = renameColumns(segmentcn)
   celllines = set(segmentcn[samplecol].tolist())
   amounts = []
   for cellline in celllines:
