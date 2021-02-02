@@ -17,6 +17,9 @@ import numpy as np
 import itertools
 import random
 
+from taigapy import TaigaClient
+tc = TaigaClient()
+
 
 rename_mut = {'contig': 'chr', 'position': 'pos', 'Reference_Allele': 'ref', 'ref_allele': 'ref', 'alt_allele': 'alt',
               'Chromosome': 'chr', 'End_postition': 'end', 'Start_position': 'pos', 'Tumor_Seq_Allele1': "alt"}
@@ -442,3 +445,15 @@ def compareDfs(df1, df2):
     print('FOUND new NAs in df1: ' + str(newNAs))
     print('FOUND new 0s in df1: ' + str(new0s))
     return nmissmatchCols, omissmatchCols, nmissmatchInds, omissmatchInds, newNAs, new0s
+
+def stringifydict(res):
+    """
+    
+    """
+    a = {}
+    for k,v in res.items():
+        if type(v) is dict:
+            a[k] = stringifydict(v)
+        else:
+            a[str(k)] = v
+    return a

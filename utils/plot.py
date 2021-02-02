@@ -10,8 +10,8 @@ from bokeh.palettes import *
 from bokeh.layouts import layout, widgetbox, column, row
 from bokeh.models.annotations import LabelSet
 from bokeh.models.widgets import TextInput
-from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar,
-  ColumnDataSource, LinearColorMapper, LogColorMapper, PrintfTickFormatter
+from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, PrintfTickFormatter
+from bokeh.models import ColumnDataSource, LinearColorMapper, LogColorMapper
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
 from bokeh.io import show
@@ -19,6 +19,8 @@ from bokeh.plotting import *
 import bokeh
 import colorcet as cc
 from PIL import Image, ImageDraw, ImageFont
+import seaborn as sns
+from JKBio.epigenetics import chipseq as chip 
 
 import pandas as pd
 from math import pi
@@ -418,8 +420,6 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
     if interactive:
         xname = []
         yname = []
-        if rangeto is None:
-            rangeto = range(len(data))
         color = []
         for i, name1 in enumerate(names):
             for j, name2 in enumerate(names):
@@ -580,7 +580,7 @@ def addTextToImage(image, text, outputpath, xy=(0, 0), color=(0, 0, 0), fontSize
     img.save(outputpath)
 
 
-def SOMPlot(net,size, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
+def SOMPlot(net, size, colnames, minweight=0.1, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
     """
     makes an interactive plot from a SOM from the SimpSOM package
 
@@ -601,7 +601,8 @@ def SOMPlot(net,size, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
     for i, node in enumerate(net.nodeList):
         somnodes['q'].append(node.pos[0]+(i%size)*distq1+(i//size)*distq2)
         somnodes['r'].append(-node.pos[1]-(i%size)*distr)
-        somnodes['features'].append([cols[i] for i in np.argsort(node.weights) if abs(node.weights[i])>0.4])
+        somnodes['features'].append([colnames[i] for i in np.argsort(
+            node.weights) if abs(node.weights[i]) > minweight])
     somnodes=pd.DataFrame(somnodes)
     for i, v in somnodes.iterrows():
         tot=""
@@ -611,4 +612,41 @@ def SOMPlot(net,size, distq1=0.535, distq2=0.055, distr=0.2, folder=""):
             tot += " "+str(j)
         somnodes.loc[i, 'features'] = tot
     #interactive SOM with features with highest importance to the nodes, displayed when hovering
-    helper.bigScatter(somnodes, precomputed=True, features=True, binsize=1, title='Cobinding SOM cluster of '+str(size), folder=folder)
+    bigScatter(somnodes, precomputed=True, features=True, binsize=1, title='Cobinding SOM cluster of '+str(size), folder=folder)
+
+
+def andrew(groups, merged, annot, enr=None, pvals=None, cols=8, precise=True, title = "sorted clustermap of cobindings clustered", folder="", rangeval=4, okpval=10**-3, size=(20,15),vmax=3, vmin=0):
+    if enr is None or pvals is None:
+        enr, pvals = chip.enrichment(merged, groups=groups)
+    rand = np.random.choice(merged.index,5000)
+    subgroups = groups[rand]
+    sorting = np.argsort(subgroups)
+    redblue = cm.get_cmap('RdBu_r',256)
+    subenr = enr.iloc[annot-cols:]
+    subenr[subenr>rangeval]=rangeval
+    subenr[subenr<-rangeval]=-rangeval
+    subenr = subenr/rangeval
+    data = []
+    #colors = []
+    impv = pvals.values
+    for i in subgroups[sorting]:
+        #colors.append(viridis(i))
+        a = redblue((128+(subenr[i]*128)).astype(int)).tolist()
+        for j in range(len(a)):
+            a[j] = [1.,1.,1.,1.] if impv[j,i] > okpval else a[j]
+        data.append(a)
+    data = pd.DataFrame(data=data,columns=list(subenr.index),index= rand[sorting])
+    #data["clusters"]  = colors
+    
+    a = np.log2(1.01+merged[merged.columns[cols:annot]].iloc[rand].iloc[sorting].T)
+    if not precise:
+        for i in set(groups):
+            e = a[a.columns[subgroups[sorting]==i]].mean(1)
+            e = pd.DataFrame([e for i in range((subgroups[sorting]==i).sum())]).T
+            a[a.columns[subgroups[sorting]==i]] = e
+    
+    fig = sns.clustermap(a, vmin=vmin, vmax=vmax, figsize=size, z_score=0, colors_ratio=0.01, col_cluster=False,col_colors=data, xticklabels=False)
+    fig.ax_col_dendrogram.set_visible(False)
+    fig.fig.suptitle(title)
+    fig.savefig(folder + str(len(set(groups))) + '_clustermap_cobinding_enrichment_andrewplot.pdf')
+    plt.show()
