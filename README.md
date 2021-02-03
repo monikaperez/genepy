@@ -49,7 +49,7 @@ if GenePy is not in your path, first do:
 
 ```python
 import sys
-sys.path.append(RELATIVE_PATH_TO_JKBio)
+sys.path.append(RELATIVE_PATH_TO_GenePy)
 ```
 
 now you can install the necessary python packages:

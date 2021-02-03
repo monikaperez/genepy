@@ -3,8 +3,8 @@ import pandas as pd
 import pysam
 import sys
 import numpy as np
-from JKBio.utils import helper as h
-from JKBio.utils import plot
+from GenePy.utils import helper as h
+from GenePy.utils import plot
 import re
 from pybedtools import BedTool
 import seaborn as sns

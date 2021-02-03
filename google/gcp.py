@@ -12,7 +12,7 @@ import pdb
 import subprocess
 import signal
 import re
-from JKBio.utils import helper as h
+from GenePy.utils import helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):

@@ -10,8 +10,8 @@ import numpy as np
 import os
 import re
 import signal
-from JKBio.utils import helper as h
-from JKBio.google import gcp
+from GenePy.utils import helper as h
+from GenePy.google import gcp
 import pdb
 import subprocess
 from gsheets import Sheets

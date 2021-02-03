@@ -4,13 +4,13 @@ with open("README.md", 'r') as f:
     long_description = f.read()
 
 setup(
-    name='JKBio',
+    name='GenePy',
     version='1.0',
     description='A useful module for any CompBio',
     long_description = long_description,
     author='Jeremie Kalfon',
     author_email='jkobject@gmail.com',
-    url="https://github.com/jkobject/JKBio",
+    url="https://github.com/BroadInstitute/GenePy",
     packages=['cell_line_mapping-master/python','epigenetics/rose'],  # same as name
     python_requires='>=3.5',
     install_requires=[

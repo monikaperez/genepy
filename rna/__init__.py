@@ -7,8 +7,8 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
-from JKBio.rna import pyDESeq2
-from JKBio.utils import helper as h
+from GenePy.rna import pyDESeq2
+from GenePy.utils import helper as h
 import pdb
 import os
 import seaborn as sns
@@ -377,9 +377,9 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
 
         ipython.magic("R -o rm rm <- exDat$Results$r_m.res$r_m.mn")
         ipython.magic("R -o se se <- exDat$Results$r_m.res$r_m.mnse")
-        ipython.magic("R write.csv(c(rm,se), file = '/tmp/JKBIO_ercc.csv')")
+        ipython.magic("R write.csv(c(rm,se), file = '/tmp/GenePy_ercc.csv')")
         ipython.magic("R print(se,rm)")
-        l = h.fileToList("/tmp/JKBIO_ercc.csv")
+        l = h.fileToList("/tmp/GenePy_ercc.csv")
         res[val] = (float(l[1][4:]), float(l[2][4:]))
     for i, v in res.items():
         if abs(v[0]) > v[1]:
@@ -551,16 +551,16 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     return results
 
 
-def gsva(data, geneset_file, pathtoJKBio, method='ssgsea'):
+def gsva(data, geneset_file, pathtoGenePy, method='ssgsea'):
   print('you need to have R installed with GSVA and GSEABase library installed')
-  data.to_csv('/tmp/data_JKBIOhelper_gsva.csv')
-  cmd = "Rscript "+pathtoJKBio + \
-      "/rna/ssGSEA.R /tmp/data_JKBIOhelper_gsva.csv " + geneset_file + " " + method
+  data.to_csv('/tmp/data_GenePyhelper_gsva.csv')
+  cmd = "Rscript "+pathtoGenePy + \
+      "/rna/ssGSEA.R /tmp/data_GenePyhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
     raise ValueError('issue with the command: ' + str(res))
   print(res)
-  res = pd.read_csv("/tmp/res_JKBIO_ssGSEA.tsv", sep='\t')
+  res = pd.read_csv("/tmp/res_GenePy_ssGSEA.tsv", sep='\t')
   return res
 
 

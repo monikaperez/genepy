@@ -1,6 +1,6 @@
 # epigenomics
 
-Especially targeted to functions related to the analysis of epigenomics data. It has functions to read, merge, denoise, ChIP seq data. It contains a lot of functions required for the [AML paper](github.com/JKBio/AMLproject).
+Especially targeted to functions related to the analysis of epigenomics data. It has functions to read, merge, denoise, ChIP seq data.
 
 ## Available functions:
 

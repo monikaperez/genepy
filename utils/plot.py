@@ -20,7 +20,7 @@ import bokeh
 import colorcet as cc
 from PIL import Image, ImageDraw, ImageFont
 import seaborn as sns
-from JKBio.epigenetics import chipseq as chip 
+from GenePy.epigenetics import chipseq as chip 
 
 import pandas as pd
 from math import pi
