@@ -1,8 +1,11 @@
-# JKBio
+# GenePy
+
+_what is [genepy](https://en.wikipedia.org/wiki/G%C3%A9n%C3%A9pi)?_
 
 A set of awesome functions & tools for Computational Genomists
 
 ![long genome](documentation/genome.jpg)
+
 ## Content
 
 - **utils**: where a bunch of helper functions and usefull general scripts are stoed
@@ -28,21 +31,21 @@ A set of awesome functions & tools for Computational Genomists
 
 ### with pip (WIP)
 
-`pip install JKBio`
+`pip install GenePy`
 ### dev mode (better for now)
 
 ```bash
-git clone git://github.com/jkobject/JKBio.git
-cd JKBio
+git clone git://github.com/BroadInstitute/GenePy.git
+cd GenePy
 git submodule update --init
 ```
 
 then you can import files in python with e.g:
 ```python
-from JKBio import TerraFunction as terra
+from GenePy import TerraFunction as terra
 ```
 
-if JKBio is not in your path, first do:
+if GenePy is not in your path, first do:
 
 ```python
 import sys
@@ -79,21 +82,10 @@ R -e 'if(!requireNamespace("BiocManager", quietly = TRUE)){install.packages("Bio
 ```
 ## About
 
-As I am working in different domains of computational genomics, I need to have a set of reusable function that will help me during my work.
-It can be functions to work with different tools that I have to use. Functions to do some plots. etc..
+please do contribute, we do not have time to fix all issues or work on feature requests
 
-I will be trying to keep each of these functions functional and documented. Feel free to pull and start use anything that might be useful to you.
-If you see anything suspicious or not working. A pull request would definitely get reviewed within a day.
-
-I hope to be able to give back to the community and maybe save a couple of hours to couple of researchers.
-
-Best.
+Jeremie Kalfon jkalfon@broadinstitute.org jkobject@gmail.com https://jkobject.com
 
 
-jkalfon@broadinstitute.org
-
-jkobject@gmail.com
-
-https://jkobject.com
 
 Apache license 2.0.
