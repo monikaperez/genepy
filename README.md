@@ -34,7 +34,7 @@ _tools that you do not need to use directly as they have binding functions in Ge
 
 ### with pip (WIP)
 
-`pip install GenePy`
+`pip install broad-genepy`
 ### dev mode (better for now)
 
 ```bash
