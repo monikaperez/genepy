@@ -20,10 +20,13 @@ A set of awesome functions & tools for Computational Genomists
   - **google_sheet**: function to upload a df as a google sheet
   - **gcp**: sets of functions to interact with google storage (relies on gsutil)
 - **epigenetics**: where we have things related to epigenomics
-  - **rose**: where an updated version of the rose algorithm is stored (as a git submodule)
   - **chipseq**: has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
-- **taigr**: a version of taiga that do not requires RCurl (and can save you when you have a faulty RCurl-Curl link)
-- **data**: should not contain anything when pulled but is used by any of the functions in the folder, to save some required data files
+
+### Helper tools
+
+_tools that you do not need to use directly as they have binding functions in GenePy._ 
+
+- **epigenetics/rose:**: where an updated version of the rose algorithm is stored (as a git submodule) 
 - **cell_line_mapping**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
 
 
