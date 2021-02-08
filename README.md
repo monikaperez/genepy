@@ -1,4 +1,4 @@
-# GenePy
+# genepy
 
 _what is [genepy](https://en.wikipedia.org/wiki/G%C3%A9n%C3%A9pi)?_
 
@@ -24,7 +24,7 @@ A set of awesome functions & tools for Computational Genomists
 
 ### Helper tools
 
-_tools that you do not need to use directly as they have binding functions in GenePy._ 
+_tools that you do not need to use directly as they have binding functions in genepy._ 
 
 - **epigenetics/rose:**: where an updated version of the rose algorithm is stored (as a git submodule) 
 - **cell_line_mapping**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
@@ -38,21 +38,21 @@ _tools that you do not need to use directly as they have binding functions in Ge
 ### dev mode (better for now)
 
 ```bash
-git clone git://github.com/BroadInstitute/GenePy.git
-cd GenePy
+git clone git://github.com/BroadInstitute/genepy.git
+cd genepy
 git submodule update --init
 ```
 
 then you can import files in python with e.g:
 ```python
-from GenePy import TerraFunction as terra
+from genepy import TerraFunction as terra
 ```
 
-if GenePy is not in your path, first do:
+if genepy is not in your path, first do:
 
 ```python
 import sys
-sys.path.append(RELATIVE_PATH_TO_GenePy)
+sys.path.append(RELATIVE_PATH_TO_genepy)
 ```
 
 now you can install the necessary python packages:

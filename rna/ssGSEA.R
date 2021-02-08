@@ -13,4 +13,4 @@ gsc_obj <- GSEABase::getGmt(gmtfile,
 collectionType = GSEABase::BroadCollection(),
 geneIdType = GSEABase::EntrezIdentifier())
 gsea <- GSVA::gsva(mat, gsc_obj, method = method)
-write.table(gsea, file = "/tmp/res_GenePy_ssGSEA.tsv", sep = '\t', quote = F)
+write.table(gsea, file = "/tmp/res_genepy_ssGSEA.tsv", sep = '\t', quote = F)
