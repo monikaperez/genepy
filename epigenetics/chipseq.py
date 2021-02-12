@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import pysam
-import sys
 import numpy as np
 from genepy.utils import helper as h
 from genepy.utils import plot
@@ -11,28 +10,24 @@ import seaborn as sns
 import pyBigWig
 import matplotlib.pyplot as plt
 import pdb
-import signal
-from scipy.optimize import curve_fit,minimize
-from sklearn.preprocessing import normalize
-from scipy.stats import poisson, zscore, boxcox, binom, fisher_exact
+from scipy.optimize import minimize
+from scipy.stats import zscore, fisher_exact
 from scipy.special import factorial
 import subprocess
-from pandas.io.parsers import ParserError, EmptyDataError
 import warnings
 import itertools
 from statsmodels.stats.multitest import multipletests
 
-size = {"GRCh37": 2864785220,
-		"GRCh38": 2913022398}
+size = {"GRCh37": 2864785220, "GRCh38": 2913022398}
 
 cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
-		 'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-		 'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+				'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+				'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
 
-chroms = {'chr1','chr10','chr11','chr12','chr13','chr14','chr15','chr16','chr17','chr18','chr19',
-'chr2','chr20','chr21','chr22','chr3','chr4','chr5','chr6','chr7','chr8','chr9','chrX',
- 'chrY','1','10','11','12','13','14','15','16','17','18','19','2','20','21','22','3','4','5','6',
- '7','8','9','X','Y'}
+chroms = {'chr1', 'chr10', 'chr11', 'chr12', 'chr13', 'chr14', 'chr15', 'chr16', 'chr17', 'chr18', 'chr19',
+'chr2', 'chr20', 'chr21', 'chr22', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chrX',
+ 'chrY', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '21', '22', '3', '4', '5', '6',
+ '7', '8', '9', 'X', 'Y'}
 
 
 def bigWigFrom(bams, folder="", numthreads=8, genome='GRCh37', scaling=None, verbose=1):
@@ -95,28 +90,30 @@ def loadPeaks(peakFile=None,peakfolder=None, isMacs=True, CTFlist=[], skiprows=0
 		bindings['name'] = peakFile.split('/')[-1].split('.')[0]
 	else:
 		raise ValueError("need to provide one of peakFile or peakfolder")
-	bindings = bindings.drop(5, 1).drop(4, 1)
+	if not len(bindings.columns)==6:
+		bindings = bindings.drop(5, 1).drop(4, 1).rename(columns={6:4, 7:5, 8:6, 9:7,})
 	bindings = bindings.rename(columns={
 		0: "chrom",
 		1: 'start',
 		2: 'end',
 		3: 'peak_number',
-		6: "foldchange",
-		7: "-log10pvalue",
-		8: "-log10qvalue",
-		9: 'relative_summit_pos'})
+		4: "foldchange",
+		5: "-log10pvalue",
+		6: "-log10qvalue",
+		7: 'relative_summit_pos'})
 	bindings = bindings.sort_values(by=["chrom", "start", "end"], axis=0)
 	bindings.start = bindings.start.astype('int')
 	bindings.end = bindings.end.astype('int')
-	bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype(
-		float) if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
+	if not len(bindings.columns)==6:
+		bindings['relative_summit_pos'] = bindings.relative_summit_pos.astype(
+			float) if 'relative_summit_pos' in bindings.columns else bindings.end - bindings.start
+		bindings["-log10pvalue"] = bindings["-log10pvalue"].astype('float')
+		bindings['-log10qvalue'] = bindings['-log10qvalue'].astype('float')
+		loc = bindings['relative_summit_pos'].isna()
+		bindings.loc[bindings[loc].index, 'relative_summit_pos'] = bindings[loc].end - bindings[loc].start
+		bindings.relative_summit_pos = bindings.relative_summit_pos.astype(int)
 	bindings.foldchange = bindings.foldchange.astype('float')
-	bindings["-log10pvalue"] = bindings["-log10pvalue"].astype('float')
-	bindings['-log10qvalue'] = bindings['-log10qvalue'].astype('float')
 	bindings = bindings.reset_index(drop=True)
-	loc = bindings['relative_summit_pos'].isna()
-	bindings.loc[bindings[loc].index, 'relative_summit_pos'] = bindings[loc].end - bindings[loc].start
-	bindings.relative_summit_pos = bindings.relative_summit_pos.astype(int)
 	return bindings
 
 
@@ -263,10 +260,15 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
 			cmd += " --outFileName " + '.'.join(name.split('.')[:-1]) + ".gz"
 			cmd += " --upstream " + str(window) + " --downstream " + str(window)
 			cmd += " --numberOfProcessors " + str(numthreads) + ' && '
-		if type(name) is list:
-			cmd+= " --matrixFile " + '.gz '.join(name) + ".gz"
 		cmd += "plotHeatmap" if not onlyProfile else 'plotProfile'
-		cmd += " --matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
+		if type(name) is list:
+			if not onlyProfile:
+				raise ValueError('needs to be set to True, can\'t average heatmaps')
+			cmd+= " --matrixFile " + '.gz '.join(name) + ".gz"
+			if average:
+				cmd+= "--averageType mean"
+		else:
+			cmd += " --matrixFile " + '.'.join(name.split('.')[:-1]) + ".gz"
 		cmd += " --outFileName " + name
 		cmd += " --refPointLabel "+ refpoint
 		if vmax is not None:
@@ -287,17 +289,15 @@ def getPeaksAt(peaks, bigwigs, folder='', bigwignames=[], peaknames=[], window=1
 			pe = ''
 			for i in peaknames:
 				pe += ' ' + i
-			peaknames = pe
-			cmd += " --regionsLabel" + peaknames
+			cmd += " --regionsLabel" + pe
 		if type(bigwigs) is list:
 			if len(bigwignames) > 0:
 				pe = ''
 				for i in bigwignames:
-					pe += ' ' + i
-				bigwignames = pe
-				cmd += " --samplesLabel" + bigwignames
+					pe += ' "' + i +'"'
+				cmd += " --samplesLabel" + pe
 		if title:
-			cmd += " --plotTitle " + title
+			cmd += " --plotTitle '"+title+"'"
 		data = subprocess.run(cmd, shell=True, capture_output=True)
 		print(data)
 	else:
@@ -903,6 +903,8 @@ def putInBed(conscensus, value, window=10, mergetype='mean'):
 		if len(num)>0:
 			if mergetype=='mean':
 				res[loc] = np.mean(num)
+			elif mergetype=='first':
+				res[loc]=np.sum(num)
 			elif mergetype=='first':
 				res[loc]=num[0]
 			elif mergetype=='last':
