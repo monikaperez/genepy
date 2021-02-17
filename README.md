@@ -2,13 +2,13 @@
 
 _what is [genepy](https://en.wikipedia.org/wiki/G%C3%A9n%C3%A9pi)?_
 
-A set of awesome functions & tools for Computational Genomists
+A set of awesome functions & tools for Computational Geneticists
 
 ![long genome](documentation/genome.jpg)
 
 ## Content
 
-- **utils**: where a bunch of helper functions and usefull general scripts are stoed
+- **utils**: where a bunch of helper functions and usefull general scripts are stored
   - **plots**: a set of plotting tools based on [matplotlib]() and [bokeh]() to make volcano plots / CNV maps etc..
   - **helper**: and additional helper functions to save data, do merging of dataframes...
 - **terra**: contains a set of functions that uses [dalmatian]() to interact with the [GCP]() powered genomics HPC platform: [Terra](). 
@@ -18,9 +18,10 @@ A set of awesome functions & tools for Computational Genomists
 - **mutations**: a set of functions to work with maf files, vcf files etc..
 - **google**: functions and packages linked to google's apis
   - **google_sheet**: function to upload a df as a google sheet
-  - **gcp**: sets of functions to interact with google storage (relies on gsutil)
+  - **gcp**: sets of functions to interact with google storage (relies on `gsutil`)
 - **epigenetics**: where we have things related to epigenomics
-  - **chipseq**: has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
+  - **chipseq**: has functions to read, merge, denoise, ChIP seq data.
+  - **plot**: has functions to plot ChIP seq data.
 
 ### Helper tools
 
@@ -47,7 +48,12 @@ pip install -e genepy
 
 then you can import files in python with e.g:
 ```python
-from genepy import TerraFunction as terra
+from genepy import terra
+from genepy.utils import helper as h
+from genepy.google import gcp
+from genepy.utils import plot
+from genepy.epigenetics import chipseq
+
 ```
 
 ## installation: to get access to all bindings
@@ -69,6 +75,6 @@ please do contribute, we do not have time to fix all issues or work on feature r
 
 Jeremie Kalfon jkalfon@broadinstitute.org jkobject@gmail.com https://jkobject.com
 
-
+Javad Noorbakhsh jnoorbak@broadinstitute.org
 
 Apache license 2.0.
