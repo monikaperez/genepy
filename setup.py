@@ -32,8 +32,7 @@ setup(
         'deeptools',
         ## from requirements.txt
         "bokeh",
-        "dalmatian",
-        "firecloud_dalmatian",
+        "firecloud-dalmatian",
         "google_api_python_client",
         "gsheets",
         "gspread",
