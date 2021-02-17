@@ -27,20 +27,22 @@ A set of awesome functions & tools for Computational Genomists
 _tools that you do not need to use directly as they have binding functions in genepy._ 
 
 - **epigenetics/rose:**: where an updated version of the rose algorithm is stored (as a git submodule) 
-- **cell_line_mapping**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
+- **cell_line_mapping-master/python/cell_line_mapper**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
 
 
 ## Install
 
-### with pip (WIP)
+### with pip
 
 `pip install broad-genepy`
-### dev mode (better for now)
+
+and then use with `from genepy.utils/epigenetics/... import ...` 
+
+### dev mode
 
 ```bash
 git clone git://github.com/BroadInstitute/genepy.git
-cd genepy
-git submodule update --init
+pip install -e genepy
 ```
 
 then you can import files in python with e.g:
@@ -48,37 +50,15 @@ then you can import files in python with e.g:
 from genepy import TerraFunction as terra
 ```
 
-if genepy is not in your path, first do:
+## installation: to get access to all bindings
 
-```python
-import sys
-sys.path.append(RELATIVE_PATH_TO_genepy)
-```
-
-now you can install the necessary python packages:
-
-```bash
-pip install requirements.txt
-pip install rpy2-bioconductor-extensions gseapy macs2 deeptools
-```
-
-or if not using the requirements.txt (computation results might change):
-
-```bash
-pip install numpy pandas
-```
-
-```bash
-pip install bokeh dalmatian firecloud_dalmatian google_api_python_client gsheets gspread ipdb ipython matplotlib Pillow pybedtools pyBigWig pysam pytest requests rpy2 scikit_learn scipy seaborn setuptools taigapy taigapy typing venn rpy2-bioconductor-extensions gseapy macs2 deeptools
-```
-
-then install the following tools:
+Install the following tools:
 - [htslib/samtools](http://www.htslib.org/)
 - [bwa](https://github.com/lh3/bwa)
 just used once:
 - [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)
 
-finaly you can install R packages (GSEABase, erccdashboard, GSVA, DESeq2):
+Finaly you can install R packages (GSEABase, erccdashboard, GSVA, DESeq2):
 
 ```bash
 R -e 'if(!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager")};BiocManager::install(c("GSEABase", "erccdashboard", "GSVA", "DESeq2"));'

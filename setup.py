@@ -63,11 +63,15 @@ setup(
     ],
 )
 
+
 print("You might want to install Bowtie2, samtools, bwa and R to be able to use all functions of this package:\n\
   http://bowtie-bio.sourceforge.net/bowtie2/index.shtml\n\
   http://www.htslib.org/\n\
   https://github.com/lh3/bwa\n")
 
-print("once R is installed you need to have installed erccdashboard, GSEABase GSVA, DESeq2 to have access to aall the functions")
+print("trying to install R packages")
+os.system("R -e 'if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));'")
+print('if it did not work. please install R or check your R installation')
+print("once R is installed you need to install erccdashboard, GSEABase GSVA, DESeq2 to have access to all the functions")
 
 print("Finished!")
