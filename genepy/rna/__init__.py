@@ -660,19 +660,22 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
         plt.show()
         plot.get_figure().savefig(folder+'failed_qc.pdf')
 
-        for val in rnaqc.index:
+        num_cols = 10
+        num_rows = math.ceil(len(rnaqc)/num_cols)
+        _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
+        for val_idx, val in enumerate(rnaqc.index):
+            ax = axes.flatten()[val_idx]
             qc = rnaqc.loc[val]
-            boxplot = sns.violinplot(y=qc)
+            sns.violinplot(y=qc, ax=ax)
             q1 = qc.quantile(qant1)
             q3 = qc.quantile(qant3)
             outlier_top_lim = q3 + 1.5 * (q3 - q1)
             outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
             for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
-                plt.text(0.05, v, k, ha='left', va='center',
+                ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
-            plt.show()
-            plt.savefig(folder +
-                        val.replace(' ', '_').replace('/', '_')+'.pdf')
+        plt.tight_layout()
+        plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
 
