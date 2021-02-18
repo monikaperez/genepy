@@ -337,13 +337,15 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
         d.update({
             featurename: 'Feature'
         })
+        cont = {}
         for i in cols:
             if val + '-' in i:
                 e += 1
                 d.update({i: val.split('_')[-1] + '_' + str(e)})
             if control + "-" in i:
                 c += 1
-                d.update({i: control + "_" + str(c)})
+                cont.update({i: control + "_" + str(c)})
+        d.update(cont)
         a = ERCC[list(d.keys())].rename(columns=d)
         a.to_csv('/tmp/ERCC_estimation.csv', index=None)
         val = val.split('_')[-1]
@@ -515,18 +517,18 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
                               data=np.array([contr, cond]).T)
         design.index = design.index.astype(str).str.replace('-', '.')
         deseq = pyDESeq2.pyDESeq2(count_matrix=data, design_matrix=design,
-                                  design_formula='~DMSO + Target', gene_column="gene_id")
+                                  design_formula='~Target', gene_column="gene_id")
         if type(scaling) is bool:
-            print("scaling using ERCC")
+            print("  scaling using ERCC")
             if scaling:
                 deseq.run_estimate_size_factors(
                     controlGenes=data.gene_id.str.contains(spikecontrolscontain))
         elif type(scaling) is list or type(scaling) is set:
-            print("scaling using a gene set")
+            print("  scaling using a gene set")
             deseq.run_estimate_size_factors(controlGenes=data.gene_id.isin(scaling))
         elif type(scaling) is dict:
             if val in scaling:
-                print("auto scaling from ERCCdashboard mean/std values")
+                print("  auto scaling from ERCCdashboard mean/std values")
                 if abs(scaling[val][0]) > threshforscaling*scaling[val][1]:
                     print("  estimating sizeFactors for this one")
                     deseq.run_estimate_size_factors(

@@ -47,7 +47,7 @@ setup(
         "pytest",
         "requests",
         "rpy2",
-        "scikit_learn",
+        "scikit-learn",
         "scipy",
         "seaborn",
         "setuptools",
