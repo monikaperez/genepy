@@ -673,7 +673,7 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                 ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
         plt.tight_layout()
-        plt.savefig('{}/qc_metrics.pdf'.format(folder, ), bbox_inches='tight')
+        plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
 
