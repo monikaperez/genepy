@@ -185,7 +185,7 @@ def createFoldersFor(filepath):
     will recursively create folders if needed until having all the folders required to save the file in this filepath
     """
     prevval = ''
-    for val in filepath.split('/')[:-1]:
+    for val in os.path.expanduser(filepath).split('/')[:-1]:
         prevval += val + '/'
         if not os.path.exists(prevval):
             os.mkdir(prevval)
