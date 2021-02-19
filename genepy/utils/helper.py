@@ -446,7 +446,7 @@ def compareDfs(df1, df2):
 
 def stringifydict(res):
     """
-    
+
     """
     a = {}
     for k, v in res.items():
@@ -459,7 +459,7 @@ def stringifydict(res):
 
 def readXMLs(folder=None, file=None, rename=None):
     if file is not None:
-        if type(file) is str: 
+        if type(file) is str:
             print('reading 1 file')
             files = [file]
         else:
