@@ -3,22 +3,17 @@
 # in 2019
 
 from __future__ import print_function
-from matplotlib import pyplot as plt
 import json
 import os
-import sys
 import string
 import subprocess
-
+import pandas as pd
 import pdb
-import ipdb
 import pandas as pd
 import numpy as np
 import itertools
 import random
-
-from taigapy import TaigaClient
-tc = TaigaClient()
+import xmltodict
 
 
 rename_mut = {'contig': 'chr', 'position': 'pos', 'Reference_Allele': 'ref', 'ref_allele': 'ref', 'alt_allele': 'alt',
@@ -357,38 +352,39 @@ def datetoint(dt, split='-', unknown='U', order="des"):
 
 
 def showcount(i, size):
-  """
-  pretty print of i/size%, to put in a for loop
-  """
-  print(str(1 + int(100 * (i / size))) + '%', end='\r')
+    """
+    pretty print of i/size%, to put in a for loop
+    """
+    print(str(1 + int(100 * (i / size))) + '%', end='\r')
 
 
 def combin(n, k):
-  """
-  Nombre de combinaisons de n objets pris k a k
-  outputs the number of comabination of n object taken k at a time
-  """
-  if k > n // 2:
-    k = n - k
-  x = 1
-  y = 1
-  i = n - k + 1
-  while i <= n:
-    x = (x * i) // y
-    y += 1
-    i += 1
-  return x
+    """
+    Nombre de combinaisons de n objets pris k a k
+    outputs the number of comabination of n object taken k at a time
+    """
+    if k > n // 2:
+        k = n - k
+    x = 1
+    y = 1
+    i = n - k + 1
+    while i <= n:
+        x = (x * i) // y
+        y += 1
+        i += 1
+    return x
 
 
 def dups(lst):
-  """
-	shows the duplicates in a list
-  """
-  seen = set()
-  # adds all elements it doesn't know yet to seen and all other to seen_twice
-  seen_twice = set(x for x in lst if x in seen or seen.add(x))
-  # turn the set into a list (as requested)
-  return list(seen_twice)
+    """
+        shows the duplicates in a list
+    """
+    seen = set()
+    # adds all elements it doesn't know yet to seen and all other to seen_twice
+    seen_twice = set(x for x in lst if x in seen or seen.add(x))
+    # turn the set into a list (as requested)
+    return list(seen_twice)
+
 
 def makeCombinations(size, proba):
     """
@@ -419,11 +415,12 @@ def makeCombinations(size, proba):
     sums[0] = 1-sum(list(sums.values()))
     return sums
 
+
 def closest(lst, K):
-  """
-  returns the index of the value closest to K in a lst
-  """
-  return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
+    """
+    returns the index of the value closest to K in a lst
+    """
+    return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
 
 def compareDfs(df1, df2):
@@ -446,14 +443,42 @@ def compareDfs(df1, df2):
     print('FOUND new 0s in df1: ' + str(new0s))
     return nmissmatchCols, omissmatchCols, nmissmatchInds, omissmatchInds, newNAs, new0s
 
+
 def stringifydict(res):
     """
     
     """
     a = {}
-    for k,v in res.items():
+    for k, v in res.items():
         if type(v) is dict:
             a[k] = stringifydict(v)
         else:
             a[str(k)] = v
     return a
+
+
+def readXMLs(folder=None, file=None, rename=None):
+    if file is not None:
+        if type(file) is str: 
+            print('reading 1 file')
+            files = [file]
+        else:
+            print('reading files')
+            files = file
+    if folder is not None:
+        print("reading from folder")
+        files = [i for i in os.listdir(folder) if i.endswith(".xml")]
+    df = pd.DataFrame()
+    for file in files:
+        res = []
+        a = open(file, "r").read()
+        xmldict = xmltodict.parse(a)
+        data = xmldict['Workbook']['Worksheet']['Table']["Row"]
+        for val in data:
+            res.append([v['Data']['#text'] if "#text" in v['Data']
+                        else None for v in val["Cell"]])
+        res = pd.DataFrame(data=res[2:], columns=res[0])
+        df = df.append(res)
+    if rename is not None:
+        df = df.rename(columns=rename)
+    return df

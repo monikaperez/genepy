@@ -7,12 +7,11 @@ from google.cloud import storage
 import dalmatian as dm
 import numpy as np
 import os
-import ipdb
 import pdb
 import subprocess
 import signal
 import re
-from GenePy.utils import helper as h
+from genepy.utils import helper as h
 
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
@@ -179,7 +178,7 @@ def rmFiles(files, group=50, add='', dryrun=True):
                 break
 
 
-def recoverFiles(files):
+def recoverFiles(files, cores=1):
     """
     recover a set of files in parallel that were erased 
 
@@ -194,7 +193,18 @@ def recoverFiles(files):
     h.parrun(cmd, cores=cores)
 
 
-def patternRN(rename_dict, location, wildcards, types=[], dryrun=True, check_dependencies=True, cores=1):
+def folderRN(gspath, newpath, cores=1):
+    """
+    """
+    lis = lsFiles([gspath])
+    if lis!=0:
+        h.parrun(['gsutil -m mv ' + val + " " + newpath for val in lis], cores=cores)
+    else:
+        raise ValueError('no such folder')
+        
+
+def patternRN(rename_dict, location, wildcards, types=[], dryrun=True, 
+check_dependencies=True, cores=1):
     """
     rename/move a bunch of GCP objects found in some specific places
 
@@ -211,7 +221,6 @@ def patternRN(rename_dict, location, wildcards, types=[], dryrun=True, check_dep
         test: if test, just shows the command but does not run it
         cores:  cores tells on how many processor to parallelize the tas#k
     """
-    r = 0
     val = []
     for k, v in rename_dict.items():
         val.append(v)

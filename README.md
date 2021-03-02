@@ -1,14 +1,14 @@
-# GenePy
+# genepy
 
 _what is [genepy](https://en.wikipedia.org/wiki/G%C3%A9n%C3%A9pi)?_
 
-A set of awesome functions & tools for Computational Genomists
+A set of awesome functions & tools for Computational Geneticists
 
 ![long genome](documentation/genome.jpg)
 
 ## Content
 
-- **utils**: where a bunch of helper functions and usefull general scripts are stoed
+- **utils**: where a bunch of helper functions and usefull general scripts are stored
   - **plots**: a set of plotting tools based on [matplotlib]() and [bokeh]() to make volcano plots / CNV maps etc..
   - **helper**: and additional helper functions to save data, do merging of dataframes...
 - **terra**: contains a set of functions that uses [dalmatian]() to interact with the [GCP]() powered genomics HPC platform: [Terra](). 
@@ -18,67 +18,53 @@ A set of awesome functions & tools for Computational Genomists
 - **mutations**: a set of functions to work with maf files, vcf files etc..
 - **google**: functions and packages linked to google's apis
   - **google_sheet**: function to upload a df as a google sheet
-  - **gcp**: sets of functions to interact with google storage (relies on gsutil)
+  - **gcp**: sets of functions to interact with google storage (relies on `gsutil`)
 - **epigenetics**: where we have things related to epigenomics
-  - **chipseq**: has functions to read, merge, denoise, ChIP seq data, it contains a lot of functions required for the AML paper.
+  - **chipseq**: has functions to read, merge, denoise, ChIP seq data.
+  - **plot**: has functions to plot ChIP seq data.
 
 ### Helper tools
 
-_tools that you do not need to use directly as they have binding functions in GenePy._ 
+_tools that you do not need to use directly as they have binding functions in genepy._ 
 
 - **epigenetics/rose:**: where an updated version of the rose algorithm is stored (as a git submodule) 
-- **cell_line_mapping**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
+- **cell_line_mapping-master/python/cell_line_mapper**: a set of functions to map cell line ids to other cell line ids based on an up to date google spreadsheet. 
 
 
 ## Install
 
-### with pip (WIP)
+### with pip
 
 `pip install broad-genepy`
-### dev mode (better for now)
+
+and then use with `from genepy.utils/epigenetics/... import ...` 
+
+### dev mode
 
 ```bash
-git clone git://github.com/BroadInstitute/GenePy.git
-cd GenePy
-git submodule update --init
+git clone git://github.com/BroadInstitute/genepy.git
+pip install -e genepy
 ```
 
 then you can import files in python with e.g:
 ```python
-from GenePy import TerraFunction as terra
+from genepy import terra
+from genepy.utils import helper as h
+from genepy.google import gcp
+from genepy.utils import plot
+from genepy.epigenetics import chipseq
+
 ```
 
-if GenePy is not in your path, first do:
+## installation: to get access to all bindings
 
-```python
-import sys
-sys.path.append(RELATIVE_PATH_TO_GenePy)
-```
-
-now you can install the necessary python packages:
-
-```bash
-pip install requirements.txt
-pip install rpy2-bioconductor-extensions gseapy macs2 deeptools
-```
-
-or if not using the requirements.txt (computation results might change):
-
-```bash
-pip install numpy pandas
-```
-
-```bash
-pip install bokeh dalmatian firecloud_dalmatian google_api_python_client gsheets gspread ipdb ipython matplotlib Pillow pybedtools pyBigWig pysam pytest requests rpy2 scikit_learn scipy seaborn setuptools taigapy taigapy typing venn rpy2-bioconductor-extensions gseapy macs2 deeptools
-```
-
-then install the following tools:
+Install the following tools:
 - [htslib/samtools](http://www.htslib.org/)
 - [bwa](https://github.com/lh3/bwa)
 just used once:
 - [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml)
 
-finaly you can install R packages (GSEABase, erccdashboard, GSVA, DESeq2):
+Finaly you can install R packages (GSEABase, erccdashboard, GSVA, DESeq2):
 
 ```bash
 R -e 'if(!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager")};BiocManager::install(c("GSEABase", "erccdashboard", "GSVA", "DESeq2"));'
@@ -89,6 +75,6 @@ please do contribute, we do not have time to fix all issues or work on feature r
 
 Jeremie Kalfon jkalfon@broadinstitute.org jkobject@gmail.com https://jkobject.com
 
-
+Javad Noorbakhsh jnoorbak@broadinstitute.org
 
 Apache license 2.0.

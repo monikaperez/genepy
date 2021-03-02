@@ -7,8 +7,8 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
-from GenePy.rna import pyDESeq2
-from GenePy.utils import helper as h
+from genepy.rna import pyDESeq2
+from genepy.utils import helper as h
 import pdb
 import os
 import seaborn as sns
@@ -97,7 +97,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
     return(renamed, not_parsed)
 
 
-def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
+async def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
                             pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
                             totrim=True, tomap=True, tofilter=True, results='res/', toremove=False):
     """
@@ -210,7 +210,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
     return norm, mapped,  # unique_mapped
 
 
-def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
+async def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
                       cores=8, cleanfunc=lambda i: i.split('(GO')[0]):
     """
 
@@ -337,13 +337,15 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
         d.update({
             featurename: 'Feature'
         })
+        cont = {}
         for i in cols:
             if val + '-' in i:
                 e += 1
                 d.update({i: val.split('_')[-1] + '_' + str(e)})
             if control + "-" in i:
                 c += 1
-                d.update({i: control + "_" + str(c)})
+                cont.update({i: control + "_" + str(c)})
+        d.update(cont)
         a = ERCC[list(d.keys())].rename(columns=d)
         a.to_csv('/tmp/ERCC_estimation.csv', index=None)
         val = val.split('_')[-1]
@@ -377,9 +379,9 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
 
         ipython.magic("R -o rm rm <- exDat$Results$r_m.res$r_m.mn")
         ipython.magic("R -o se se <- exDat$Results$r_m.res$r_m.mnse")
-        ipython.magic("R write.csv(c(rm,se), file = '/tmp/GenePy_ercc.csv')")
+        ipython.magic("R write.csv(c(rm,se), file = '/tmp/genepy_ercc.csv')")
         ipython.magic("R print(se,rm)")
-        l = h.fileToList("/tmp/GenePy_ercc.csv")
+        l = h.fileToList("/tmp/genepy_ercc.csv")
         res[val] = (float(l[1][4:]), float(l[2][4:]))
     for i, v in res.items():
         if abs(v[0]) > v[1]:
@@ -515,18 +517,18 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
                               data=np.array([contr, cond]).T)
         design.index = design.index.astype(str).str.replace('-', '.')
         deseq = pyDESeq2.pyDESeq2(count_matrix=data, design_matrix=design,
-                                  design_formula='~DMSO + Target', gene_column="gene_id")
+                                  design_formula='~Target', gene_column="gene_id")
         if type(scaling) is bool:
-            print("scaling using ERCC")
+            print("  scaling using ERCC")
             if scaling:
                 deseq.run_estimate_size_factors(
                     controlGenes=data.gene_id.str.contains(spikecontrolscontain))
         elif type(scaling) is list or type(scaling) is set:
-            print("scaling using a gene set")
+            print("  scaling using a gene set")
             deseq.run_estimate_size_factors(controlGenes=data.gene_id.isin(scaling))
         elif type(scaling) is dict:
             if val in scaling:
-                print("auto scaling from ERCCdashboard mean/std values")
+                print("  auto scaling from ERCCdashboard mean/std values")
                 if abs(scaling[val][0]) > threshforscaling*scaling[val][1]:
                     print("  estimating sizeFactors for this one")
                     deseq.run_estimate_size_factors(
@@ -551,16 +553,16 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     return results
 
 
-def gsva(data, geneset_file, pathtoGenePy, method='ssgsea'):
+async def gsva(data, geneset_file, pathtogenepy, method='ssgsea'):
   print('you need to have R installed with GSVA and GSEABase library installed')
-  data.to_csv('/tmp/data_GenePyhelper_gsva.csv')
-  cmd = "Rscript "+pathtoGenePy + \
-      "/rna/ssGSEA.R /tmp/data_GenePyhelper_gsva.csv " + geneset_file + " " + method
+  data.to_csv('/tmp/data_genepyhelper_gsva.csv')
+  cmd = "Rscript "+pathtogenepy + \
+      "/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
     raise ValueError('issue with the command: ' + str(res))
   print(res)
-  res = pd.read_csv("/tmp/res_GenePy_ssGSEA.tsv", sep='\t')
+  res = pd.read_csv("/tmp/res_genepy_ssGSEA.tsv", sep='\t')
   return res
 
 
@@ -658,19 +660,22 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
         plt.show()
         plot.get_figure().savefig(folder+'failed_qc.pdf')
 
-        for val in rnaqc.index:
+        num_cols = 10
+        num_rows = math.ceil(len(rnaqc)/num_cols)
+        _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
+        for val_idx, val in enumerate(rnaqc.index):
+            ax = axes.flatten()[val_idx]
             qc = rnaqc.loc[val]
-            boxplot = sns.violinplot(y=qc)
+            sns.violinplot(y=qc, ax=ax)
             q1 = qc.quantile(qant1)
             q3 = qc.quantile(qant3)
             outlier_top_lim = q3 + 1.5 * (q3 - q1)
             outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
             for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
-                plt.text(0.05, v, k, ha='left', va='center',
+                ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
-            plt.show()
-            plt.savefig(folder +
-                        val.replace(' ', '_').replace('/', '_')+'.pdf')
+        plt.tight_layout()
+        plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
 

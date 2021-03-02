@@ -233,4 +233,7 @@ bh_unicode_properties.cache
 # https://packagecontrol.io/packages/sublime-github
 GitHub.sublime-settings
 
+# tmp files
+tmp.py
+
 # End of https://www.gitignore.io/api/r,macos,python,sublimetext

@@ -20,7 +20,6 @@ import bokeh
 import colorcet as cc
 from PIL import Image, ImageDraw, ImageFont
 import seaborn as sns
-from GenePy.epigenetics import chipseq as chip 
 
 import pandas as pd
 from math import pi
@@ -502,6 +501,136 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
         plt.show()
 
 
+def heatmap(data, colors=None, title="correlation Matrix", size=40, 
+            folder='', interactive=False, pvals=None, maxokpval=10**-9, maxval=None, minval=None):
+    """
+    Make an interactive heatmap from a dataframe using bokeh
+
+    Args:
+    -----
+      data: dataframe of int / float/ bool of size(names1*names2)
+      colors: list[int] of size(names) a color for each names (good to display clusters)
+      pvals: arraylike of int / float/ bool of size(names*val) or (names*names) with the corresponding pvalues
+      maxokpval: float threshold when pvalue is considered good. otherwise lowers the size of the square
+        until 10**-3 when it disappears
+      title: str the plot title
+      size: int the plot size
+      folder: str of folder location where to save the plot, won't save if empty
+      interactive: bool whether or not to make the plot interactive (else will use matplotlib)
+      maxval: float clamping coloring up to maxval
+      minval: float clamping coloring down to minval
+
+    Returns:
+    -------
+      the bokeh object if interactive else None
+
+    """
+    regdata = data.copy()
+    if minval is not None:
+        data[data<minval]=minval
+    if maxval is not None:
+        data[data > maxval] = maxval
+    data=data/data.max()
+    data = data.values
+    TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save"
+    xname = []
+    yname = []
+    color = []
+    alpha = []
+    height = []
+    width = []
+    if pvals is not None:
+        print('we are assuming you want to display the pvals of your correlation with size')
+        regpvals = pvals.copy()
+        u = pvals<maxokpval
+        pvals[~u] = np.log10(1/pvals[~u])
+        pvals = pvals/pvals.max()
+        pvals[u]=1
+    if interactive:
+        xname = []
+        yname = []
+        color = []
+        for i, name1 in enumerate(regdata.index):
+            for j, name2 in enumerate(regdata.columns):
+                xname.append(name2)
+                yname.append(name1)
+                if pvals is not None:
+                    #import pdb;pdb.set_trace()
+                    height.append(max(0.1, min(0.9, pvals.loc[name1][name2])))
+                    color.append(cc.coolwarm[int((data[i, j]*128)+127)])
+                    alpha.append(min(abs(data[i, j]), 0.9))
+                elif other is not None:
+                    color.append(cc.coolwarm[int((data[i, j]*128)+127)])
+                    alpha.append(max(min(other[i, j], 0.9),0.1) if other[i, j]!=0 else 0)
+                else:
+                    alpha.append(min(abs(data[i, j]), 0.9))
+                if colors is not None:
+                    if type(colors) is list:
+                        if colors[i] == colors[j]:
+                            color.append(
+                                Category10[10][colors[i]])
+                        else:
+                            color.append('lightgrey')
+
+                elif pvals is None and other is None:
+                    color.append('grey' if data[i, j]
+                                 > 0 else Category20[3][2])
+        if pvals is not None:
+            width = height.copy()
+            data = dict(
+                xname=xname,
+                yname=yname,
+                colors=color,
+                alphas=alpha,
+                data=regdata.values.ravel(),
+                pvals=regpvals.values.ravel(),
+                width=width,
+                height=height
+            )
+        else:
+            data = dict(
+                xname=xname,
+                yname=yname,
+                colors=color,
+                alphas=alpha,
+                data=data.ravel()
+            )
+        tt = [('names', '@yname, @xname'), ('value', '@data')]
+        if pvals is not None:
+            tt.append(('pvals','@pvals'))
+        p = figure(title=title if title is not None else "Heatmap",
+                   x_axis_location="above", tools=TOOLS,
+                   x_range=list(reversed(regdata.columns.astype(str).tolist())), y_range=regdata.index.tolist(),
+                   tooltips=tt)
+
+        p.plot_width = 800
+        p.plot_height = 800
+        p.grid.grid_line_color = None
+        p.axis.axis_line_color = None
+        p.axis.major_tick_line_color = None
+        p.axis.major_label_text_font_size = "5pt"
+        p.axis.major_label_standoff = 0
+        p.xaxis.major_label_orientation = np.pi / 3
+
+        p.rect('xname', 'yname', width = 0.9 if not width else 'width',
+                height = 0.9 if not height else 'height', source=data,
+               color='colors', alpha='alphas', line_color=None,
+               hover_line_color='black', hover_color='colors')
+        save(p, folder + title.replace(' ', "_") + "_heatmap.html")
+        #export_png(p, filename=folder + title.replace(' ', "_") + "_correlation.png")
+        try:
+            show(p)
+        except:
+            show(p)
+        return p  # show the plot
+    else:
+        plt.figure(figsize=size)
+        plt.title('the correlation matrix')
+        plt.imshow(data)
+        plt.savefig(title + "_correlation.pdf")
+        plt.show()
+
+
 def venn(inp, names, title="venn", folder=''):
     """
     Plots a venn diagram using the pyvenn package
@@ -613,40 +742,3 @@ def SOMPlot(net, size, colnames, minweight=0.1, distq1=0.535, distq2=0.055, dist
         somnodes.loc[i, 'features'] = tot
     #interactive SOM with features with highest importance to the nodes, displayed when hovering
     bigScatter(somnodes, precomputed=True, features=True, binsize=1, title='Cobinding SOM cluster of '+str(size), folder=folder)
-
-
-def andrew(groups, merged, annot, enr=None, pvals=None, cols=8, precise=True, title = "sorted clustermap of cobindings clustered", folder="", rangeval=4, okpval=10**-3, size=(20,15),vmax=3, vmin=0):
-    if enr is None or pvals is None:
-        enr, pvals = chip.enrichment(merged, groups=groups)
-    rand = np.random.choice(merged.index,5000)
-    subgroups = groups[rand]
-    sorting = np.argsort(subgroups)
-    redblue = cm.get_cmap('RdBu_r',256)
-    subenr = enr.iloc[annot-cols:]
-    subenr[subenr>rangeval]=rangeval
-    subenr[subenr<-rangeval]=-rangeval
-    subenr = subenr/rangeval
-    data = []
-    #colors = []
-    impv = pvals.values
-    for i in subgroups[sorting]:
-        #colors.append(viridis(i))
-        a = redblue((128+(subenr[i]*128)).astype(int)).tolist()
-        for j in range(len(a)):
-            a[j] = [1.,1.,1.,1.] if impv[j,i] > okpval else a[j]
-        data.append(a)
-    data = pd.DataFrame(data=data,columns=list(subenr.index),index= rand[sorting])
-    #data["clusters"]  = colors
-    
-    a = np.log2(1.01+merged[merged.columns[cols:annot]].iloc[rand].iloc[sorting].T)
-    if not precise:
-        for i in set(groups):
-            e = a[a.columns[subgroups[sorting]==i]].mean(1)
-            e = pd.DataFrame([e for i in range((subgroups[sorting]==i).sum())]).T
-            a[a.columns[subgroups[sorting]==i]] = e
-    
-    fig = sns.clustermap(a, vmin=vmin, vmax=vmax, figsize=size, z_score=0, colors_ratio=0.01, col_cluster=False,col_colors=data, xticklabels=False)
-    fig.ax_col_dendrogram.set_visible(False)
-    fig.fig.suptitle(title)
-    fig.savefig(folder + str(len(set(groups))) + '_clustermap_cobinding_enrichment_andrewplot.pdf')
-    plt.show()
