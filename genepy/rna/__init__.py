@@ -655,8 +655,9 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
     res.to_csv(folder+'_qc_results.csv')
     if plot and len(res)>0:
         h.createFoldersFor(folder)
-        _, ax = plt.subplots(figsize=(10, 10))
-        plot = sns.heatmap(res, ax=ax)
+        _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
+        plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
+        plt.yticks(rotation = 0)
         plt.show()
         plot.get_figure().savefig(folder+'failed_qc.pdf')
 
@@ -675,6 +676,7 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                 ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
         plt.tight_layout()
+        plt.show()
         plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
