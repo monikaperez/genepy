@@ -97,7 +97,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
     return(renamed, not_parsed)
 
 
-def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
+async def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa', pairedEnd=False, cores=1,
                             pathtosam='samtools', pathtotrim_galore='trim_galore', pathtobwa='bwa',
                             totrim=True, tomap=True, tofilter=True, results='res/', toremove=False):
     """
@@ -210,7 +210,7 @@ def getSpikeInControlScales(refgenome, fastq=None, fastQfolder='', mapper='bwa',
     return norm, mapped,  # unique_mapped
 
 
-def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
+async def GSEAonExperiments(data, experiments, res={}, savename='', scaling=[], geneset='GO_Biological_Process_2015',
                       cores=8, cleanfunc=lambda i: i.split('(GO')[0]):
     """
 
@@ -553,7 +553,7 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     return results
 
 
-def gsva(data, geneset_file, pathtogenepy, method='ssgsea'):
+async def gsva(data, geneset_file, pathtogenepy, method='ssgsea'):
   print('you need to have R installed with GSVA and GSEABase library installed')
   data.to_csv('/tmp/data_genepyhelper_gsva.csv')
   cmd = "Rscript "+pathtogenepy + \
@@ -655,8 +655,9 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
     res.to_csv(folder+'_qc_results.csv')
     if plot and len(res)>0:
         h.createFoldersFor(folder)
-        _, ax = plt.subplots(figsize=(10, 10))
-        plot = sns.heatmap(res, ax=ax)
+        _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
+        plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
+        plt.yticks(rotation = 0)
         plt.show()
         plot.get_figure().savefig(folder+'failed_qc.pdf')
 
@@ -675,6 +676,7 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                 ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
         plt.tight_layout()
+        plt.show()
         plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
