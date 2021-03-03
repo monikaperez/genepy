@@ -310,9 +310,17 @@ def extractPath(val):
     return 'gs://' + val.split('gs://')[1].split('#')[0]
 
 
-def extractHash(val):
+def extractHash(val, typ="crc32c"):
     """
     extract the crc32 from the string returned by an ls -L command
+
+    Args:
+    ----
+        type: flag ['crc32c','md5']
     """
-    if '    Hash (crc32c):' in val:
+    if '    Hash (crc32c):' in val and typ=="crc32c":
         return val.split('    Hash (crc32c):          ')[-1].split('\\\\n')[0].split('\\n')[0]
+    elif '    Hash (md5):' in val and typ == "md5":
+        return val.split('    Hash (md5):          ')[-1].split('\\\\n')[0].split('\\n')[0]
+    else:
+        return None
