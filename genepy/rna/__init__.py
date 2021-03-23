@@ -7,9 +7,10 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
+from scipy.stats import pearsonr
 from genepy.rna import pyDESeq2
 from genepy.utils import helper as h
-import pdb
+import math
 import os
 import seaborn as sns
 import gseapy
@@ -700,8 +701,9 @@ def getDifferencesFromCorrelations(df1, df2, minsimi=0.99999999999999):
 
 def rnaseqcorrelation(cn, rna, ax=None, name=None):
   """
-  correlates the copy number to the rnaseq in ccle and shows the plot
+  correlates gene copy number matrix to an expression count matrix
 
+  Shows the correlation plots.
   Gene names should be thee same ones, sample names as welll
   """
   a = set(cn.columns) & set(rna.columns)
