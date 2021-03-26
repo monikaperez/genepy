@@ -426,10 +426,10 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
                 yname.append(name2)
                 if pvals is not None:
                     height.append(max(0.1, min(0.9, pvals[i, j])))
-                    color.append(cc.coolwarm[int((data[i, j]*128)+127)])
+                    color.append(cc.coolwarm[int((data[i, j]*127)+127)])
                     alpha.append(min(abs(data[i, j]), 0.9))
                 elif other is not None:
-                    color.append(cc.coolwarm[int((data[i, j]*128)+127)])
+                    color.append(cc.coolwarm[int((data[i, j]*127)+127)])
                     alpha.append(max(min(other[i, j], 0.9),0.1) if other[i, j]!=0 else 0)
                 else:
                     alpha.append(min(abs(data[i, j]), 0.9))
