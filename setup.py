@@ -2,7 +2,7 @@ from setuptools import setup
 import sys
 import os
 if sys.version_info.major < 3 or sys.version_info.minor < 2:
-    raise ValueError("genepy is only compatible with Python 3.3 and below")
+    raise ValueError("genepy is only compatible with Python 3.3 and above")
 if sys.version_info.minor < 5:
     import warnings
     warnings.warn("genepy may not function properly on Python < 3.5")
