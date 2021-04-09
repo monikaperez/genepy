@@ -702,7 +702,7 @@ async def shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_len
     if (len(cmd) > arg_max_length) | (n==len(togiveaccess)-1):
         if n < len(togiveaccess)-1:
             cmd = oldcmd
-        print('granting access to {:d} files'.format(n))
+        print('granting access to {:d} files'.format(n+1))
         with open('/tmp/grantaccess{:d}.sh'.format(n), 'w') as f:
           f.write(cmd)
         code = os.system(cmd)
