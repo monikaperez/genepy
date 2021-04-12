@@ -14,7 +14,7 @@ from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, PrintfTickF
 from bokeh.models import ColumnDataSource, LinearColorMapper, LogColorMapper
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
-from bokeh.io import show
+from bokeh.io import show, export_svg
 from bokeh.plotting import *
 import bokeh
 import colorcet as cc
@@ -90,13 +90,14 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
         labels = LabelSet(x='x', y='y', text='labels', level='glyph', text_font_size='9pt',
                           x_offset=5, y_offset=5, source=source, render_mode='canvas')
         p.add_layout(labels)
+    p.output_backend = "svg"
     try:
         show(p)
     except:
         show(p)
     if folder:
       save(p, folder + title.replace(' ', "_") + "_scatter.html")
-      #export_png(p, filename=folder + title.replace(' ', "_") + "_scatter.png")
+      export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
     return p
 
 
@@ -149,15 +150,14 @@ def bigScatter(data, precomputed=False, logscale=False, features=False,
             tooltips=names,
             mode="mouse", point_policy="follow_mouse", renderers=[r] if not precomputed else None
         ))
-
+    p.output_backend = "svg"
     try:
         show(p)
     except:
         show(p)
     if folder:
       save(p, folder + title.replace(' ', "_") + "_scatter.html")
-      #export_png(p, filename=folder + title.replace(' ', "_") + "_scatter.png")
-
+      export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
     return p
 
 
@@ -225,9 +225,10 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
         hline = Span(location=val, dimension='width',
                      line_color='green', line_width=0.2)
         p.renderers.extend([hline])
+    p.output_backend = "svg"
     if folder:
       save(p, folder + title.replace(' ', "_") + "_cn_plot.html")
-      #export_png(p, filename=folder + title.replace(' ', "_") + "_cn_plot.png")
+      export_svg(p, filename=folder + title.replace(' ', "_") + "_cn_plot.svg")
     show(p)      # show the plot
     return p
 
@@ -300,9 +301,10 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
       console.log(source)
       """))
         p = column(text, p)
+    p.output_backend = "svg"
     if folder:
       save(p, folder + title.replace(' ', "_") + "_volcano.html")
-      #export_png(p, filename=folder + title.replace(' ', "_") + "_volcano.png")
+      export_svg(p, filename=folder + title.replace(' ', "_") + "_volcano.svg")
     try:
         show(p)
     except:
@@ -481,13 +483,13 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
         p.axis.major_label_text_font_size = "5pt"
         p.axis.major_label_standoff = 0
         p.xaxis.major_label_orientation = np.pi / 3
-
+        p.output_backend = "svg"
         p.rect('xname', 'yname', width = 0.9 if not width else 'width',
                 height = 0.9 if not height else 'height', source=data,
                color='colors', alpha='alphas', line_color=None,
                hover_line_color='black', hover_color='colors')
         save(p, folder + title.replace(' ', "_") + "_correlation.html")
-        #export_png(p, filename=folder + title.replace(' ', "_") + "_correlation.png")
+        export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
         try:
             show(p)
         except:
@@ -611,13 +613,13 @@ def heatmap(data, colors=None, title="correlation Matrix", size=40,
         p.axis.major_label_text_font_size = "5pt"
         p.axis.major_label_standoff = 0
         p.xaxis.major_label_orientation = np.pi / 3
-
+        p.output_backend = "svg"
         p.rect('xname', 'yname', width = 0.9 if not width else 'width',
                 height = 0.9 if not height else 'height', source=data,
                color='colors', alpha='alphas', line_color=None,
                hover_line_color='black', hover_color='colors')
         save(p, folder + title.replace(' ', "_") + "_heatmap.html")
-        #export_png(p, filename=folder + title.replace(' ', "_") + "_correlation.png")
+        export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
         try:
             show(p)
         except:
