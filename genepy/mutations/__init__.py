@@ -4,11 +4,11 @@
 
 from __future__ import print_function
 
-import pdb
-import ipdb
 import pandas as pd
 import numpy as np
-
+from genepy.utils import helper as h
+import gzip
+import seaborn as sns
 from taigapy import TaigaClient
 tc = TaigaClient()
 
@@ -97,7 +97,7 @@ def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutN
     sample_col: str colname for samples
     boolify: bool whether or not to convert the matrix into a boolean (mut/no mut)
     freqcol: str colname where ref/alt frequencies are stored
-    mutNameCol: str colname where mutation names are stored
+    mutNameCol: str colname where mutation names are stored, will merge things over that column name
 
   Returns:
   --------
@@ -255,6 +255,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
         # the rest to the other
         l.append([val[Chromosome], val[Start] - int(sizeofgap / 2), val[End]])
       elif val[Start] < prevend:  # this should never happen
+        # import pdb; pdb.set_trace()
         raise ValueError("start comes after end")
       else:
         l.append([val[Chromosome], val[Start], val[End]])
@@ -264,7 +265,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
   l[-1][2] = 1000000000 if cyto is None else cyto[cyto['chrom']
                                                   == prevchr]['end'].values[-1]
   segments[[Chromosome, Start, End]] = l
-  return segments
+  return segments.reset_index(drop=True)
 
 
 def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
@@ -291,13 +292,17 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
     j = 0
     h.showcount(i, len(samples))
     for k, gene in enumerate(gene_mapping[['Chromosome', 'start', 'end']].values):
+        #print(i,j)
         if gene[0] in hasmissing:
           data[i, k] = np.nan
           continue
-        while gene[0] != segs[j][0] or gene[1] >= segs[j][2]:
-          #print("went beyong",gene, segs[j])
-          j += 1
-        # some genes are within other genes, we need to go back in the list of segment in that case
+        try:
+          while gene[0] != segs[j][0] or gene[1] >= segs[j][2]:
+            #print("went beyong",gene, segs[j])
+            j += 1
+          # some genes are within other genes, we need to go back in the list of segment in that case
+        except:
+          raise ValueError('forgot to sort one of the DF?')
         while gene[1] < segs[j][1]:
           j -= 1
           #print("decrease gene",gene)
@@ -311,7 +316,7 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
           # print('coef',coef)
           val = segs[j][3] * coef if style == "weighted" else segs[j][3]
           end = segs[j][2]
-          # until the end of a segments goes beyon the end of the gene (say if we have X segments within the gene)
+          # until the end of a segments goes beyond the end of the gene (say if we have X segments within the gene)
           while end < gene[2]:
             # pdb.set_trace()
             j += 1
@@ -346,7 +351,6 @@ def checkAmountOfSegments(segmentcn, thresh=850, samplecol="DepMap_ID"):
     thresh: max ok amount
   """
   failed = []
-  segmentcn = renameColumns(segmentcn)
   celllines = set(segmentcn[samplecol].tolist())
   amounts = []
   for cellline in celllines:

@@ -185,7 +185,7 @@ def createFoldersFor(filepath):
     will recursively create folders if needed until having all the folders required to save the file in this filepath
     """
     prevval = ''
-    for val in filepath.split('/')[:-1]:
+    for val in os.path.expanduser(filepath).split('/')[:-1]:
         prevval += val + '/'
         if not os.path.exists(prevval):
             os.mkdir(prevval)
@@ -446,7 +446,7 @@ def compareDfs(df1, df2):
 
 def stringifydict(res):
     """
-    
+
     """
     a = {}
     for k, v in res.items():
@@ -459,7 +459,7 @@ def stringifydict(res):
 
 def readXMLs(folder=None, file=None, rename=None):
     if file is not None:
-        if type(file) is str: 
+        if type(file) is str:
             print('reading 1 file')
             files = [file]
         else:

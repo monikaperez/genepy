@@ -10,6 +10,9 @@ import re
 import pandas as pd
 import numpy as np
 
+from genepy.google import gcp
+from genepy.utils import helper as h
+
 from taigapy import TaigaClient
 tc = TaigaClient()
 
@@ -48,7 +51,7 @@ def fromGTF2BED(gtfname, bedname, gtftype='geneAnnot'):
         prevname = ''
         newbed = {'chr': [], 'start': [], 'end': [], 'gene': []}
         for i, val in gtf.iterrows():
-            showcount(i, len(gtf))
+            h.showcount(i, len(gtf))
             if val['name'] == prevname:
                 newbed['end'][-1] = val['stop']
             else:
@@ -107,16 +110,21 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
     return DTs
 
 
-def indexBams(bucketpath, cores=4):
-    """
-    given a bucket path, will index all .bam files without an associated index and return their paths
-    """
-    files = gcp.lsFiles([bucketpath])
-    bams = [val for val in files if '.bam' in val[-4:]]
-    unindexed = [val for val in bams if val[:-4]+'.bai' not in files and val[:4] +'.bam.bai' not in files]
-    print("found "+str(len(unindexed))+" files to reindex")
-    h.parrun(["export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` && samtools index "+val for val in unindexed], cores)
-    return {val: val[:-4]+".bam.bai" for val in unindexed}
+async def indexBams(bams=None, bucketpath=None, cores=4):
+	"""
+	given a bucket path, will index all .bam files without an associated index and return their paths
+	"""
+	if bams is None:
+		if bucketpath is None:
+			raise ValueError('need one of bams or bucketpath')
+		files = gcp.lsFiles([bucketpath])
+		bams = [val for val in files if '.bam' in val[-4:]]
+		unindexed = [val for val in bams if val[:-4]+'.bai' not in files and val[:4] +'.bam.bai' not in files]
+		print("found "+str(len(unindexed))+" files to reindex")
+	else:
+		unindexed = bams
+	h.parrun(["export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` && samtools index "+val for val in unindexed], cores)
+	return {val: val[:-4]+".bam.bai" for val in unindexed}
 
 
 
@@ -191,7 +199,6 @@ def findReplicatesBams(folder, sep='-', namings='-r([0-9])', namepos=2):
 		if val[-4:] == '.bam':
 			match = re.search(namings, val)
 			if match:
-				number = match.groups()[0]
 				name = val.split(sep)[namepos]
 				if name in rep:
 					rep[name].append(val)
@@ -226,7 +233,7 @@ def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
 	# run the paired end pipeline
 	"""
 	print("you need to have bowtie2 installed: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml")
-	for key, val in pairedend.items():
+	for _, val in pairedend.items():
 		out1 = folder + mappedFolder + val[0].split('.')[0] + ".mapped.sam"
 		in1 = folder + val[0]
 		in2 = folder + val[1]
@@ -241,10 +248,11 @@ def pairedEnd(pairedend, folder="", numthreads=8, peaksFolder="peaks/",
 		# it can take many TB so better delete
 
 
-def mergeBams(rep):
+async def mergeBams(rep):
 	"""
 	uses samtools to merge a set of replicates considered into one file
 	"""
+	in1 =''
 	for i, val in rep.items():
 		out1 = i + '.merged.bam'
 		for bam in val:
