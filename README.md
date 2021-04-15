@@ -56,6 +56,11 @@ from genepy.epigenetics import chipseq
 
 ```
 
+## data:
+
+hg38 genome sizes: from https://github.com/igvteam/igv/blob/master/genomes/sizes/hg38.chrom.sizes
+
+
 ## installation: to get access to all bindings
 
 Install the following tools:

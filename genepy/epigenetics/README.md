@@ -13,7 +13,7 @@ Especially targeted to functions related to the analysis of epigenomics data. It
 - putInBed: given a conscensus bed-like dataframe and another one, will merge the second one into the first
 - pairwiseOverlap: compute pairwise overlap and correlation on this overlap for a set of peaks mappe to a conscensus 
 - enrichment: compute pairwise enrichment and correlation for a set of peaks mappe to a conscensus 
-- fullDiffPeak: will use macs2 to call differential peak binding from two bam files and their control
+- fullDiffPeak: will use macs3 to call differential peak binding from two bam files and their control
 - diffPeak: calls MACS2 bdgdiff given some parameters
 - MakeSuperEnhancers: Calls super enhancer from H3K27ac with the ROSE algorithm
 - runChromHMM: runs the chromHMM algorithm

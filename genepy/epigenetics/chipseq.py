@@ -545,7 +545,7 @@ def refineGroupsWithHiC():
 async def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=None, directory='diffData/',
          res_directory="diffPeaks/", isTF=False, compute_size=True, pairedend=True):
   """
-  will use macs2 to call differential peak binding from two bam files and their control
+  will use macs3 to call differential peak binding from two bam files and their control
 
   one can also provide some spike in scaling information
 
@@ -560,12 +560,12 @@ async def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=N
   directory: str the directory where to save the produced data
   res_directory: str the directory where to save the results
   isTF: bool true if TF else false (will change the size)
-  compute_size: bool whether to compute the extsize value with `macs2 predictd`
+  compute_size: bool whether to compute the extsize value with `macs3 predictd`
   pairedend: bool if paired end
 
   Returns:
   -------
-    str the log of the macs2 bdgdiff command
+    str the log of the macs3 bdgdiff command
   """
   print("doing diff from " + bam1 + " and " + bam2)
   if scaling is not None:
@@ -580,7 +580,7 @@ async def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=N
       size = 200
   if compute_size:
     print('computing the fragment avg size')
-    cmd = "macs2 predictd -i " + bam1
+    cmd = "macs3 predictd -i " + bam1
     ret = subprocess.run(cmd, capture_output=True, shell=True)
     size = re.findall("# predicted fragment length is (\d+)", str(ret.stderr))[0]
     print(size)
@@ -589,8 +589,8 @@ async def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=N
   pairedend = "BAMPE" if pairedend else "BAM"
   if control2 is None:
     control2 = control1
-  cmd1 = "macs2 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + str(size) + " -n " + name1 + " --outdir " + directory + " -f " + pairedend
-  cmd2 = "macs2 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + str(size) + " -n " + name2 + " --outdir " + directory + " -f " + pairedend
+  cmd1 = "macs3 callpeak -B -t " + bam1 + " -c " + control1 + " --nomodel --extsize " + str(size) + " -n " + name1 + " --outdir " + directory + " -f " + pairedend
+  cmd2 = "macs3 callpeak -B -t " + bam2 + " -c " + control2 + " --nomodel --extsize " + str(size) + " -n " + name2 + " --outdir " + directory + " -f " + pairedend
   print('computing the scaling values')
   ret = subprocess.run(cmd1, capture_output=True, shell=True)
   print(ret.stderr)
@@ -606,9 +606,9 @@ async def fullDiffPeak(bam1, bam2, control1, size=None, control2=None, scaling=N
     scaling1 = int(scaling1/scaling[0])
     scaling2 = int(scaling2/scaling[1])
   print(scaling1, scaling2)
-  return diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg",
+  return (await diffPeak(directory+name1+"_treat_pileup.bdg", directory+name2+"_treat_pileup.bdg",
     directory+name1+"_control_lambda.bdg", directory+name2+"_control_lambda.bdg",
-    res_directory, scaling1, scaling2, size)
+    res_directory, scaling1, scaling2, size))
 
 
 async def diffPeak(name1, name2, control1, control2, res_directory, scaling1, scaling2, size):
@@ -628,10 +628,10 @@ async def diffPeak(name1, name2, control1, control2, res_directory, scaling1, sc
 
   Returns:
   -------
-    str the log of the macs2 bdgdiff command
+    str the log of the macs3 bdgdiff command
   """
   print("doing differential peak binding")
-  cmd = "macs2 bdgdiff --t1 " + name1 + " --c1 "
+  cmd = "macs3 bdgdiff --t1 " + name1 + " --c1 "
   cmd += control1+" --t2 " + name2 +" --c2 " + control2
   cmd += " --d1 " + str(scaling1) + " --d2 " + str(scaling2) + " -g 60 "
   cmd += "-l " + str(size) + " --o-prefix " + name1.split('/')[-1].split('.')[0] + "_vs_"

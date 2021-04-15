@@ -469,6 +469,6 @@ def findAdditionalPeaks(peaks, tolookfor, filepath, sampling=1000, mincov=4,
 				la = poissonFit((zone/lamb[val.chrom][1]).astype(int))
 				kl = KLpoisson(la, lamb[val.chrom][0])
 				if kl > minKL:
-					res[i] = max(zone) / cov[val.chrom]  # foldchange from macs2
+					res[i] = max(zone) / cov[val.chrom]  # foldchange from macs3
 
 	return res
