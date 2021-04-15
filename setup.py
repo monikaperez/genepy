@@ -24,7 +24,7 @@ setup(
               'genepy/epigenetics', 'genepy/mutations', 'genepy/google', 'genepy/sequencing/',
               'genepy/terra', 'genepy/rna', 'genepy/utils'],
     package_data={'genepy': ['data/*']},
-    python_requires='>=3.5',
+    python_requires='>=3.8',
     install_requires=[
         'rpy2-bioconductor-extensions',
         'gseapy',
@@ -32,13 +32,14 @@ setup(
         'deeptools',
         ## from requirements.txt
         "bokeh",
-        "firecloud-dalmatian",
-        "google_api_python_client",
+        "colorcet",
+        "firecloud_dalmatian",
+        "gseapy",
         "gsheets",
         "gspread",
-        "ipython",
         "matplotlib",
         "numpy",
+        "oauth2client",
         "pandas",
         "Pillow",
         "pybedtools",
@@ -47,12 +48,12 @@ setup(
         "pytest",
         "requests",
         "rpy2",
-        "scikit-learn",
+        "itermplot",
+        "scikit_learn",
         "scipy",
         "seaborn",
-        "setuptools",
+        "statsmodels",
         "taigapy",
-        "typing",
         "venn",
         ],  # external packages as dependencies
     classifiers=[
@@ -69,7 +70,8 @@ print("You might want to install Bowtie2, samtools, bwa and R to be able to use 
   https://github.com/lh3/bwa\n")
 
 print("trying to install R packages")
-os.system("R -e 'if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));'")
+os.system(
+    "R -e \"if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\", repos=\"http://cran.us.r-project.org\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));\"")
 print('if it did not work. please install R or check your R installation')
 print("once R is installed you need to install erccdashboard, GSEABase GSVA, DESeq2 to have access to all the functions")
 
