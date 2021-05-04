@@ -10,6 +10,9 @@ from genepy.utils import helper as h
 import gzip
 import seaborn as sns
 from taigapy import TaigaClient
+from JKBio.utils import helper as h
+import seaborn as sns
+
 tc = TaigaClient()
 
 def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
@@ -84,7 +87,6 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
     a = pd.concat([a.drop(columns=sample), pd.DataFrame(
         data=res, columns=sorting, index=a.index)], axis=1)
   return a.drop(columns='format'), description
-
 
 
 def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol"):
@@ -376,3 +378,16 @@ def checkGeneChangeAccrossAll(genecn, thresh=0.2):
     thresh: threshold in logfold change accross all of them
   """
   return genecn.columns[genecn.var()<thresh].tolist()
+
+def renameColumns(df):
+  """
+  rename some of the main columns names from RSEM, GATK.. to more readable column names
+  Args:
+  -----
+    df: the df to rename
+  Returns:
+  ------
+    df the renamed df
+  """
+  return(df.rename(columns={'Sample': 'DepMap_ID', 'CONTIG': 'Chromosome', 'START': 'Start',
+                            'END': 'End', 'seqnames': 'Chromosome', 'start': 'Start', 'end': 'End'}))
