@@ -88,7 +88,7 @@ def lsFiles(files, add='', group=50):
             if "One or more URLs matched no objects" not in str(data.stderr):
                 raise ValueError('issue with the command: ' + str(data.stderr))
         if len(str(data.stdout)) < 4:
-            return 0
+            return []
         res += str(data.stdout)[2:-1].split('\\n')[:-1] if 'L' not in add else ['gs://' + i for i in str(data.stdout).split('\\ngs://')]
         if "TOTAL:" in res[-1] and 'L' not in add:
             res = res[:-1]
@@ -141,7 +141,7 @@ def catFiles(files, group=50, split=False, cut=False):
                 print(ValueError('issue with the command: ' + str(data.stderr)))
                 return res
         if len(str(data.stdout)) < 4:
-            return 0
+            return []
         resa = str(data.stdout)[2:-1]
         if cut:
             res += [resa[i * cut:(i + 1) * cut] for i in range(int(len(resa) / cut))]

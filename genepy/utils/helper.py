@@ -232,9 +232,9 @@ def randomString(stringLength=6, stype='all', withdigits=True):
       the string
     """
     if stype == 'lowercase':
-        lettersAndDigits = ascii_lowercase
+        lettersAndDigits = string.ascii_lowercase
     elif stype == 'uppercase':
-        lettersAndDigits = ascii_uppercase
+        lettersAndDigits = string.ascii_uppercase
     else:
         lettersAndDigits = string.ascii_letters
     if withdigits:
