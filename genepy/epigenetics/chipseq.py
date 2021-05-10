@@ -384,7 +384,7 @@ async def pairwiseOverlap(bedfile, norm=True, bedcol=8, correct=True, docorrelat
   return overlap, correlation if docorrelation else None
 
 
-async def enrichment(bedfile, bedcol=8, groups=None, correct=True, okpval=10**-3):
+async def enrichment(bedfile: pd.DataFrame, bedcol=8, groups=None, correct=True, okpval=10**-3):
   """
   compute pairwise enrichment and correlation for a set of peaks mappe to a conscensus 
 
