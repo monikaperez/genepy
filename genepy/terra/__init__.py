@@ -329,7 +329,7 @@ def addToPairSet(workspace, pairsetid, pairs):
 def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
                     pathto_stats='sample_statistics',
                     specific_cohorts=[],
-                    speicifc_celllines=[],
+                    specific_celllines=[],
                     is_from_pairs=True,
                     pathto_snv='filtered_variants',
                     pathto_seg='cnv_calls',
@@ -344,7 +344,7 @@ def saveOmicsOutput(workspace, pathto_cnvpng='segmented_copy_ratio_img',
     pathto_cnvpng: sample col of the CNV plot results
     pathto_stats: sample col of the bam QC results
     specific_cohorts: if provided, will only look for this specific
-    speicifc_celllines: if need to rrun on specific cell lines
+    specific_celllines: if need to rrun on specific cell lines
     is_from_pairs: if we process on pairs or samples data
     pathto_snv: sample col of the snv files
     pathto_seg: sample col of the segment files

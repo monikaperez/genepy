@@ -10,8 +10,6 @@ from genepy.utils import helper as h
 import gzip
 import seaborn as sns
 from taigapy import TaigaClient
-from JKBio.utils import helper as h
-import seaborn as sns
 
 tc = TaigaClient()
 
