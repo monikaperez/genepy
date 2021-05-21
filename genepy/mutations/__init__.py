@@ -87,7 +87,10 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   return a.drop(columns='format'), description
 
 
-def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol"):
+
+def mafToMat(maf, mode="bool", freqcol='tumor_f', 
+             samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol",
+             minfreqtocall=0.25):
   """
   turns a maf file into a matrix of mutations x samples (works with multiple sample file)
 
@@ -95,7 +98,9 @@ def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutN
   -----
     maf: dataframe of the maf file
     sample_col: str colname for samples
-    boolify: bool whether or not to convert the matrix into a boolean (mut/no mut)
+    mode: flag  "bool" to convert the matrix into a boolean (mut/no mut)
+                "float" to keep the allele frequencies as is (0.x)
+                "genotype" to have either 1, 0.5 or 0
     freqcol: str colname where ref/alt frequencies are stored
     mutNameCol: str colname where mutation names are stored, will merge things over that column name
 
@@ -103,18 +108,20 @@ def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutN
   --------
     the dataframe matrix
   """
-  maf = maf.sort_values(by=mutNameCol)
   samples = set(maf[samplesCol])
+  maf = maf[maf[freqcol]>=minfreqtocall]
+  maf = maf.sort_values(by=mutNameCol)
   mut = pd.DataFrame(data=np.zeros((len(set(maf[mutNameCol])), 1)), columns=[
                       'fake'], index=set(maf[mutNameCol])).astype(float)
   for i, val in enumerate(samples):
     h.showcount(i, len(samples))
     mut = mut.join(maf[maf[samplesCol] == val].drop_duplicates(
         mutNameCol).set_index(mutNameCol)[freqcol].rename(val))
-  return mut.fillna(0).astype(bool if boolify else float).drop(columns=['fake'])
+  mut = mut.fillna(0).astype(bool if mode=="bool" else float).drop(columns=['fake'])
+  return mut
 
 
-def mergeAnnotations(firstmaf, additionalmaf, Genome_Change="Genome_Change",
+def mergeAnnotations(firstmaf, additionalmaf, mutcol="mutation", Genome_Change="Genome_Change",
 Start_position="Start_position", Chromosome="Chromosome", samplename="DepMap_ID",
 useSecondForConflict=True, dry_run=False):
   """
@@ -166,7 +173,11 @@ useSecondForConflict=True, dry_run=False):
             set(subother.ind))]
       mutations = mutations.append(additionalmaf[additionalmaf['ind'].isin(
           set(additionalmaf['ind']) - set(mutations['ind']))])
-    return mutations.drop(columns=['loci', 'ind']).sort_values(by=[samplename, Chromosome, Start_position])
+    subother = additionalmaf[additionalmaf.loci.isin(
+        inboth) & ~additionalmaf.ind.isin(notineach)].set_index("ind")
+    mutations = mutations.set_index("ind")
+    mutations.loc[subother.index.tolist(), mutcol] = subother[mutcol].tolist()
+    return mutations.drop(columns=['loci']).sort_values(by=[samplename, Chromosome, Start_position]).reset_index(drop=True)
   else:
     return issues
 
@@ -243,7 +254,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
       # we extend the previous segment (last of the prev chrom) to.. way enough
       if len(l) > 0:
         l[-1][2] = 1000000000 if cyto is None else cyto[cyto['chrom']
-                                                        == prevchr]['end'].values[-1]
+                                                      == prevchr]['end'].values[-1]
       # we extend the first segment to 0
       l.append([val[Chromosome], 0, val[End]])
     else:

@@ -554,11 +554,11 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     return results
 
 
-async def gsva(data, geneset_file, pathtogenepy, method='ssgsea'):
+async def gsva(data, geneset_file, pathtogenepy="../", method='ssgsea'):
   print('you need to have R installed with GSVA and GSEABase library installed')
   data.to_csv('/tmp/data_genepyhelper_gsva.csv')
   cmd = "Rscript "+pathtogenepy + \
-      "/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
+      "genepy/genepy/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
     raise ValueError('issue with the command: ' + str(res))
@@ -791,10 +791,3 @@ def findClosestMatching(repprofiles, goodprofile, closest=False, returncorr=Fals
     return match, corr
   else:
     return match
-
-
-def renameFusionGene(a):
-  """
-  Given a fusion name from star-fusion, renames it
-  """
-  return [str(i.split('^')).replace(', ', ' (').replace("'", "")[1:-1]+')' for i in a]

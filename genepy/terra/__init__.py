@@ -956,10 +956,6 @@ def findFilesInWorkspaces(names=[], lookup=['**', '*.', '.*']):
                 res = res[:-1]
     return res
 
-def updateWorkflows(workflowIDs, path):
-    """
-    will download the latest version of workflows (from a list of workflowIDs) to a folder paths
-    """
 
 def uploadWorkflows(workspaceID, workflows, path=None):
     """

@@ -376,12 +376,17 @@ def datetoint(dt, split='-', unknown='U', order="des"):
     arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
   return [res] if type(res) is np.int64 else res
 
+prevshowcount = 100
 
 def showcount(i, size):
-  """
-  pretty print of i/size%, to put in a for loop
-  """
-  print(str(1 + int(100 * (i / size))) + '%', end='\r')
+    """
+    pretty print of i/size%, to put in a for loop
+    """
+    global prevshowcount
+    a = 1 + int(100 * (i / size))
+    if a != prevshowcount:
+        print(str(a) + '%', end='\r')
+        prevshowcount = a
 
 
 def combin(n, k):
