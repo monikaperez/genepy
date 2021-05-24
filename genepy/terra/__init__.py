@@ -467,13 +467,11 @@ def changeGSlocation(workspacefrom, newgs, workspaceto=None, prevgslist=[], inde
         print(['gsutil mv ' + a.iloc[i][col] + ' ' + v for i, v in enumerate(val)])
       else:
         print("mv "+str(a[col].tolist()) +" "+newgs)
-  if workspaceto is None:
-    wmto = wmfrom
-  else:
-    wmto = dm.WorkspaceManager(workspaceto)
   torename = pd.DataFrame(data=torename, index=[i for i in a.index.tolist() if i != 'nan'])
-  if not dry_run:
-    wmto.disable_hound().update_entity_attributes(entity, torename)
+  if workspaceto is not None:
+    wmto = dm.WorkspaceManager(workspaceto)
+    if not dry_run:
+      wmto.disable_hound().update_entity_attributes(entity, torename)
   return torename, flaglist
 
 
