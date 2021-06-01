@@ -12,6 +12,7 @@ import numpy as np
 
 from genepy.google import gcp
 from genepy.utils import helper as h
+from tqdm import tqdm
 
 from taigapy import TaigaClient
 tc = TaigaClient()
@@ -73,7 +74,7 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
 
     Args:
     -----
-      bams: the bams file|bucket paths 
+      bams: the bams file|bucket paths
       split: the splitter in the output date
       unknown: maybe the some dates can't be found the program will output unknown for them
       order: if 'asc', do d,m,y else do y,m,d
@@ -83,8 +84,7 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
       a list of likely dates or [unknown]s
     """
     DTs = []
-    for i, bam in enumerate(bams):
-        print(i / len(bams), end='\r')
+    for i, bam in enumerate(tqdm(bams)):
         data = os.popen('export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token`\
        && samtools view -H ' + bam + ' | grep "^@RG"')
         if data == signal.SIGINT:
@@ -163,7 +163,7 @@ def dropWeirdChromosomes(bedfile, keep=[], skip=0):
 def extractPairedSingleEndFrom(folder, sep='-', namepos=2):
 	"""
 	given a folder, find fastq files and sorts paired and single end based on the R1/R2 patterns
-		
+
 	Args:
 	-----
 		folder: the folder where the fastqs are
