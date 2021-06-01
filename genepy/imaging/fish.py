@@ -7,7 +7,7 @@ import pandas as pd
 
 
 # make a plot of averaged binned signal strength by distance from locis
-def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="group", 
+def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="group",
                           sclass='green', signal="mean_green", area="area"):
     """
     """
@@ -25,7 +25,7 @@ def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="gro
                 h.showcount(i, len(m))
                 dist.append(
                     distance_matrix(d[(d['class']==sclass)&
-                                      (d[groupcol]==v[groupcol])][['x', "y", "z"]].values, 
+                                      (d[groupcol]==v[groupcol])][['x', "y", "z"]].values,
                                     np.array([v[['x_mean', "y_mean", "z_mean"]]])).T[0].astype(float))
                 weight.append(d[(d['class'] == sclass)&(d[groupcol]==v[groupcol])][signal])
                 a = d[(d['class']==sclass) &
@@ -38,7 +38,7 @@ def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="gro
     return  twodists, dists
 
 
-def drawDots(dists, scenter=False, size=1000, zsize=1000, 
+def drawDots(dists, scenter=False, size=1000, zsize=1000,
              folder="", sscale=1, signal="signal",
              area="area", ** kwargs):
     """
@@ -62,11 +62,13 @@ def drawDots(dists, scenter=False, size=1000, zsize=1000,
 
         plt.show()
         plt.savefig(folder+''.join(k)+"_scatter_representation_size_to_center.pdf")
-        
+
 
 def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
               default_maxdist=None, distance_scale=1.2, areacol="area",
               mergedidcol='m_id'):
+    """
+    """
     idcount = 0
     merged = dots.copy()
     for group in set(dots[groupcol]):
@@ -75,9 +77,9 @@ def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
         gdot = dots[(dots[groupcol] == group)]
         maxdist = default_maxdist if default_maxdist else np.sqrt(
             gdot[areacol].mean() / 3.14) * distance_scale
-        
+
         gdot[mergedidcol]=None
-        
+
         pos = gdot[[xcol, ycol, zcol]].values
         dist = distance_matrix(pos, pos)
 
@@ -109,7 +111,7 @@ def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
     return merged
 
 
-def mergeAnnotated(annot, minzstack=2, groupdefault={}, todrop=[], coltocount="image", 
+def mergeAnnotated(annot, minzstack=2, groupdefault={}, todrop=[], coltocount="image",
                     id="m_id", colocName="cobinding"):
     """
     """
