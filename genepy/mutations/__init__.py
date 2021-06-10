@@ -279,7 +279,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
   return segments.reset_index(drop=True)
 
 
-def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
+def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y'], gene_names_col='gene_name'):
   """
   makes a geneXsample matrix from segment level copy number (works with multiple sample file)
 
@@ -347,7 +347,7 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
             end = segs[j][2]
             coef = ncoef
           data[i, k] = val if style == "weighted" else val / c
-  return pd.DataFrame(data=data, index=samples, columns=[i['symbol'] + ' (' + str(i['ensembl_id']) + ')' for _, i in gene_mapping.iterrows()])
+  return pd.DataFrame(data=data, index=samples, columns=gene_mapping[gene_names_col])
 
 
 def checkAmountOfSegments(segmentcn, thresh=850, samplecol="DepMap_ID"):
