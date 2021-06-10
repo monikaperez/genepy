@@ -8,8 +8,6 @@ import os
 import string
 import subprocess
 import pandas as pd
-import pdb
-import pandas as pd
 import numpy as np
 import itertools
 import random
@@ -537,7 +535,7 @@ def readXMLs(folder=None, file=None, rename=None):
 
 def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt"):
     """
-    make a df from cellosaurus data
+    make a df from cellosaurus' human cancer cell line data
 
     Args:
     -----
