@@ -1,18 +1,11 @@
 # GCPFunction.py
 #
-
-import time
-import pandas as pd
 from google.cloud import storage
-import dalmatian as dm
-import numpy as np
 import os
-import pdb
 import subprocess
-import signal
 import re
 from genepy.utils import helper as h
-
+import signal
 
 def list_blobs_with_prefix(bucket_name, prefix, delimiter=None):
     """Lists all the blobs in the bucket that begin with the prefix.
@@ -324,3 +317,29 @@ def extractHash(val, typ="crc32c"):
         return val.split('    Hash (md5):          ')[-1].split('\\\\n')[0].split('\\n')[0]
     else:
         return None
+
+async def shareFiles(flist, users):
+  """
+  will share a list of files from gcp with a set of users.
+
+  Args:
+  ----
+    users: list[str] of users' google accounts
+    flist: list[str] of google storage path for which you want to share data
+
+  """
+  if type(users) is str:
+    users = [users]
+  for user in users:
+    files = ''
+    for i in flist:
+      files += ' ' + i
+    code = os.system("gsutil -m acl ch -ru " + user + ":R " + files)
+    if code == signal.SIGINT:
+      print('Awakened')
+      break
+  print('the files are stored here:\n\n')
+  print(flist)
+  print('\n\njust install and use gsutil to copy them')
+  print('https://cloud.google.com/storage/docs/gsutil_install')
+  print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
