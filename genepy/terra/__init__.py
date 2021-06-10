@@ -107,10 +107,11 @@ def removeSamples(workspace, samples):
   except:
     print('we had pairs.')
     pairs = wm.get_pairs()
-    pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
-    for k, val in wm.get_pair_sets().iterrows():
-      wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
-    wm.delete_pair(pairid)
+    if len(pairs) >0:
+      pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
+      for k, val in wm.get_pair_sets().iterrows():
+        wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
+      wm.delete_pair(pairid)
     wm.delete_sample(samples)
 
 
@@ -716,8 +717,7 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
   print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
   return togiveaccess
 
-
-def saveConfigs(workspace, filepath):
+def saveWorkspace(workspace, folderpath):
   """
   will save everything about a workspace into a csv and json file
 
@@ -726,18 +726,25 @@ def saveConfigs(workspace, filepath):
     workspace: str namespace/workspace from url typically
       namespace (str): project to which workspace belongs
       workspace (str): Workspace name
-    filepath to save files
+    folderpath: str path to save files
   """
   wm = dm.WorkspaceManager(workspace)
-  h.createFoldersFor(filepath)
+  h.createFoldersFor(folderpath)
 
   conf = wm.get_configs()
-  conf.to_csv(filepath + '.csv')
+  for k,val in conf.iterrows():
+    with open(folderpath+val['name']+".wdl", "w") as f:
+      f.write(dm.get_wdl('/'.join(val[[
+              'methodNamespace', 'methodName', 'methodVersion']].astype(str).tolist())))
+  conf.to_csv(folderpath + 'worflow_list.csv')
   params = {}
   params['GENERAL'] = wm.get_workspace_metadata()
   for k, val in conf.iterrows():
     params[k] = wm.get_config(val['name'])
-  h.dictToFile(params, filepath + '.json')
+    h.dictToFile(params[k]['inputs'], folderpath +"inputs_" +val['name']+'.json')
+    h.dictToFile(params[k], folderpath +"conf_" +val['name']+'.json')
+    h.dictToFile(params[k]['outputs'], folderpath + "outputs_" + val['name']+'.json')
+  h.dictToFile(params, folderpath + 'all_configs.json')
 
 
 async def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['workspace', 'scripts',
