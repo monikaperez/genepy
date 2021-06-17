@@ -73,7 +73,7 @@ def drawDots(dists, scenter=False, size=1000, zsize=1000,
       n=None
     ax=sns.kdeplot(data=a[['x', 'y', signal]].astype(float),
                  x='x', fill=True, y='y', weights=signal, color=color,
-                   shade_lowest=False, levels=levels, cbar=m[i] == max(m),
+                  thresh=False, levels=levels, cbar=m[i] == max(m),
                  hue_norm=n, 
                  vmin=vmin/(m[i]/max(m)), vmax=vmax/(m[i]/max(m)))  # (None, max(sm)/sca) if norm is None else norm)
     if second is not None:
