@@ -87,10 +87,9 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   return a.drop(columns='format'), description
 
 
-
-def mafToMat(maf, mode="bool", freqcol='tumor_f', 
+def mafToMat(maf, mode="bool", freqcol='tumor_f',
              samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol",
-             minfreqtocall=0.25):
+             minfreqtocall=0.1):
   """
   turns a maf file into a matrix of mutations x samples (works with multiple sample file)
 
@@ -109,15 +108,27 @@ def mafToMat(maf, mode="bool", freqcol='tumor_f',
     the dataframe matrix
   """
   samples = set(maf[samplesCol])
-  maf = maf[maf[freqcol]>=minfreqtocall]
+  maf = maf[maf[freqcol] >= minfreqtocall]
   maf = maf.sort_values(by=mutNameCol)
   mut = pd.DataFrame(data=np.zeros((len(set(maf[mutNameCol])), 1)), columns=[
-                      'fake'], index=set(maf[mutNameCol])).astype(float)
+      'fake'], index=set(maf[mutNameCol])).astype(float)
   for i, val in enumerate(samples):
     h.showcount(i, len(samples))
-    mut = mut.join(maf[maf[samplesCol] == val].drop_duplicates(
-        mutNameCol).set_index(mutNameCol)[freqcol].rename(val))
-  mut = mut.fillna(0).astype(bool if mode=="bool" else float).drop(columns=['fake'])
+    if mode == "genotype":  # if mode:
+      import pdb
+      pdb.set_trace()
+      mut = mut.join(maf[maf[samplesCol] == val].set_index(mutNameCol)[freqcol].groupby(
+          mutNameCol).agg('sum').rename(val))
+    else:
+      mut = mut.join(maf[maf[samplesCol] == val].drop_duplicates(
+          mutNameCol).set_index(mutNameCol)[freqcol].rename(val))
+  mut = mut.fillna(0).astype(
+      bool if mode == "bool" else float).drop(columns=['fake'])
+  if mode == "dez":
+    mut[(mut > 1.3)] = 3
+    mut[(mut >= 0.8) & (mut <= 1.3)] = 2
+    mut[(mut > .2) & (mut < .8)] = 1
+    mut[mut <= .2] = 0
   return mut
 
 

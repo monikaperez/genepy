@@ -533,148 +533,160 @@ def readXMLs(folder=None, file=None, rename=None):
   return df
 
 
-def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt"):
-    """
-    make a df from cellosaurus' human cancer cell line data
+def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt",
+  reload=False):
+  """
+  make a df from cellosaurus' human cancer cell line data
 
-    Args:
-    -----
-      ftp str the ftp link to the cellosaurus latest txt db export
+  Args:
+  -----
+    ftp str the ftp link to the cellosaurus latest txt db export
 
-    Returns:
-    -------
-      pd.DataFrame indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
-      "sex", "patient_id", "parent_id", "date", "synonyms", "has_issues", "comments"
-    """
-    print('make sure to have wget installed')
+  Returns:
+  -------
+    pd.DataFrame indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
+    "sex", "patient_id", "parent_id", "date", "synonyms", "has_issues", "comments"
+  """
+  print('make sure to have wget installed')
+  if reload or not os.path.exists('/tmp/cellosaurus.txt'):
     subprocess.run('wget '+ ftp +' -O /tmp/cellosaurus.txt')
-    l = open('cellosaurus.txt', 'r')
-    print("""
+  l = open('/tmp/cellosaurus.txt', 'r')
+  print("""
 
-     ---------  ---------------------------     ----------------------
-     Line code  Content                         Occurrence in an entry
-     ---------  ---------------------------     ----------------------
-     ID         Identifier (cell line name)     Once; starts an entry
-     AC         Accession (CVCL_xxxx)           Once
-     AS         Secondary accession number(s)   Optional; once
-     SY         Synonyms                        Optional; once
-     DR         Cross-references                Optional; once or more
-     RX         References identifiers          Optional: once or more
-     WW         Web pages                       Optional; once or more
-     CC         Comments                        Optional; once or more
-     ST         STR profile data                Optional; once or more
-     DI         Diseases                        Optional; once or more
-     OX         Species of origin               Once or more
-     HI         Hierarchy                       Optional; once or more
-     OI         Originate from same individual  Optional; once or more
-     SX         Sex of cell                     Optional; once
-     AG         Age of donor at sampling        Optional; once
-     CA         Category                        Once
-     DT         Date (entry history)            Once
-     //         Terminator                      Once; ends an entry
+    ---------  ---------------------------     ----------------------
+    Line code  Content                         Occurrence in an entry
+    ---------  ---------------------------     ----------------------
+    ID         Identifier (cell line name)     Once; starts an entry
+    AC         Accession (CVCL_xxxx)           Once
+    AS         Secondary accession number(s)   Optional; once
+    SY         Synonyms                        Optional; once
+    DR         Cross-references                Optional; once or more
+    RX         References identifiers          Optional: once or more
+    WW         Web pages                       Optional; once or more
+    CC         Comments                        Optional; once or more
+    ST         STR profile data                Optional; once or more
+    DI         Diseases                        Optional; once or more
+    OX         Species of origin               Once or more
+    HI         Hierarchy                       Optional; once or more
+    OI         Originate from same individual  Optional; once or more
+    SX         Sex of cell                     Optional; once
+    AG         Age of donor at sampling        Optional; once
+    CA         Category                        Once
+    DT         Date (entry history)            Once
+    //         Terminator                      Once; ends an entry
 
-    """)
-    v = []
-    CL=False
-    Homo=False
-    age = "U"
-    sex = "U"
-    date = "U"
-    parent = ""
-    ID = ""
-    SY = ""
-    DI = ""
-    depmap = ''
-    lid = None
-    individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-    hasIssues=False
-    comments=[""]
-    cl = {}
-    while True:
-        # Get next line from file
-        line = l.readline()
-        # if line is empty
-        # end of file is reached
-        if not line:
-            break
-        else:
-            line = line[:-1]
-        if line[:2]=="AC":
-            lid = line[5:]
-            if lid in cl:
-                lid=None
-        elif line[:2] =="//":
-            if CL and Homo and (lid is not None) and ID:
-                v.append(depmap)
-                v.append(ID)
-                v.append(DI)
-                v.append(age)
-                v.append(sex)
-                v.append(individual)
-                v.append(parent)
-                v.append(date)
-                v.append(SY)
-                v.append(hasIssues)
-                v.append(', '.join(comments))
-                cl.update({lid: v})
-            v = []
-            CL=False
-            Homo=False
-            age = ""
-            sex = ""
-            date = ""
-            parent = ""
-            ID = ""
-            SY = ""
-            DI = ""
-            depmap = ''
-            lid = None
-            individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-            hasIssues=False
-            comments=[""]
-        elif line[:2] == "HI":
-            parent = line[5:].split(' !')[0]
-        elif line[:2] == "OX":
-            if "Homo sapiens" in line:
-                Homo=True
-        elif line[:2] == "OI":
-            name = line[5:].split(' !')[0]
-            # adding its same id
-            if name in cl:
-                individual = cl[name][5]        
-        elif line[:2] == "ID":
-            ID = line[5:]
-        elif line[:2] == "SY":
-            SY = line[5:]
-        elif line[:2] == "DI":
-            DI = line[5:]
-        elif line[:2] == "DT":
-            date = line.split("Created: ")[-1].split(";")[0]
-        elif line[:2] == "DR":
-            if 'DepMap; ' in line:
-                depmap = line.split('DepMap; ')[-1]
-        elif line[:2] == "CA":
-            if 'Cancer cell line' in line:
-                CL=True
-        elif line[:2] == "AG":
-            age = line[5:]
-        elif line[:2] == "SX":
-            sex = line[5:]
-        elif line[:2] == "CC":
-            comments.append(line[5:])
-            if 'Problematic cell line:' in line:
-                hasIssues=True
+  """)
+  v = []
+  CL=False
+  Homo=False
+  age = "U"
+  sex = "U"
+  date = "U"
+  parent = ""
+  ID = ""
+  SY = ""
+  DI = ""
+  depmap = ''
+  lid = None
+  individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
+  hasIssues=False
+  comments=[""]
+  tofind={}
+  cl = {}
+  while True:
+    # Get next line from file
+    line = l.readline()
+    # if line is empty
+    # end of file is reached
+    if not line:
+      break
+    else:
+      line = line[:-1]
+    if line[:2]=="AC":
+      lid = line[5:]
+      if lid in cl:
+        lid=None
+    elif line[:2] =="//":
+      if ((CL and Homo and ID) or depmap) and (lid is not None) :
+        v.append(depmap)
+        v.append(ID)
+        v.append(DI)
+        v.append(age)
+        v.append(sex)
+        v.append(individual)
+        v.append(parent)
+        v.append(date)
+        v.append(SY)
+        v.append(hasIssues)
+        v.append(', '.join(comments))
+        cl.update({lid: v})
+      v = []
+      CL=False
+      Homo=False
+      age = ""
+      sex = ""
+      date = ""
+      parent = ""
+      ID = ""
+      SY = ""
+      DI = ""
+      depmap = ''
+      lid = None
+      individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
+      hasIssues=False
+      comments=[""]
+    elif line[:2] == "HI":
+      parent = line[5:].split(' !')[0]
+      if parent in cl:
+        individual = cl[parent][5]
+      else:
+        tofind.update({lid:parent})
+    elif line[:2] == "OX":
+      if "Homo sapiens" in line:
+        Homo=True
+    elif line[:2] == "OI":
+      name = line[5:].split(' !')[0]
+      # adding its same id
+      if name in cl:
+        individual = cl[name][5]
+      else:
+        tofind.update({lid:name})
+    elif line[:2] == "ID":
+      ID = line[5:]
+    elif line[:2] == "SY":
+      SY = line[5:]
+    elif line[:2] == "DI":
+      DI = line[5:]
+    elif line[:2] == "DT":
+      date = line.split("Created: ")[-1].split(";")[0]
+    elif line[:2] == "DR":
+      if 'DepMap; ' in line:
+        depmap = line.split('DepMap; ')[-1]
+    elif line[:2] == "CA":
+      if 'Cancer cell line' in line:
+        CL=True
+    elif line[:2] == "AG":
+      age = line[5:]
+    elif line[:2] == "SX":
+      sex = line[5:]
+    elif line[:2] == "CC":
+      comments.append(line[5:])
+      if 'Problematic cell line:' in line:
+        hasIssues=True
 
-    l.close()
-    cld = pd.DataFrame(data=cl.values(), columns=["depmap_id",
-                                        "id",
-                                        "disease",
-                                        "age",
-                                        "sex",
-                                        "patient_id",
-                                        "parent_id",
-                                        "date",
-                                        "synonyms",
-                                        "has_issues",
-                                        "comments"], index=cl.keys())
-    return cld
+  l.close()
+  for k, v in tofind.items():
+    if k in cl and v in cl:
+      cl[k][5] = cl[v][5]
+  cld = pd.DataFrame(data=cl.values(), columns=["depmap_id",
+                                      "id",
+                                      "disease",
+                                      "age",
+                                      "sex",
+                                      "patient_id",
+                                      "parent_id",
+                                      "date",
+                                      "synonyms",
+                                      "has_issues",
+                                      "comments"], index=cl.keys())
+  return cld
