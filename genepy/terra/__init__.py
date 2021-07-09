@@ -15,7 +15,7 @@ from genepy.google import gcp
 import pdb
 import subprocess
 from gsheets import Sheets
-
+from dalmatian.core import MethodNotFound
 
 def createManySubmissions(workspace, workflow, references, entity=None, expression=None, use_callcache=True):
   """
@@ -256,7 +256,7 @@ def uploadFromFolder(gcpfolder, prefix, workspace, sep='_', loc=0,
     return df
 
 
-def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='All_samples'):
+def updateAllSampleSet(workspace, newsample_setname, Allsample_setname='all'):
   """
   update the previous All Sample sample_set with the new samples that have been added.
 
@@ -734,8 +734,15 @@ def saveWorkspace(workspace, folderpath):
   conf = wm.get_configs()
   for k,val in conf.iterrows():
     with open(folderpath+val['name']+".wdl", "w") as f:
-      f.write(dm.get_wdl('/'.join(val[[
-              'methodNamespace', 'methodName', 'methodVersion']].astype(str).tolist())))
+      if val.sourceRepo == 'dockstore':
+        name = "dockstore.org/"+'/'.join(val['methodPath'].split('/')[2:4])+'/'+val['methodVersion']
+      else:
+        name = '/'.join(val[[
+            'methodNamespace', 'methodName', 'methodVersion']].astype(str).tolist())
+      try :
+        f.write(dm.get_wdl(name))
+      except MethodNotFound:
+        print(name+" could not be found")
   conf.to_csv(folderpath + 'worflow_list.csv')
   params = {}
   params['GENERAL'] = wm.get_workspace_metadata()

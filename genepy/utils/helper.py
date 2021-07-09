@@ -464,9 +464,9 @@ def compareDfs(df1, df2):
   omissmatchInds = set(df2.index)-set(df1.index)
   newNAs = df1.isna().sum().sum() - df2.isna().sum().sum()
   new0s = (df1 == 0).sum().sum() - (df2 == 0).sum().sum()
-  print('FOUND missmatch Columns IN df1: ' + str(nmissmatchCols))
+  print('FOUND missmatch Columns NOT IN df2: ' + str(nmissmatchCols))
   print('FOUND missmatch Columns NOT IN df1: ' + str(omissmatchCols))
-  print('FOUND missmatch Index IN df1: ' + str(nmissmatchInds))
+  print('FOUND missmatch Index NOT IN df2: ' + str(nmissmatchInds))
   print('FOUND missmatch Index NOT IN df1: ' + str(omissmatchInds))
   print('FOUND new NAs in df1: ' + str(newNAs))
   print('FOUND new 0s in df1: ' + str(new0s))
@@ -534,7 +534,7 @@ def readXMLs(folder=None, file=None, rename=None):
 
 
 def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt",
-  reload=False):
+                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',]):
   """
   make a df from cellosaurus' human cancer cell line data
 
@@ -586,7 +586,7 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
   ID = ""
   SY = ""
   DI = ""
-  depmap = ''
+  depmap = set()
   lid = None
   individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
   hasIssues=False
@@ -607,7 +607,14 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       if lid in cl:
         lid=None
     elif line[:2] =="//":
-      if ((CL and Homo and ID) or depmap) and (lid is not None) :
+      depmap-= set(dropped)
+      if ((CL and Homo and ID) or depmap) and (lid is not None):
+        if len(depmap)>1:
+          raise ValueError('multiple depmap mapping to one line', depmap)
+        elif len(depmap)==1:
+          depmap=depmap.pop()
+        else:
+          depmap=''
         v.append(depmap)
         v.append(ID)
         v.append(DI)
@@ -618,7 +625,7 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
         v.append(date)
         v.append(SY)
         v.append(hasIssues)
-        v.append(', '.join(comments))
+        v.append(' | '.join(comments))
         cl.update({lid: v})
       v = []
       CL=False
@@ -630,7 +637,7 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       ID = ""
       SY = ""
       DI = ""
-      depmap = ''
+      depmap = set()
       lid = None
       individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
       hasIssues=False
@@ -661,7 +668,7 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       date = line.split("Created: ")[-1].split(";")[0]
     elif line[:2] == "DR":
       if 'DepMap; ' in line:
-        depmap = line.split('DepMap; ')[-1]
+        depmap.add(line.split('DepMap; ')[-1])
     elif line[:2] == "CA":
       if 'Cancer cell line' in line:
         CL=True
@@ -673,6 +680,9 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       comments.append(line[5:])
       if 'Problematic cell line:' in line:
         hasIssues=True
+      if 'Discontinued: DepMap; ' in line:
+        hasIssues=True
+        depmap.remove(line.split(';')[1][1:])
 
   l.close()
   for k, v in tofind.items():
