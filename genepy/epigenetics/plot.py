@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from genepy.epigenetics import chipseq as chip
+from genepy.utils import helper as h
 
 def plotAverageOfSamples(samples, folder="", showAll=False, maxv=None, minv=None):
   res = [] 
