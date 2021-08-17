@@ -1,10 +1,10 @@
 # genepy/CREME: ChIP REplicate MErger
 
+CREME is part of the [genepy](https://github.com/broadinstitute/GenePy) package.
+
 For Introduction we will link to the [article](https://ro-che.info/articles/2018-07-11-chip-seq-consensus) by Roman Cheplyaka on the subject.
 
-We built this tool noticing the lack of publicly available simple Chip Merger working for [MACS2](https://github.com/macs3-project/MACS)'s output, with replicates of broadly different quality. We wanted a 1 function tool that would work in python.
-
-CREME is part of the [genepy](https://github.com/broadinstitute/GenePy) package.
+We built this tool noticing the lack of publicly available simple Chip Merging tool working for [MACS2](https://github.com/macs3-project/MACS)'s output, with replicates of broadly different quality. We wanted a 1 function tool that would work in python.
 
 We will although note tools such as:
 - [PePr](https://pubmed.ncbi.nlm.nih.gov/24894502/) [code](https://github.com/shawnzhangyx/PePr) which can substitute itself from MACS2 by ccalling on mutliple bam files at the same time. It will work by counting reads and looking at the peak shape.
@@ -25,17 +25,17 @@ CREME will output, amongst other thing, a dataframe representing a concatenation
 
 ## Process
 
-### Selecion: Finding the best replicate
+### Selection: Finding the best replicate
 
-A first goal of CREME was to find the best replicate, to do so, it can take manual annotation of bad replicates. These can be provided by visual inspection of bigwig tracks + bed files on IGV, from thresholding on QC results such as FRiP scores.
+A first goal of CREME was to find the best replicate, to do so, it can take manual annotation of _BAD_ (bad/lower quality) replicates. These can be provided by visual inspection of bigwig tracks + bed files on IGV, from thresholding on QC results such as FRiP scores.
 
-![plot igv]()
+![plot igv](docsCREME/igv-app-MED1-zoom.png)
 
 Given all available replicates, CREME will compute a conscensus, considering any peaks at most 150 bp from another peak, to be in overlap. We have noticed that changing this parameter from 0 to 150 decreased the total number of peaks found by only 8%.
 
 Non overlapping peaks are kept in the conscensus. When we have an overlap we take the mean of signals and the product of pvalues across overlapping replicates.
 
-![plot venn](MED1_before_venn_venn.png)
+![plot venn](docsCREME/MED1_before_venn_venn.png)
 
 Then, CREME will look at their overlap and select the one that has the best overlap score:
 
@@ -50,7 +50,7 @@ The non-bad quality replicate with the best score will be selected as the __main
 
 In addition to the venn diagram, correlation between each replicate's peak signal is computed and displayed to the user.
 
-![pairplot of replicates](MED1_before_pairplot.png)
+![pairplot of replicates](docsCREME/MED1_before_pairplot.png)
 
 ### Validation: Finding new peaks
 
@@ -77,7 +77,7 @@ The output of our tool is a dataframe of concatenated merged replicates. The pip
 
 Additionally, inforrmation on distribution of peak signal across replicates and number of peaks found is provided to the user.
 
-![kdeplot of new found peaks](MED1_new_found_peaks_kdeplot.png)
+![kdeplot of new found peaks](docsCREME/MED1_new_found_peaks_kdeplot.png)
 
 ## WIP and current issues
 
