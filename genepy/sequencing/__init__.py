@@ -11,8 +11,6 @@ import pandas as pd
 import numpy as np
 from genepy.utils import helper as h
 from genepy.google import gcp
-from taigapy import TaigaClient
-tc = TaigaClient()
 
 size = {"GRCh37": 2864785220,
 		"GRCh38": 2913022398}

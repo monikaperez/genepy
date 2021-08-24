@@ -26,9 +26,6 @@ from math import pi
 import numpy as np
 import pdb
 
-from taigapy import TaigaClient
-tc = TaigaClient()
-
 
 def scatter(data, labels=None, title='scatter plot', showlabels=False, folder='',
 						colors=None, xname='', yname="", importance=None, radi=5, alpha=0.8, **kwargs):

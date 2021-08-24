@@ -6,12 +6,8 @@ from __future__ import print_function
 
 from genepy.utils import helper as h
 import pdb
-import ipdb
 import pandas as pd
 import numpy as np
-
-from taigapy import TaigaClient
-tc = TaigaClient()
 
 def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   """
