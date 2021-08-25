@@ -651,8 +651,7 @@ async def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filep
   print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
   return togiveaccess
 
-
-async def shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+async def _shareCCLEbams(users, samples, groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
                   refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
                   privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
   """
