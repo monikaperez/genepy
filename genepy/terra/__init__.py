@@ -843,7 +843,7 @@ def deleteJob(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
   wm = dm.WorkspaceManager(workspaceid)
   bucket = wm.get_bucket_id()
   data= []
-  if DeleteCurrent:
+  if deleteCurrent:
     if dryrun:
       print('gsutil -m rm gs://'+bucket+'/'+subid+'/*/'+taskid+'/**')
     else:
