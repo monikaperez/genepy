@@ -9,9 +9,6 @@ import numpy as np
 from genepy.utils import helper as h
 import gzip
 import seaborn as sns
-from taigapy import TaigaClient
-
-tc = TaigaClient()
 
 def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   """

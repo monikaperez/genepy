@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
 from scipy.stats import pearsonr
-from genepy.rna import pyDESeq2
 from genepy.utils import helper as h
 import math
 import os
@@ -17,9 +16,6 @@ import gseapy
 import pandas as pd
 import numpy as np
 import subprocess
-
-from taigapy import TaigaClient
-tc = TaigaClient()
 
 
 def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
@@ -40,6 +36,9 @@ def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
     tokeep = []
     b = 0
     print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
+    from taigapy import TaigaClient
+    tc = TaigaClient()
+    
     gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
     for i, val in enumerate(listofgenes):
         if from_idtype == "ensembl_gene_id":
@@ -75,6 +74,9 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
       2: the names of genes that could not be matched
     """
     print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
+    from taigapy import TaigaClient
+    tc = TaigaClient()
+    
     gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
     not_parsed = []
     renamed = []
@@ -504,6 +506,7 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     ------
 
     """
+    from genepy.rna import pyDESeq2
     if "gene_id" not in list(data.columns):
         print("using index as gene_id")
         data['gene_id'] = data.index

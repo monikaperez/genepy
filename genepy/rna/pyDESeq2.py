@@ -6,7 +6,7 @@
 
 from __future__ import print_function
 import pandas as pd
-import ipdb
+import pdb
 import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, Formula, numpy2ri

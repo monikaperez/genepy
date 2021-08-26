@@ -22,5 +22,7 @@ statsmodels
 taigapy==2.12
 venn
 itermplot
-ipdb
 autopep8
+io
+os
+biomart
