@@ -689,11 +689,11 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
-  key = " -u " if unshare else " -d "
+  key = " -d " if unshare else " -u "
   for group in groups:
-    usrs += " -g " + group + ":R"
+    usrs += " -g " + group + (":R" if not unshare else "")
   for user in users:
-    usrs += key + user + ":R"
+    usrs += key + user + (":R" if not unshare else "")
   cmd_prefix = "gsutil -m acl ch" + usrs
   cmd = cmd_prefix
   for n, filename in enumerate(togiveaccess):
@@ -704,7 +704,7 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
         if n < len(togiveaccess)-1:
           cmd = oldcmd
         if unshare:
-          print('preventing access to {: d} files'.format(n+1))
+          print('preventing access to {:d} files'.format(n+1))
         else:
           print('granting access to {:d} files'.format(n+1))
         with open('/tmp/grantaccess{:d}.sh'.format(n), 'w') as f:
