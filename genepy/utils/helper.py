@@ -545,7 +545,7 @@ def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomar
     res = pd.read_csv(cachefile)
   else:
     print('downloading gene names from biomart')
-    res = _fetchFromServer(ensemble_server, defattr, attributes)
+    res = _fetchFromServer(ensemble_server, defattr+ attributes)
     res.to_csv(cachefile, index=False)
 
   res.columns = defattr+attributes
