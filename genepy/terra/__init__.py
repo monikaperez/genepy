@@ -611,7 +611,8 @@ async def findBackErasedDuplicaBamteFromTerraBucket(workspace, gsfolder, bamcol=
       print("no data for " + str(k))
 
 
-async def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filepath", "internal_bai_filepath"]):
+async def shareTerraBams(samples, users, workspace, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
+  unshare=False):
   """
   will share some files from gcp with a set of users using terra as metadata repo.
 
@@ -633,11 +634,12 @@ async def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filep
     users = [users]
   wm = dm.WorkspaceManager(workspace)
   togiveaccess = np.ravel(wm.get_samples()[bamcols].loc[samples].values)
+  key = "-rdu " if unshare else "-ru " 
   for user in users:
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil -m acl ch -ru " + user + ":R " + files)
+    code = os.system("gsutil -m acl ch " + key + user + ":R " + files)
     if code == signal.SIGINT:
       print('Awakened')
       break
@@ -650,8 +652,8 @@ async def shareTerraBams(users, workspace, samples, bamcols=["internal_bam_filep
 
 
 async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_length=100000, bamcols=["internal_bam_filepath", "internal_bai_filepath"],
-                        refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
-                  privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4"):
+                        refsheet_url="https://docs.google.com/spreadsheets/d/1Pgb5fIClGnErEqzxpU7qqX6ULpGTDjvzWwDN8XUJKIY",
+                  privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4", unshare=False):
   """
   same as shareTerraBams but is completed to work with CCLE bams from the CCLE sample tracker
 
@@ -687,10 +689,11 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
+  key = " -u " if unshare else " -d "
   for group in groups:
     usrs += " -g " + group + ":R"
   for user in users:
-    usrs += " -u " + user + ":R"
+    usrs += key + user + ":R"
   cmd_prefix = "gsutil -m acl ch" + usrs
   cmd = cmd_prefix
   for n, filename in enumerate(togiveaccess):
@@ -700,7 +703,10 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
       if (len(cmd) > arg_max_length) | (n==len(togiveaccess)-1):
         if n < len(togiveaccess)-1:
           cmd = oldcmd
-        print('granting access to {:d} files'.format(n+1))
+        if unshare:
+          print('preventing access to {: d} files'.format(n+1))
+        else:
+          print('granting access to {:d} files'.format(n+1))
         with open('/tmp/grantaccess{:d}.sh'.format(n), 'w') as f:
           f.write(cmd)
         code = os.system(cmd)

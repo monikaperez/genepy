@@ -706,12 +706,12 @@ def _fetchFromServer(ensemble_server, attributes):
   server = BiomartServer(ensemble_server)
   ensmbl = server.datasets['hsapiens_gene_ensembl']
   res = pd.read_csv(io.StringIO(ensmbl.search({
-    'attributes': defattr+attributes
+    'attributes': attributes
   }, header=1).content.decode()), sep='\t')
   return res
 
 def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomart", 
-  useCache=False, cache_folder=".genepycache/", attributes=[]):
+                      useCache=False, cache_folder='/'.join(__file__.split('/')[:-3])+"/", attributes=[]):
   """generate a genelist dataframe from ensembl's biomart
 
   Args:
@@ -725,21 +725,22 @@ def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomar
   Returns:
       [type]: [description]
   """
-  defattr = ['ensembl_gene_id', 'clone_based_ensembl_gene', 'hgnc_symbol', 'gene_biotype',
+  attr = ['ensembl_gene_id', 'clone_based_ensembl_gene', 'hgnc_symbol', 'gene_biotype',
              'entrezgene_id']
   assert cache_folder[-1] == '/'
+  
   cache_folder = os.path.expanduser(cache_folder)
   createFoldersFor(cache_folder)
-  cachefile = os.path.join(cache_folder, 'biomart_ensembltohgnc.csv')
+  cachefile = os.path.join(cache_folder, '.biomart.csv')
   if useCache & os.path.isfile(cachefile):
     print('fetching gene names from biomart cache')
     res = pd.read_csv(cachefile)
   else:
     print('downloading gene names from biomart')
-    res = _fetchFromServer(ensemble_server, defattr+ attributes)
+    res = _fetchFromServer(ensemble_server, attr + attributes)
     res.to_csv(cachefile, index=False)
 
-  res.columns = defattr+attributes
+  res.columns = attr+attributes
   if type(res) is not type(pd.DataFrame()):
     raise ValueError('should be a dataframe')
   res = res[~(res[
