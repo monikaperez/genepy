@@ -8,8 +8,6 @@ import os
 import string
 import subprocess
 import pandas as pd
-import pdb
-import pandas as pd
 import numpy as np
 import itertools
 import random
@@ -18,297 +16,297 @@ from biomart import BiomartServer
 import io
 
 chromsize = {
-    "chr1":	248956422,
-    "chr10":133797422,
-    "chr11":135086622,
-    "chr12":133275309,
-    "chr13":114364328,
-    "chr14":107043718,
-    "chr15":101991189,
-    "chr16":90338345,
-    "chr17":83257441,
-    "chr18":80373285,
-    "chr19":58617616,
-    "chr2":	242193529,
-    "chr20":64444167,
-    "chr21":46709983,
-    "chr22":50818468,
-    "chr3":	198295559,
-    "chr4":	190214555,
-    "chr5":	181538259,
-    "chr6":	170805979,
-    "chr7":	159345973,
-    "chr8":	145138636,
-    "chr9":	138394717,
-    "chrX":	156040895,
-    "chrY":	57227415,
+  "chr1":	248956422,
+  "chr10":133797422,
+  "chr11":135086622,
+  "chr12":133275309,
+  "chr13":114364328,
+  "chr14":107043718,
+  "chr15":101991189,
+  "chr16":90338345,
+  "chr17":83257441,
+  "chr18":80373285,
+  "chr19":58617616,
+  "chr2":	242193529,
+  "chr20":64444167,
+  "chr21":46709983,
+  "chr22":50818468,
+  "chr3":	198295559,
+  "chr4":	190214555,
+  "chr5":	181538259,
+  "chr6":	170805979,
+  "chr7":	159345973,
+  "chr8":	145138636,
+  "chr9":	138394717,
+  "chrX":	156040895,
+  "chrY":	57227415,
 }
 
 rename_mut = {'contig': 'chr', 'position': 'pos', 'Reference_Allele': 'ref', 'ref_allele': 'ref', 'alt_allele': 'alt',
-              'Chromosome': 'chr', 'End_postition': 'end', 'Start_position': 'pos', 'Tumor_Seq_Allele1': "alt"}
+            'Chromosome': 'chr', 'End_postition': 'end', 'Start_position': 'pos', 'Tumor_Seq_Allele1': "alt"}
 
 
 def fileToList(filename):
-    """
-    loads an input file with a\\n b\\n.. into a list [a,b,..]
-    """
-    with open(filename) as f:
-        return [val[:-1] for val in f.readlines()]
+  """
+  loads an input file with a\\n b\\n.. into a list [a,b,..]
+  """
+  with open(filename) as f:
+    return [val[:-1] for val in f.readlines()]
 
 
 def listToFile(l, filename):
-    """
-    loads a list with [a,b,..] into an input file a\\n b\\n..
-    """
-    with open(filename, 'w') as f:
-        for item in l:
-            f.write("%s\n" % item)
+  """
+  loads a list with [a,b,..] into an input file a\\n b\\n..
+  """
+  with open(filename, 'w') as f:
+    for item in l:
+      f.write("%s\n" % item)
 
 
 def dictToFile(d, filename):
-    """
-    turn a dict into a json file
-    """
-    with open(filename, 'w') as json_file:
-        json.dump(d, json_file)
+  """
+  turn a dict into a json file
+  """
+  with open(filename, 'w') as json_file:
+    json.dump(d, json_file)
 
 
 def fileToDict(filename):
-    """
-    loads a json file into a python dict
-    """
-    with open(filename) as f:
-        data = json.load(f)
-    return data
+  """
+  loads a json file into a python dict
+  """
+  with open(filename) as f:
+    data = json.load(f)
+  return data
 
 
 def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
-    """
-    moves a set of files l into a folder:
+  """
+  moves a set of files l into a folder:
 
-    Args:
-    -----
-      l: file list
-      pattern: if files are a set of patterns to match
-      folder: folder to move file into
-      add: some additional mv parameters
-    """
-    for val in l:
-        cmd = 'mv '
-        if add:
-            cmd += add + ' '
-        if '*.' in pattern:
-            cmd += '*'
-        cmd += val
-        if '.*' in pattern:
-            cmd += '*'
-        cmd += " " + folder
-        res = os.system(cmd)
-        if res != 0:
-            raise Exception("Leave command pressed or command failed")
+  Args:
+  -----
+    l: file list
+    pattern: if files are a set of patterns to match
+    folder: folder to move file into
+    add: some additional mv parameters
+  """
+  for val in l:
+    cmd = 'mv '
+    if add:
+      cmd += add + ' '
+    if '*.' in pattern:
+      cmd += '*'
+    cmd += val
+    if '.*' in pattern:
+      cmd += '*'
+    cmd += " " + folder
+    res = os.system(cmd)
+    if res != 0:
+      raise Exception("Leave command pressed or command failed")
 
 
 def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
-    """
-    Given a dict renames corresponding files in a folder
+  """
+  Given a dict renames corresponding files in a folder
 
-    Args:
-    ----
-      dt: dict(currentName:newName) renaming dictionnary
-      folder: folder to look into
-      add: some additional mv parameters
-    """
-    cmd = 'ls -R ' + folder if doAll else 'ls ' + folder
-    files = os.popen(cmd).read().split('\n')
-    if doAll:
+  Args:
+  ----
+    dt: dict(currentName:newName) renaming dictionnary
+    folder: folder to look into
+    add: some additional mv parameters
+  """
+  cmd = 'ls -R ' + folder if doAll else 'ls ' + folder
+  files = os.popen(cmd).read().split('\n')
+  if doAll:
+    prep=''
+    f = []
+    for val in files:
+      if len(val)==0:
         prep=''
-        f = []
-        for val in files:
-            if len(val)==0:
-                prep=''
-                continue
-            if val[0]=='.' and len(val)>3:
-                prep=val[:-1]
-                continue
-            if "." in val:
-                f.append(prep+"/"+val)
-        files = f
-    for k, val in dt.items():
-        for f in files:
-            if k in f:
-                cmd = 'sudo mv ' if sudo else 'mv '
-                if add:
-                    cmd += add + ' '
-                if not doAll:
-                    cmd += folder
-                cmd += f
-                cmd += ' '
-                if not doAll:
-                    cmd += folder
-                cmd += f.replace(k, val)
-                if dryrun:
-                    print(cmd)
-                else:
-                    res = os.system(cmd)
-                    if res != 0:
-                        raise Exception("Leave command pressed or command failed")
+        continue
+      if val[0]=='.' and len(val)>3:
+        prep=val[:-1]
+        continue
+      if "." in val:
+        f.append(prep+"/"+val)
+    files = f
+  for k, val in dt.items():
+    for f in files:
+      if k in f:
+        cmd = 'sudo mv ' if sudo else 'mv '
+        if add:
+          cmd += add + ' '
+        if not doAll:
+          cmd += folder
+        cmd += f
+        cmd += ' '
+        if not doAll:
+          cmd += folder
+        cmd += f.replace(k, val)
+        if dryrun:
+          print(cmd)
+        else:
+          res = os.system(cmd)
+          if res != 0:
+            raise Exception("Leave command pressed or command failed")
 
 
 def grouped(iterable, n):
-    """
-    iterate over element of list 2 at a time python
-    s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
-    """
-    it = iter(iterable)
-    while True:
-        chunk = tuple(itertools.islice(it, n))
-        if not chunk:
-            return
-        yield chunk
+  """
+  iterate over element of list 2 at a time python
+  s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
+  """
+  it = iter(iterable)
+  while True:
+    chunk = tuple(itertools.islice(it, n))
+    if not chunk:
+      return
+    yield chunk
 
 
 def overlap(interval1, interval2):
-    """
-    Given [0, 4] and [1, 10] returns [1, 4]
-    Given [0, 4] and [8, 10] returns False
-    """
-    if interval2[0] <= interval1[0] <= interval2[1]:
-        start = interval1[0]
-    elif interval1[0] <= interval2[0] <= interval1[1]:
-        start = interval2[0]
-    else:
-        return False
+  """
+  Given [0, 4] and [1, 10] returns [1, 4]
+  Given [0, 4] and [8, 10] returns False
+  """
+  if interval2[0] <= interval1[0] <= interval2[1]:
+    start = interval1[0]
+  elif interval1[0] <= interval2[0] <= interval1[1]:
+    start = interval2[0]
+  else:
+    return False
 
-    if interval2[0] <= interval1[1] <= interval2[1]:
-        end = interval1[1]
-    elif interval1[0] <= interval2[1] <= interval1[1]:
-        end = interval2[1]
-    else:
-        return False
+  if interval2[0] <= interval1[1] <= interval2[1]:
+    end = interval1[1]
+  elif interval1[0] <= interval2[1] <= interval1[1]:
+    end = interval2[1]
+  else:
+    return False
 
-    return (start, end)
+  return (start, end)
 
 
 def union(interval1, interval2):
-    """
-    Given [0, 4] and [1, 10] returns [0, 10]
-    Given [0, 4] and [8, 10] returns False
-    """
-    if interval1[0] <= interval2[0] <= interval1[1]:
-        start = interval1[0]
-        end = interval1[1] if interval2[1] <= interval1[1] else interval2[1]
-    elif interval1[0] <= interval2[1] <= interval1[1]:
-        start = interval2[0] if interval2[0] <= interval1[0] else interval1[0]
-        end = interval1[1]
-    else:
-        return False
-    return (start, end)
+  """
+  Given [0, 4] and [1, 10] returns [0, 10]
+  Given [0, 4] and [8, 10] returns False
+  """
+  if interval1[0] <= interval2[0] <= interval1[1]:
+    start = interval1[0]
+    end = interval1[1] if interval2[1] <= interval1[1] else interval2[1]
+  elif interval1[0] <= interval2[1] <= interval1[1]:
+    start = interval2[0] if interval2[0] <= interval1[0] else interval1[0]
+    end = interval1[1]
+  else:
+    return False
+  return (start, end)
 
 
 def nans(df): return df[df.isnull().any(axis=1)]
 
 
 def createFoldersFor(filepath):
-    """
-    will recursively create folders if needed until having all the folders required to save the file in this filepath
-    """
-    prevval = ''
-    for val in filepath.split('/')[:-1]:
-        prevval += val + '/'
-        if not os.path.exists(prevval):
-            os.mkdir(prevval)
+  """
+  will recursively create folders if needed until having all the folders required to save the file in this filepath
+  """
+  prevval = ''
+  for val in os.path.expanduser(filepath).split('/')[:-1]:
+    prevval += val + '/'
+    if not os.path.exists(prevval):
+      os.mkdir(prevval)
 
 
 def randomString(stringLength=6, stype='all', withdigits=True):
-    """
-    Generate a random string of letters and digits
+  """
+  Generate a random string of letters and digits
 
-    Args:
-    -----
-      stringLength: the amount of char
-      stype: one of lowercase, uppercase, all
-      withdigits: digits allowed in the string?
+  Args:
+  -----
+    stringLength: the amount of char
+    stype: one of lowercase, uppercase, all
+    withdigits: digits allowed in the string?
 
-    Returns:
-    -------
-      the string
-    """
-    if stype == 'lowercase':
-        lettersAndDigits = ascii_lowercase
-    elif stype == 'uppercase':
-        lettersAndDigits = ascii_uppercase
-    else:
-        lettersAndDigits = string.ascii_letters
-    if withdigits:
-        lettersAndDigits += string.digits
-    return ''.join(random.choice(lettersAndDigits) for i in range(stringLength))
+  Returns:
+  -------
+    the string
+  """
+  if stype == 'lowercase':
+    lettersAndDigits = string.ascii_lowercase
+  elif stype == 'uppercase':
+    lettersAndDigits = string.ascii_uppercase
+  else:
+    lettersAndDigits = string.ascii_letters
+  if withdigits:
+    lettersAndDigits += string.digits
+  return ''.join(random.choice(lettersAndDigits) for i in range(stringLength))
 
 
 def pdDo(df, op="mean", of="value1", over="value2"):
-    """
-    apply a function to a panda dataframe WIP
-    """
-    df = df.sort_values(by=over)
-    index = []
-    data = df.iloc[0, of]
-    ret = []
-    prev = df.iloc[0, over]
-    j = 0
-    for k, val in df.iloc[1:].iterrows():
-        if val[over] == prev:
-            data.append(val[of])
-        else:
-            if of == "mean":
-                ret[j] = np.mean(data)
-            elif of == "sum":
-                ret[j] = np.sum(data)
-            elif of == "max":
-                ret[j] = np.max(data)
-            elif of == "min":
-                ret[j] = np.min(data)
-            index.append(k)
-            j += 1
-            data = [val[of]]
-    return index, ret
+  """
+  apply a function to a panda dataframe WIP
+  """
+  df = df.sort_values(by=over)
+  index = []
+  data = df.iloc[0, of]
+  ret = []
+  prev = df.iloc[0, over]
+  j = 0
+  for k, val in df.iloc[1:].iterrows():
+    if val[over] == prev:
+      data.append(val[of])
+    else:
+      if of == "mean":
+        ret[j] = np.mean(data)
+      elif of == "sum":
+        ret[j] = np.sum(data)
+      elif of == "max":
+        ret[j] = np.max(data)
+      elif of == "min":
+        ret[j] = np.min(data)
+      index.append(k)
+      j += 1
+      data = [val[of]]
+  return index, ret
 
 
 def parrun(cmds, cores, add=[]):
-    """
-    runs a set of commands in parallel using the "&" command
+  """
+  runs a set of commands in parallel using the "&" command
 
-    Args:
-    -----
-      cmds: the list of commands
-      cores: number of parallel execution
-      add: an additional list(len(cmds)) of command to run in parallel at the end of each parallel run
-    """
-    count = 0
-    exe = ''
-    if len(add) != 0 and len(add) != len(cmds):
-        raise ValueError("we would want them to be the same size")
+  Args:
+  -----
+    cmds: the list of commands
+    cores: number of parallel execution
+    add: an additional list(len(cmds)) of command to run in parallel at the end of each parallel run
+  """
+  count = 0
+  exe = ''
+  if len(add) != 0 and len(add) != len(cmds):
+    raise ValueError("we would want them to be the same size")
+  else:
+    addexe = ''
+  for i, cmd in enumerate(cmds):
+    count += 1
+    exe += cmd
+    if len(add) != 0:
+      addexe += add[i]
+    if count < cores and i < len(cmds) - 1:
+      exe += ' & '
+      if len(add) != 0:
+        addexe += ' & '
     else:
+      count = 0
+      res = subprocess.run(exe, capture_output=True, shell=True)
+      if res.returncode != 0:
+        raise ValueError('issue with the command: ' + str(res.stderr))
+      exe = ''
+      if len(add) != 0:
+        res = subprocess.run(addexe, capture_output=True, shell=True)
+        if res.returncode != 0:
+          raise ValueError(
+            'issue with the command: ' + str(res.stderr))
         addexe = ''
-    for i, cmd in enumerate(cmds):
-        count += 1
-        exe += cmd
-        if len(add) != 0:
-            addexe += add[i]
-        if count < cores and i < len(cmds) - 1:
-            exe += ' & '
-            if len(add) != 0:
-                addexe += ' & '
-        else:
-            count = 0
-            res = subprocess.run(exe, capture_output=True, shell=True)
-            if res.returncode != 0:
-                raise ValueError('issue with the command: ' + str(res.stderr))
-            exe = ''
-            if len(add) != 0:
-                res = subprocess.run(addexe, capture_output=True, shell=True)
-                if res.returncode != 0:
-                    raise ValueError(
-                        'issue with the command: ' + str(res.stderr))
-                addexe = ''
 
 
 def askif(quest):
@@ -318,11 +316,11 @@ def askif(quest):
     print(quest)
     inp = input()
     if inp in ['yes', 'y', 'Y', 'YES', 'oui', 'si']:
-        return 1
+      return 1
     elif inp in ['n', 'no', 'nope', 'non', 'N']:
-        return 0
+      return 0
     else:
-        return askif('you need to answer by yes or no')
+      return askif('you need to answer by yes or no')
 
 
 def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
@@ -354,162 +352,355 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
 
 
 def datetoint(dt, split='-', unknown='U', order="des"):
-    """
-    same as inttodate but in the opposite way;
+  """
+  same as inttodate but in the opposite way;
 
-    starts at 0y,0m,0d
+  starts at 0y,0m,0d
 
-    dt: the date string
-    split: the splitter in the string (e.g. /,-,...)
-    unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
-    order: if 'asc', do d,m,y else do y,m,d
+  dt: the date string
+  split: the splitter in the string (e.g. /,-,...)
+  unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
+  order: if 'asc', do d,m,y else do y,m,d
 
-    Returns:
-      the date
-    """
-    arr = np.array(dt[0].split(split) if dt[0] !=
-                   unknown else [0, 0, 0]).astype(int)
-    if len(dt) > 1:
-        for val in dt[1:]:
-            arr = np.vstack(
-                (arr, np.array(val.split(split) if val != unknown and val.count(split) == 2 else [0, 0, 0]).astype(int)))
-        arr = arr.T
-    res = arr[2] * 365 + arr[1] * 31 + \
-        arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
-    return [res] if type(res) is np.int64 else res
+  Returns:
+    the date
+  """
+  arr = np.array(dt[0].split(split) if dt[0] !=
+                  unknown else [0, 0, 0]).astype(int)
+  if len(dt) > 1:
+    for val in dt[1:]:
+      arr = np.vstack(
+        (arr, np.array(val.split(split) if val != unknown and val.count(split) == 2 else [0, 0, 0]).astype(int)))
+    arr = arr.T
+  res = arr[2] * 365 + arr[1] * 31 + \
+    arr[0] if order == "asc" else arr[0] * 365 + arr[1] * 31 + arr[2]
+  return [res] if type(res) is np.int64 else res
 
+prevshowcount = 100
 
 def showcount(i, size):
     """
     pretty print of i/size%, to put in a for loop
     """
-    print(str(1 + int(100 * (i / size))) + '%', end='\r')
+    global prevshowcount
+    a = 1 + int(100 * (i / size))
+    if a != prevshowcount:
+        print(str(a) + '%', end='\r')
+        prevshowcount = a
 
 
 def combin(n, k):
-    """
-    Nombre de combinaisons de n objets pris k a k
-    outputs the number of comabination of n object taken k at a time
-    """
-    if k > n // 2:
-        k = n - k
-    x = 1
-    y = 1
-    i = n - k + 1
-    while i <= n:
-        x = (x * i) // y
-        y += 1
-        i += 1
-    return x
+  """
+  Nombre de combinaisons de n objets pris k a k
+  outputs the number of comabination of n object taken k at a time
+  """
+  if k > n // 2:
+      k = n - k
+  x = 1
+  y = 1
+  i = n - k + 1
+  while i <= n:
+    x = (x * i) // y
+    y += 1
+    i += 1
+  return x
 
 
 def dups(lst):
-    """
-        shows the duplicates in a list
-    """
-    seen = set()
-    # adds all elements it doesn't know yet to seen and all other to seen_twice
-    seen_twice = set(x for x in lst if x in seen or seen.add(x))
-    # turn the set into a list (as requested)
-    return list(seen_twice)
+  """
+      shows the duplicates in a list
+  """
+  seen = set()
+  # adds all elements it doesn't know yet to seen and all other to seen_twice
+  seen_twice = set(x for x in lst if x in seen or seen.add(x))
+  # turn the set into a list (as requested)
+  return list(seen_twice)
 
 
 def makeCombinations(size, proba):
-    """
-    produces probability of X event happening at the same time
+  """
+  produces probability of X event happening at the same time
 
-    pretty usefull for cobinding analysis. wil compute it
-    given binomial probabilities of each event occuring and the number of trials
+  pretty usefull for cobinding analysis. wil compute it
+  given binomial probabilities of each event occuring and the number of trials
 
-    Args:
-    -----
-      size: int number of trials
-      proba: list[float] probabilities of each event occuring
-    """
-    sums = {i:0 for i in range(1,size)}
-    for i in range(size-1,0,-1):
-        print(i)
-        if sums[i]> 0:
-            continue
-        print(combin(size+3,i))
-        v=0
-        for j in itertools.combinations(proba, i):
-            v+=np.prod(j)
-        sums[i] = v
-    for i in range(size-1,0,-1):
-        for j in range(i+1,size):
-            icomb = combin(j,i)
-            sums[i] -= icomb*sums[j]
-    sums[0] = 1-sum(list(sums.values()))
-    return sums
+  Args:
+  -----
+    size: int number of trials
+    proba: list[float] probabilities of each event occuring
+  """
+  sums = {i:0 for i in range(1,size)}
+  for i in range(size-1,0,-1):
+    print(i)
+    if sums[i]> 0:
+      continue
+    print(combin(size+3,i))
+    v=0
+    for j in itertools.combinations(proba, i):
+      v+=np.prod(j)
+    sums[i] = v
+  for i in range(size-1,0,-1):
+    for j in range(i+1,size):
+      icomb = combin(j,i)
+      sums[i] -= icomb*sums[j]
+  sums[0] = 1-sum(list(sums.values()))
+  return sums
 
 
 def closest(lst, K):
-    """
-    returns the index of the value closest to K in a lst
-    """
-    return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
+  """
+  returns the index of the value closest to K in a lst
+  """
+  return lst[min(range(len(lst)), key = lambda i: abs(lst[i]-K))]
 
 
 def compareDfs(df1, df2):
-    """
-    compares df1 to df2
+  """
+  compares df1 to df2
 
-    shows col difference, index difference, nans & 0s differences
-    """
-    nmissmatchCols = set(df1.columns)-set(df2.columns)
-    omissmatchCols = set(df2.columns)-set(df1.columns)
-    nmissmatchInds = set(df1.index)-set(df2.index)
-    omissmatchInds = set(df2.index)-set(df1.index)
-    newNAs = df1.isna().sum().sum() - df2.isna().sum().sum()
-    new0s = (df1 == 0).sum().sum() - (df2 == 0).sum().sum()
-    print('FOUND missmatch Columns IN df1: ' + str(nmissmatchCols))
-    print('FOUND missmatch Columns NOT IN df1: ' + str(omissmatchCols))
-    print('FOUND missmatch Index IN df1: ' + str(nmissmatchInds))
-    print('FOUND missmatch Index NOT IN df1: ' + str(omissmatchInds))
-    print('FOUND new NAs in df1: ' + str(newNAs))
-    print('FOUND new 0s in df1: ' + str(new0s))
-    return nmissmatchCols, omissmatchCols, nmissmatchInds, omissmatchInds, newNAs, new0s
+  shows col difference, index difference, nans & 0s differences
+  """
+  nmissmatchCols = set(df1.columns)-set(df2.columns)
+  omissmatchCols = set(df2.columns)-set(df1.columns)
+  nmissmatchInds = set(df1.index)-set(df2.index)
+  omissmatchInds = set(df2.index)-set(df1.index)
+  newNAs = df1.isna().sum().sum() - df2.isna().sum().sum()
+  new0s = (df1 == 0).sum().sum() - (df2 == 0).sum().sum()
+  print('FOUND missmatch Columns NOT IN df2: ' + str(nmissmatchCols))
+  print('FOUND missmatch Columns NOT IN df1: ' + str(omissmatchCols))
+  print('FOUND missmatch Index NOT IN df2: ' + str(nmissmatchInds))
+  print('FOUND missmatch Index NOT IN df1: ' + str(omissmatchInds))
+  print('FOUND new NAs in df1: ' + str(newNAs))
+  print('FOUND new 0s in df1: ' + str(new0s))
+  return nmissmatchCols, omissmatchCols, nmissmatchInds, omissmatchInds, newNAs, new0s
 
 
 def stringifydict(res):
-    """
-    
-    """
-    a = {}
-    for k, v in res.items():
-        if type(v) is dict:
-            a[k] = stringifydict(v)
-        else:
-            a[str(k)] = v
-    return a
+  """[summary]
+
+  Args:
+      res ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """
+  a = {}
+  for k, v in res.items():
+    if type(v) is dict:
+      a[k] = stringifydict(v)
+    else:
+      a[str(k)] = v
+  return a
 
 
 def readXMLs(folder=None, file=None, rename=None):
-    if file is not None:
-        if type(file) is str: 
-            print('reading 1 file')
-            files = [file]
+  """[summary]
+
+  Args:
+      folder ([type], optional): [description]. Defaults to None.
+      file ([type], optional): [description]. Defaults to None.
+      rename ([type], optional): [description]. Defaults to None.
+
+  Raises:
+      ValueError: [description]
+
+  Returns:
+      [type]: [description]
+  """
+  if file is not None:
+    if type(file) is str:
+      print('reading 1 file')
+      files = [file]
+    else:
+      print('reading files')
+      files = file
+  elif folder is not None:
+    print("reading from folder")
+    files = [i for i in os.listdir(folder) if i.endswith(".xml")]
+  else:
+    raise ValueError('need folder or file')
+  df = pd.DataFrame()
+  for file in files:
+    res = []
+    a = open(file, "r").read()
+    xmldict = xmltodict.parse(a)
+    data = xmldict['Workbook']['Worksheet']['Table']["Row"]
+    for val in data:
+      res.append([v['Data']['#text'] if "#text" in v['Data']
+                  else None for v in val["Cell"]])
+    res = pd.DataFrame(data=res[2:], columns=res[0])
+    df = df.append(res)
+  if rename is not None:
+    df = df.rename(columns=rename)
+  return df
+
+def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt",
+                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',]):
+  """
+  make a df from cellosaurus' human cancer cell line data
+
+  Args:
+  -----
+    ftp str the ftp link to the cellosaurus latest txt db export
+
+  Returns:
+  -------
+    pd.DataFrame indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
+    "sex", "patient_id", "parent_id", "date", "synonyms", "has_issues", "comments"
+  """
+  print('make sure to have wget installed')
+  if reload or not os.path.exists('/tmp/cellosaurus.txt'):
+    subprocess.run('wget '+ ftp +' -O /tmp/cellosaurus.txt')
+  l = open('/tmp/cellosaurus.txt', 'r')
+  print("""
+
+    ---------  ---------------------------     ----------------------
+    Line code  Content                         Occurrence in an entry
+    ---------  ---------------------------     ----------------------
+    ID         Identifier (cell line name)     Once; starts an entry
+    AC         Accession (CVCL_xxxx)           Once
+    AS         Secondary accession number(s)   Optional; once
+    SY         Synonyms                        Optional; once
+    DR         Cross-references                Optional; once or more
+    RX         References identifiers          Optional: once or more
+    WW         Web pages                       Optional; once or more
+    CC         Comments                        Optional; once or more
+    ST         STR profile data                Optional; once or more
+    DI         Diseases                        Optional; once or more
+    OX         Species of origin               Once or more
+    HI         Hierarchy                       Optional; once or more
+    OI         Originate from same individual  Optional; once or more
+    SX         Sex of cell                     Optional; once
+    AG         Age of donor at sampling        Optional; once
+    CA         Category                        Once
+    DT         Date (entry history)            Once
+    //         Terminator                      Once; ends an entry
+
+  """)
+  v = []
+  CL=False
+  Homo=False
+  age = "U"
+  sex = "U"
+  date = "U"
+  parent = ""
+  ID = ""
+  SY = ""
+  DI = ""
+  depmap = set()
+  lid = None
+  individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
+  hasIssues=False
+  comments=[""]
+  tofind={}
+  cl = {}
+  while True:
+    # Get next line from file
+    line = l.readline()
+    # if line is empty
+    # end of file is reached
+    if not line:
+      break
+    else:
+      line = line[:-1]
+    if line[:2]=="AC":
+      lid = line[5:]
+      if lid in cl:
+        lid=None
+    elif line[:2] =="//":
+      depmap-= set(dropped)
+      if ((CL and Homo and ID) or depmap) and (lid is not None):
+        if len(depmap)>1:
+          raise ValueError('multiple depmap mapping to one line', depmap)
+        elif len(depmap)==1:
+          depmap=depmap.pop()
         else:
-            print('reading files')
-            files = file
-    if folder is not None:
-        print("reading from folder")
-        files = [i for i in os.listdir(folder) if i.endswith(".xml")]
-    df = pd.DataFrame()
-    for file in files:
-        res = []
-        a = open(file, "r").read()
-        xmldict = xmltodict.parse(a)
-        data = xmldict['Workbook']['Worksheet']['Table']["Row"]
-        for val in data:
-            res.append([v['Data']['#text'] if "#text" in v['Data']
-                        else None for v in val["Cell"]])
-        res = pd.DataFrame(data=res[2:], columns=res[0])
-        df = df.append(res)
-    if rename is not None:
-        df = df.rename(columns=rename)
-    return df
+          depmap=''
+        v.append(depmap)
+        v.append(ID)
+        v.append(DI)
+        v.append(age)
+        v.append(sex)
+        v.append(individual)
+        v.append(parent)
+        v.append(date)
+        v.append(SY)
+        v.append(hasIssues)
+        v.append(' | '.join(comments))
+        cl.update({lid: v})
+      v = []
+      CL=False
+      Homo=False
+      age = ""
+      sex = ""
+      date = ""
+      parent = ""
+      ID = ""
+      SY = ""
+      DI = ""
+      depmap = set()
+      lid = None
+      individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
+      hasIssues=False
+      comments=[""]
+    elif line[:2] == "HI":
+      parent = line[5:].split(' !')[0]
+      if parent in cl:
+        individual = cl[parent][5]
+      else:
+        tofind.update({lid:parent})
+    elif line[:2] == "OX":
+      if "Homo sapiens" in line:
+        Homo=True
+    elif line[:2] == "OI":
+      name = line[5:].split(' !')[0]
+      # adding its same id
+      if name in cl:
+        individual = cl[name][5]
+      else:
+        tofind.update({lid:name})
+    elif line[:2] == "ID":
+      ID = line[5:]
+    elif line[:2] == "SY":
+      SY = line[5:]
+    elif line[:2] == "DI":
+      DI = line[5:]
+    elif line[:2] == "DT":
+      date = line.split("Created: ")[-1].split(";")[0]
+    elif line[:2] == "DR":
+      if 'DepMap; ' in line:
+        depmap.add(line.split('DepMap; ')[-1])
+    elif line[:2] == "CA":
+      if 'Cancer cell line' in line:
+        CL=True
+    elif line[:2] == "AG":
+      age = line[5:]
+    elif line[:2] == "SX":
+      sex = line[5:]
+    elif line[:2] == "CC":
+      comments.append(line[5:])
+      if 'Problematic cell line:' in line:
+        hasIssues=True
+      if 'Discontinued: DepMap; ' in line:
+        hasIssues=True
+        depmap.remove(line.split(';')[1][1:])
+
+  l.close()
+  for k, v in tofind.items():
+    if k in cl and v in cl:
+      cl[k][5] = cl[v][5]
+  cld = pd.DataFrame(data=cl.values(), columns=["depmap_id",
+                                      "id",
+                                      "disease",
+                                      "age",
+                                      "sex",
+                                      "patient_id",
+                                      "parent_id",
+                                      "date",
+                                      "synonyms",
+                                      "has_issues",
+                                      "comments"], index=cl.keys())
+  return cld
 
 def _fetchFromServer(ensemble_server, attributes):
   server = BiomartServer(ensemble_server)

@@ -7,8 +7,9 @@ import warnings
 from matplotlib import pyplot as plt
 from bokeh.palettes import *
 from bokeh.plotting import *
+from scipy.stats import pearsonr
 from genepy.utils import helper as h
-import pdb
+import math
 import os
 import seaborn as sns
 import gseapy
@@ -556,11 +557,18 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
     return results
 
 
-async def gsva(data, geneset_file, pathtogenepy, method='ssgsea'):
+async def gsva(data, geneset_file, pathtogenepy="../", method='ssgsea', recompute=True):
   print('you need to have R installed with GSVA and GSEABase library installed')
+  if not recompute and os.path.exists("/tmp/data_genepyhelper_gsva.csv") and os.path.exists(
+    "/tmp/res_genepy_ssGSEA.tsv"):
+    print('trying to bypass computing...')
+    v = pd.read_csv("/tmp/data_genepyhelper_gsva.csv", index_col=0)
+    if v.shape[0] != data.shape[0] or v.shape[1] != data.shape[1]:
+      print('WARNING: recompute to false but not the same df for sure')
+    return pd.read_csv("/tmp/res_genepy_ssGSEA.tsv", sep='\t')
   data.to_csv('/tmp/data_genepyhelper_gsva.csv')
   cmd = "Rscript "+pathtogenepy + \
-      "/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
+      "genepy/genepy/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
     raise ValueError('issue with the command: ' + str(res))
@@ -658,8 +666,9 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
     res.to_csv(folder+'_qc_results.csv')
     if plot and len(res)>0:
         h.createFoldersFor(folder)
-        _, ax = plt.subplots(figsize=(10, 10))
-        plot = sns.heatmap(res, ax=ax)
+        _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
+        plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
+        plt.yticks(rotation = 0)
         plt.show()
         plot.get_figure().savefig(folder+'failed_qc.pdf')
 
@@ -678,6 +687,7 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                 ax.text(0.05, v, k, ha='left', va='center',
                          color='red' if k in a else 'black')
         plt.tight_layout()
+        plt.show()
         plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
     return res
 
@@ -701,8 +711,9 @@ def getDifferencesFromCorrelations(df1, df2, minsimi=0.99999999999999):
 
 def rnaseqcorrelation(cn, rna, ax=None, name=None):
   """
-  correlates the copy number to the rnaseq in ccle and shows the plot
+  correlates gene copy number matrix to an expression count matrix
 
+  Shows the correlation plots.
   Gene names should be thee same ones, sample names as welll
   """
   a = set(cn.columns) & set(rna.columns)
@@ -790,10 +801,3 @@ def findClosestMatching(repprofiles, goodprofile, closest=False, returncorr=Fals
     return match, corr
   else:
     return match
-
-
-def renameFusionGene(a):
-  """
-  Given a fusion name from star-fusion, renames it
-  """
-  return [str(i.split('^')).replace(', ', ' (').replace("'", "")[1:-1]+')' for i in a]

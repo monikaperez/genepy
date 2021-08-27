@@ -9,8 +9,10 @@ import re
 
 import pandas as pd
 import numpy as np
-from genepy.utils import helper as h
+
 from genepy.google import gcp
+from genepy.utils import helper as h
+from tqdm import tqdm
 
 size = {"GRCh37": 2864785220,
 		"GRCh38": 2913022398}
@@ -69,7 +71,7 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
 
     Args:
     -----
-      bams: the bams file|bucket paths 
+      bams: the bams file|bucket paths
       split: the splitter in the output date
       unknown: maybe the some dates can't be found the program will output unknown for them
       order: if 'asc', do d,m,y else do y,m,d
@@ -79,8 +81,7 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
       a list of likely dates or [unknown]s
     """
     DTs = []
-    for i, bam in enumerate(bams):
-        print(i / len(bams), end='\r')
+    for i, bam in enumerate(tqdm(bams)):
         data = os.popen('export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token`\
        && samtools view -H ' + bam + ' | grep "^@RG"')
         if data == signal.SIGINT:
@@ -106,16 +107,21 @@ def getBamDate(bams, split='-', order="des", unknown='U'):
     return DTs
 
 
-async def indexBams(bucketpath, cores=4):
-    """
-    given a bucket path, will index all .bam files without an associated index and return their paths
-    """
-    files = gcp.lsFiles([bucketpath])
-    bams = [val for val in files if '.bam' in val[-4:]]
-    unindexed = [val for val in bams if val[:-4]+'.bai' not in files and val[:4] +'.bam.bai' not in files]
-    print("found "+str(len(unindexed))+" files to reindex")
-    h.parrun(["export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` && samtools index "+val for val in unindexed], cores)
-    return {val: val[:-4]+".bam.bai" for val in unindexed}
+async def indexBams(bams=None, bucketpath=None, cores=4):
+	"""
+	given a bucket path, will index all .bam files without an associated index and return their paths
+	"""
+	if bams is None:
+		if bucketpath is None:
+			raise ValueError('need one of bams or bucketpath')
+		files = gcp.lsFiles([bucketpath])
+		bams = [val for val in files if '.bam' in val[-4:]]
+		unindexed = [val for val in bams if val[:-4]+'.bai' not in files and val[:4] +'.bam.bai' not in files]
+		print("found "+str(len(unindexed))+" files to reindex")
+	else:
+		unindexed = bams
+	h.parrun(["export GCS_OAUTH_TOKEN=`gcloud auth application-default print-access-token` && samtools index "+val for val in unindexed], cores)
+	return {val: val[:-4]+".bam.bai" for val in unindexed}
 
 
 
@@ -154,7 +160,7 @@ def dropWeirdChromosomes(bedfile, keep=[], skip=0):
 def extractPairedSingleEndFrom(folder, sep='-', namepos=2):
 	"""
 	given a folder, find fastq files and sorts paired and single end based on the R1/R2 patterns
-		
+
 	Args:
 	-----
 		folder: the folder where the fastqs are

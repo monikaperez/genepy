@@ -5,7 +5,7 @@ scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
          "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
 
 
-def dfToSheet(df, sheetid, secret='~/client_secret.json'):
+def dfToSheet(df, sheetid, secret='~/.credentials.json'):
     credentials = ServiceAccountCredentials.from_json_keyfile_name(secret, scope)
     client = gspread.authorize(credentials)
     spreadsheet = client.open(sheetid)
