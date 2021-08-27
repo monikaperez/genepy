@@ -634,12 +634,12 @@ async def shareTerraBams(samples, users, workspace, bamcols=["internal_bam_filep
     users = [users]
   wm = dm.WorkspaceManager(workspace)
   togiveaccess = np.ravel(wm.get_samples()[bamcols].loc[samples].values)
-  key = "-rdu " if unshare else "-ru " 
+  key = "-rd " if unshare else "-ru " 
   for user in users:
     files = ''
     for i in togiveaccess:
       files += ' ' + i
-    code = os.system("gsutil -m acl ch " + key + user + ":R " + files)
+    code = os.system("gsutil -m acl ch " + key + user +(" " if unshare else ":R ") + files)
     if code == signal.SIGINT:
       print('Awakened')
       break
@@ -689,11 +689,10 @@ async def shareCCLEbams(samples, users=[], groups=[], raise_error=True, arg_max_
 
   togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
   usrs = ""
-  key = " -d " if unshare else " -u "
   for group in groups:
-    usrs += " -g " + group + (":R" if not unshare else "")
+    usrs += (" -d " if unshare else ' -g') + group + (":R" if not unshare else "")
   for user in users:
-    usrs += key + user + (":R" if not unshare else "")
+    usrs += (" -d " if unshare else " -u ") + user + (":R" if not unshare else "")
   cmd_prefix = "gsutil -m acl ch" + usrs
   cmd = cmd_prefix
   for n, filename in enumerate(togiveaccess):
