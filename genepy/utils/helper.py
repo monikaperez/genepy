@@ -539,7 +539,6 @@ def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomar
   assert cache_folder[-1] == '/'
   cache_folder = os.path.expanduser(cache_folder)
   createFoldersFor(cache_folder)
-  assert(os.path.exists(cache_folder))
   cachefile = os.path.join(cache_folder, 'biomart_ensembltohgnc.csv')
   if useCache & os.path.isfile(cachefile):
     print('fetching gene names from biomart cache')
