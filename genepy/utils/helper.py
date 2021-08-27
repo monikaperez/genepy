@@ -511,7 +511,7 @@ def readXMLs(folder=None, file=None, rename=None):
         df = df.rename(columns=rename)
     return df
 
-def _fetchFromServer(ensemble_server, defattr, attributes):
+def _fetchFromServer(ensemble_server, attributes):
   server = BiomartServer(ensemble_server)
   ensmbl = server.datasets['hsapiens_gene_ensembl']
   res = pd.read_csv(io.StringIO(ensmbl.search({
