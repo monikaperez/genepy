@@ -2,10 +2,10 @@ from setuptools import setup
 import sys
 import os
 if sys.version_info.major < 3 or sys.version_info.minor < 2:
-    raise ValueError("genepy is only compatible with Python 3.3 and above")
+    raise ValueError("genepy is only compatible with Python 3.5 and above")
 if sys.version_info.minor < 5:
     import warnings
-    warnings.warn("genepy may not function properly on Python < 3.5")
+    warnings.warn("genepy may not function properly on Python < 3.8")
 
 os.system('git submodule init && git submodule sync')
 
@@ -24,7 +24,7 @@ setup(
               'genepy/epigenetics', 'genepy/mutations', 'genepy/google', 'genepy/sequencing/',
               'genepy/terra', 'genepy/rna', 'genepy/utils'],
     package_data={'genepy': ['data/*']},
-    python_requires='>=3.8',
+    python_requires='>=3.5',
     install_requires=[
         'rpy2-bioconductor-extensions',
         'gseapy',
