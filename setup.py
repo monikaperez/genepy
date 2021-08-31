@@ -35,6 +35,7 @@ setup(
         "colorcet",
         "firecloud_dalmatian",
         "gseapy",
+        "biomart",
         "gsheets",
         "gspread",
         "matplotlib",
