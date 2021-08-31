@@ -38,7 +38,7 @@ def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   from taigapy import TaigaClient
   tc = TaigaClient()
-  
+
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   for i, val in enumerate(listofgenes):
     if from_idtype == "ensembl_gene_id":
@@ -76,7 +76,7 @@ def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol")
   print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
   from taigapy import TaigaClient
   tc = TaigaClient()
-  
+
   gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   not_parsed = []
   renamed = []
@@ -659,35 +659,35 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                                         "Min Genes Detected",
                                         "Max Genes Detected"], data=np.array(tot).astype(bool).T)
 
-    print(a)
+  print(a)
+  h.createFoldersFor(folder)
+  res.to_csv(folder+'_qc_results.csv')
+  if plot and len(res)>0:
     h.createFoldersFor(folder)
-    res.to_csv(folder+'_qc_results.csv')
-    if plot and len(res)>0:
-      h.createFoldersFor(folder)
-      _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
-      plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
-      plt.yticks(rotation = 0)
-      plt.show()
-      plot.get_figure().savefig(folder+'failed_qc.pdf')
+    _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
+    plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
+    plt.yticks(rotation = 0)
+    plt.show()
+    plot.get_figure().savefig(folder+'failed_qc.pdf')
 
-      num_cols = 10
-      num_rows = math.ceil(len(rnaqc)/num_cols)
-      _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
-      for val_idx, val in enumerate(rnaqc.index):
-        ax = axes.flatten()[val_idx]
-        qc = rnaqc.loc[val]
-        sns.violinplot(y=qc, ax=ax)
-        q1 = qc.quantile(qant1)
-        q3 = qc.quantile(qant3)
-        outlier_top_lim = q3 + 1.5 * (q3 - q1)
-        outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
-        for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
-          ax.text(0.05, v, k, ha='left', va='center',
-                    color='red' if k in a else 'black')
-      plt.tight_layout()
-      plt.show()
-      plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
-    return res
+    num_cols = 10
+    num_rows = math.ceil(len(rnaqc)/num_cols)
+    _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
+    for val_idx, val in enumerate(rnaqc.index):
+      ax = axes.flatten()[val_idx]
+      qc = rnaqc.loc[val]
+      sns.violinplot(y=qc, ax=ax)
+      q1 = qc.quantile(qant1)
+      q3 = qc.quantile(qant3)
+      outlier_top_lim = q3 + 1.5 * (q3 - q1)
+      outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
+      for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
+        ax.text(0.05, v, k, ha='left', va='center',
+                  color='red' if k in a else 'black')
+    plt.tight_layout()
+    plt.show()
+    plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
+  return res
 
 
 def getDifferencesFromCorrelations(df1, df2, minsimi=0.99999999999999):
