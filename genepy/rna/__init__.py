@@ -555,8 +555,9 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
   return results
 
 
-async def gsva(data, geneset_file, pathtogenepy="../", method='ssgsea', recompute=True):
+async def gsva(data, geneset_file, method='ssgsea', recompute=True):
   print('you need to have R installed with GSVA and GSEABase library installed')
+  pathtogenepy = os.path.dirname(os.path.abspath(__file__))
   if not recompute and os.path.exists("/tmp/data_genepyhelper_gsva.csv") and os.path.exists(
     "/tmp/res_genepy_ssGSEA.tsv"):
     print('trying to bypass computing...')
