@@ -295,7 +295,7 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
             var value = cb_obj.value
             var gene_id = data.gene_id
             var a = -1
-            for (i=0; i < gene_id.length; i++) {
+            for (let i=0; i < gene_id.length; i++) {
                 if ( gene_id[i]===value ) { a=i; console.log(i); data.size[i]=7; data.alpha[i]=1; data.color[i]='#fc8d59' }
             }
             source.data = data

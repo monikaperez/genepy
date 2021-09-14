@@ -555,8 +555,9 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
   return results
 
 
-async def gsva(data, geneset_file, pathtogenepy="../", method='ssgsea', recompute=True):
+async def gsva(data, geneset_file, method='ssgsea', recompute=True):
   print('you need to have R installed with GSVA and GSEABase library installed')
+  pathtogenepy = os.path.dirname(os.path.abspath(__file__))
   if not recompute and os.path.exists("/tmp/data_genepyhelper_gsva.csv") and os.path.exists(
     "/tmp/res_genepy_ssGSEA.tsv"):
     print('trying to bypass computing...')
@@ -691,20 +692,20 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
 
 
 def getDifferencesFromCorrelations(df1, df2, minsimi=0.99999999999999):
-    res = []
-    overlap = set(df1.columns) & set(df2.columns)
-    print(str(len(overlap))+" overlap")
-    df1 = df1[overlap].copy()
-    df2 = df2[overlap].copy()
-    for k, val in df1.iterrows():
-      if k in df2.index:
-        corr = np.corrcoef(df1.loc[k], df2.loc[k])
-        if corr[0, 1] < minsimi:
-          res.append((k, corr[0, 1]))
-        else:
-          print(k+" not in second df")
-    print("found "+str(len(res))+" samples that did not match")
-    return res
+  res = []
+  overlap = set(df1.columns) & set(df2.columns)
+  print(str(len(overlap))+" overlap")
+  df1 = df1[overlap].copy()
+  df2 = df2[overlap].copy()
+  for k, val in df1.iterrows():
+    if k in df2.index:
+      corr = np.corrcoef(df1.loc[k], df2.loc[k])
+      if corr[0, 1] < minsimi:
+        res.append((k, corr[0, 1]))
+      else:
+        print(k+" not in second df")
+  print("found "+str(len(res))+" samples that did not match")
+  return res
 
 
 def rnaseqcorrelation(cn, rna, ax=None, name=None):

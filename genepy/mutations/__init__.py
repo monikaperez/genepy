@@ -123,9 +123,9 @@ def mafToMat(maf, mode="bool", freqcol='tumor_f',
       bool if mode == "bool" else float).drop(columns=['fake'])
   if mode == "genotype":
     mut[(mut > 1.3)] = 3
-    mut[(mut >= 0.8) & (mut <= 1.3)] = 2
-    mut[(mut > .2) & (mut < .8)] = 1
-    mut[mut <= .2] = 0
+    mut[(mut >= 0.7) & (mut <= 1.3)] = 2
+    mut[(mut > .3) & (mut < .7)] = 1
+    mut[mut <= .3] = 0
   return mut
 
 
