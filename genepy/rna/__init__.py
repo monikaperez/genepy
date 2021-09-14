@@ -575,7 +575,8 @@ async def gsva(data, geneset_file, pathtogenepy="../", method='ssgsea', recomput
   return res
 
 
-def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3=0.93, thresholds={}):
+def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3=0.93, thresholds={},
+    num_cols = 10, figsize=(10, 0.2)):
   thresh = {'minmapping': 0.8,  # Mapping Rate
             'minendmapping': 0.75,
             'minefficiency': 0.6,  # Expression Profiling Efficiency
@@ -660,33 +661,32 @@ def filterRNAfromQC(rnaqc, folder='tempRNAQCplot/', plot=True, qant1=0.07, qant3
                                         "Max Genes Detected"], data=np.array(tot).astype(bool).T)
 
   print(a)
-  h.createFoldersFor(folder)
-  res.to_csv(folder+'_qc_results.csv')
-  if plot and len(res)>0:
+  if len(res) > 0:
     h.createFoldersFor(folder)
-    _, ax = plt.subplots(figsize=(10, math.ceil(len(res)*0.2)))
-    plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
-    plt.yticks(rotation = 0)
-    plt.show()
-    plot.get_figure().savefig(folder+'failed_qc.pdf')
+    res.to_csv(folder+'_qc_results.csv')
+    if plot:
+      _, ax = plt.subplots(figsize=(figsize[0], math.ceil(len(res)*figsize[1])))
+      plot = sns.heatmap(res, xticklabels=True, yticklabels=True, cbar=False)
+      plt.yticks(rotation = 0)
+      plt.show()
+      plot.get_figure().savefig(folder+'failed_qc.pdf')
 
-    num_cols = 10
-    num_rows = math.ceil(len(rnaqc)/num_cols)
-    _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
-    for val_idx, val in enumerate(rnaqc.index):
-      ax = axes.flatten()[val_idx]
-      qc = rnaqc.loc[val]
-      sns.violinplot(y=qc, ax=ax)
-      q1 = qc.quantile(qant1)
-      q3 = qc.quantile(qant3)
-      outlier_top_lim = q3 + 1.5 * (q3 - q1)
-      outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
-      for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
-        ax.text(0.05, v, k, ha='left', va='center',
-                  color='red' if k in a else 'black')
-    plt.tight_layout()
-    plt.show()
-    plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
+      num_rows = math.ceil(len(rnaqc)/num_cols)
+      _, axes = plt.subplots(num_rows, num_cols, figsize=(20, num_rows*2))
+      for val_idx, val in enumerate(rnaqc.index):
+        ax = axes.flatten()[val_idx]
+        qc = rnaqc.loc[val]
+        sns.violinplot(y=qc, ax=ax)
+        q1 = qc.quantile(qant1)
+        q3 = qc.quantile(qant3)
+        outlier_top_lim = q3 + 1.5 * (q3 - q1)
+        outlier_bottom_lim = q1 - 1.5 * (q3 - q1)
+        for k, v in qc[(qc < outlier_bottom_lim) | (qc > outlier_top_lim)].iteritems():
+          ax.text(0.05, v, k, ha='left', va='center',
+                    color='red' if k in a else 'black')
+      plt.tight_layout()
+      plt.show()
+      plt.savefig('{}/qc_metrics.pdf'.format(folder), bbox_inches='tight')
   return res
 
 
