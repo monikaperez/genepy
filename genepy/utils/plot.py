@@ -60,7 +60,7 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
   cols = []
   for i in range(data.shape[0]):
     radii.append(radi if importance is None else radi /
-                  2 + importance[i] * 30)
+                  (1 + importance[i]))
     fill_alpha.append(
       alpha if importance is None else alpha - (0.2 * importance[i]))
     cols.append(col[0] if colors is None else col[int(colors[i])])
@@ -748,3 +748,26 @@ def SOMPlot(net, size, colnames, minweight=0.1, distq1=0.535, distq2=0.055, dist
     somnodes.loc[i, 'features'] = tot
   #interactive SOM with features with highest importance to the nodes, displayed when hovering
   bigScatter(somnodes, precomputed=True, features=True, binsize=1, title='Cobinding SOM cluster of '+str(size), folder=folder)
+
+
+def quartdist(x):
+  """
+  creates a dist plot from a dataframe with quartiles
+
+  Args:
+  -----
+    x: dataframe to run kdeplot on
+
+  """
+  ax, _ = plt.subplots(figsize=(10, 10))
+  sns.kdeplot(x, shade=False, color='crimson', ax=ax)
+  kdeline = ax.lines[0]
+  xs = kdeline.get_xdata()
+  ys = kdeline.get_ydata()
+  left, middle, right = np.percentile(x, [25, 50, 75])
+  ax.set_title('Showing median and quartiles')
+  ax.vlines(middle, 0, np.interp(middle, xs, ys), color='crimson', ls=':')
+  ax.fill_between(xs, 0, ys, facecolor='crimson', alpha=0.2)
+  ax.fill_between(xs, 0, ys, where=(left <= xs) & (xs <= right), interpolate=True, facecolor='crimson', alpha=0.2)
+  ax.set_ylim(ymin=0)
+  plt.show()
