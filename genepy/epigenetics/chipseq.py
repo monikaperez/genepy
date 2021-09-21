@@ -278,7 +278,7 @@ def putInBed(conscensus, value, window=10, mergetype='mean'):
     if len(num)>0:
       if mergetype=='mean':
         res[loc] = np.mean(num)
-      elif mergetype=='first':
+      elif mergetype=='sum':
         res[loc]=np.sum(num)
       elif mergetype=='first':
         res[loc]=num[0]
