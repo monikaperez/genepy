@@ -85,7 +85,6 @@ def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
   moves a set of files l into a folder:
 
   Args:
-  -----
     l: file list
     pattern: if files are a set of patterns to match
     folder: folder to move file into
@@ -111,9 +110,8 @@ def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
   Given a dict renames corresponding files in a folder
 
   Args:
-  ----
-    dt: dict(currentName:newName) renaming dictionnary
-    folder: folder to look into
+    dt (dict): dict(currentName:newName) renaming dictionnary
+    folder (str): folder to look into
     add: some additional mv parameters
   """
   cmd = 'ls -R ' + folder if doAll else 'ls ' + folder
@@ -155,6 +153,7 @@ def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
 def grouped(iterable, n):
   """
   iterate over element of list 2 at a time python
+
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
   it = iter(iterable)
@@ -166,7 +165,8 @@ def grouped(iterable, n):
 
 
 def overlap(interval1, interval2):
-  """
+  """computed overlap
+
   Given [0, 4] and [1, 10] returns [1, 4]
   Given [0, 4] and [8, 10] returns False
   """
@@ -222,14 +222,12 @@ def randomString(stringLength=6, stype='all', withdigits=True):
   Generate a random string of letters and digits
 
   Args:
-  -----
-    stringLength: the amount of char
-    stype: one of lowercase, uppercase, all
-    withdigits: digits allowed in the string?
+    stringLength (int, optional): the amount of char. Defaults to 6.
+    stype (str, optional): one of lowercase, uppercase, all. Defaults to 'all'.
+    withdigits (bool, optional): digits allowed in the string? Defaults to True.
 
   Returns:
-  -------
-    the string
+    str: random string
   """
   if stype == 'lowercase':
     lettersAndDigits = string.ascii_lowercase
@@ -275,7 +273,6 @@ def parrun(cmds, cores, add=[]):
   runs a set of commands in parallel using the "&" command
 
   Args:
-  -----
     cmds: the list of commands
     cores: number of parallel execution
     add: an additional list(len(cmds)) of command to run in parallel at the end of each parallel run
@@ -328,7 +325,6 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
     transforms an int representing days into a date
 
     Args:
-    ----
       i: the int
       lim: the limited year below which we have a mistake
       unknown: what to return when unknown (date is bellow the limited year)
@@ -337,7 +333,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
       startsatyear: when is the year to start counting for this int
 
     Returns:
-      the date or unknown
+      str: the date or unknown
     """
     a = int(i // 365)
     if a > lim:
@@ -357,13 +353,14 @@ def datetoint(dt, split='-', unknown='U', order="des"):
 
   starts at 0y,0m,0d
 
-  dt: the date string
-  split: the splitter in the string (e.g. /,-,...)
-  unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
-  order: if 'asc', do d,m,y else do y,m,d
+  Args:
+    dt: the date string
+    split: the splitter in the string (e.g. /,-,...)
+    unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
+    order: if 'asc', do d,m,y else do y,m,d
 
   Returns:
-    the date
+    int: the date
   """
   arr = np.array(dt[0].split(split) if dt[0] !=
                   unknown else [0, 0, 0]).astype(int)
@@ -425,7 +422,6 @@ def makeCombinations(size, proba):
   given binomial probabilities of each event occuring and the number of trials
 
   Args:
-  -----
     size: int number of trials
     proba: list[float] probabilities of each event occuring
   """
@@ -540,12 +536,10 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
   make a df from cellosaurus' human cancer cell line data
 
   Args:
-  -----
-    ftp str the ftp link to the cellosaurus latest txt db export
+    ftp (str): the ftp link to the cellosaurus latest txt db export
 
   Returns:
-  -------
-    pd.DataFrame indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
+    pd.DataFrame: indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
     "sex", "patient_id", "parent_id", "date", "synonyms", "has_issues", "comments"
   """
   print('make sure to have wget installed')

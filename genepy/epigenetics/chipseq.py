@@ -248,7 +248,9 @@ def simpleMergePeaks(peaks, window=0, totpeaknumber=0, maxp=True, mergedFold="me
   tfmerged = pd.DataFrame(tfmerged)
   return pd.concat([merged_bed, tfmerged], axis=1, sort=False)
 
+#from numba import jit, float32, int8
 
+#@jit(float32[:](float32[:, 3], float32[:, 4], int8, str))
 def putInBed(conscensus, value, window=10, mergetype='mean'):
   """ 
   given a conscensus bed-like dataframe and another one, will merge the second one into the first
@@ -293,37 +295,40 @@ def putInBed(conscensus, value, window=10, mergetype='mean'):
     return res, num, not_end,loc
   while not_end:
     print(loc/len(conscensus),end="\r")
-    a = conscensus.iloc[loc]
-    b = value.iloc[locinvalue]
-    if b.chrom < a.chrom:
-      locinvalue+=1
-      if locinvalue == len(value):
-        not_end=False
-    elif b.chrom > a.chrom:
-      loc+=1
-      if loc == len(conscensus):
-        not_end=False
-    elif b.start<a.start:
-      if b.end+window>a.start:
+    try:
+      a = conscensus.iloc[loc]
+      b = value.iloc[locinvalue]
+      if b.chrom < a.chrom:
+        locinvalue+=1
+        if locinvalue == len(value):
+          not_end=False
+      elif b.chrom > a.chrom:
+        loc+=1
+        if loc == len(conscensus):
+          not_end=False
+      elif b.start<a.start:
+        if b.end+window>a.start:
+          tot+=1
+          num.append(b.foldchange)
+          if b.end>a.end+window:
+            res,num,not_end,loc = add(res,num,not_end,loc)
+            continue
+        locinvalue+=1
+        if locinvalue == len(value):
+          not_end=False
+      elif b.start<a.end+window:
         tot+=1
         num.append(b.foldchange)
         if b.end>a.end+window:
           res,num,not_end,loc = add(res,num,not_end,loc)
           continue
-      locinvalue+=1
-      if locinvalue == len(value):
-        not_end=False
-    elif b.start<a.end+window:
-      tot+=1
-      num.append(b.foldchange)
-      if b.end>a.end+window:
+        locinvalue+=1
+        if locinvalue == len(value):
+          not_end=False
+      else:
         res,num,not_end,loc = add(res,num,not_end,loc)
-        continue
-      locinvalue+=1
-      if locinvalue == len(value):
-        not_end=False
-    else:
-      res,num,not_end,loc = add(res,num,not_end,loc)
+    except:
+      import pdb; pdb.set_trace()
   print(str(tot)+' were merged into conscensus')
   return res
 

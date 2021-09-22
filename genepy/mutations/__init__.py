@@ -10,7 +10,7 @@ from genepy.utils import helper as h
 import gzip
 import seaborn as sns
 
-def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
+def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[], **kwargs):
   """
   transforms a vcf file into a dataframe file as best as it can
 
@@ -56,8 +56,12 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   names = ['chr', 'pos', 'id', 'ref', 'alt', 'qual']
   names += ['filter'] if hasfilter else ['strand']
   names += ['data', 'format'] + samples
-  a = pd.read_csv(path, sep='\t', comment="#", header=None,
-                  names=names, index_col=False)
+  csvkwargs = {'sep': '\t', 
+              'index_col': False, 
+              'header': None, 
+              #'names': names, 
+              'comment': "#"}
+  a = pd.read_csv(path, **csvkwargs)
   print(description)
   try:
     for j, val in enumerate(a.data.str.split(';').values.tolist()):
@@ -68,6 +72,8 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   except ValueError:
     print(val)
     raise ValueError('unknown field')
+  except:
+    import pdb; pdb.set_trace()
   a = pd.concat([a.drop(columns='data'), pd.DataFrame(
       data=fields, index=a.index)], axis=1)
   for sample in samples:
