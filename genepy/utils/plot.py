@@ -3,6 +3,7 @@
 # in 2019
 
 from __future__ import print_function
+from bokeh.core.enums import OutputBackend
 import venn as pyvenn
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -14,7 +15,7 @@ from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, PrintfTickF
 from bokeh.models import ColumnDataSource, LinearColorMapper, LogColorMapper
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
-from bokeh.io import show, export_svg
+from bokeh.io import show, export_svg, output_file
 from bokeh.plotting import *
 import bokeh
 import colorcet as cc
@@ -76,7 +77,7 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
 				("name", "@labels"),
 				("(x,y)", "(@x, @y)"),
 		]
-		p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title)
+		p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title, output_backend="svg")
 		p.circle('x', 'y', color='fill_color',
 						 fill_alpha='fill_alpha',
 						 line_width=0,
@@ -87,14 +88,14 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
 				labels = LabelSet(x='x', y='y', text='labels', level='glyph', text_font_size='9pt',
 													x_offset=5, y_offset=5, source=source, render_mode='canvas')
 				p.add_layout(labels)
-		p.output_backend = "svg"
+		#p.output_backend = "svg"
 		try:
 				show(p)
 		except:
 				show(p)
 		if folder:
-			save(p, folder + title.replace(' ', "_") + "_scatter.html")
-			export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
+			save(p, folder + '_' + title.replace(' ', "_") + "_scatter.html")
+			#export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
 		return p
 
 
@@ -262,8 +263,7 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
 																	 names=['circles'])
 
 		# Create figure
-		p = bokeh.plotting.figure(title=title, plot_width=650,
-															plot_height=450)
+		p = bokeh.plotting.figure(title=title, plot_width=650, plot_height=450, output_backend="svg")
 
 		p.xgrid.grid_line_color = 'white'
 		p.ygrid.grid_line_color = 'white'
@@ -272,10 +272,8 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
 
 		# Add the hover tool
 		p.add_tools(hover)
-		p, source1 = add_points(p, to_plot_not, 'log2FoldChange',
-														'pvalue', color='#1a9641', maxvalue=maxvalue)
-		p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue',
-														color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
+		p, source1 = add_points(p, to_plot_not, 'log2FoldChange', 'pvalue', color='#1a9641', maxvalue=maxvalue)
+		p, source2 = add_points(p, to_plot_yes, 'log2FoldChange', 'pvalue', color='#fc8d59', alpha=0.6, outline=True, maxvalue=maxvalue)
 		if showlabels:
 				labels = LabelSet(x='log2FoldChange', y='transformed_q', text_font_size='7pt', text="gene_id", level="glyph",
 													x_offset=5, y_offset=5, source=source2, render_mode='canvas')
@@ -298,10 +296,13 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
 			console.log(source)
 			"""))
 				p = column(text, p)
-		p.output_backend = "svg"
+		#p.output_backend = "svg"
 		if folder:
-			save(p, folder + title.replace(' ', "_") + "_volcano.html")
-			export_svg(p, filename=folder + title.replace(' ', "_") + "_volcano.svg")
+			output_filename = "{}_{}_volcano.html".format(folder,title.replace(" ", "_"))
+			print("Attempting to save figure to {}".format(output_filename))
+			save(p, output_filename)
+			#save(p, folder + "_" + title.replace(' ', "_") + "_volcano.html")
+			#export_svg(p, filename=folder + title.replace(' ', "_") + "_volcano.svg")
 		try:
 				show(p)
 		except:
