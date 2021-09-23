@@ -10,5 +10,5 @@ client = gspread.authorize(credentials)
 spreadsheet = client.open('https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE')
 
 with open(file, 'r') as file_obj:
-    content = file_obj.read()
-    client.import_csv(spreadsheet.id, data=content)
+  content = file_obj.read()
+  client.import_csv(spreadsheet.id, data=content)

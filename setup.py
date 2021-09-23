@@ -2,10 +2,10 @@ from setuptools import setup
 import sys
 import os
 if sys.version_info.major < 3 or sys.version_info.minor < 2:
-    raise ValueError("genepy is only compatible with Python 3.3 and above")
+    raise ValueError("genepy is only compatible with Python 3.5 and above")
 if sys.version_info.minor < 5:
     import warnings
-    warnings.warn("genepy may not function properly on Python < 3.5")
+    warnings.warn("genepy may not function properly on Python < 3.8")
 
 os.system('git submodule init && git submodule sync')
 
@@ -32,13 +32,15 @@ setup(
         'deeptools',
         ## from requirements.txt
         "bokeh",
-        "firecloud-dalmatian",
-        "google_api_python_client",
+        "colorcet",
+        "firecloud_dalmatian",
+        "gseapy",
+        "biomart",
         "gsheets",
         "gspread",
-        "ipython",
         "matplotlib",
         "numpy",
+        "oauth2client",
         "pandas",
         "Pillow",
         "pybedtools",
@@ -47,12 +49,12 @@ setup(
         "pytest",
         "requests",
         "rpy2",
-        "scikit-learn",
+        "itermplot",
+        "scikit_learn",
         "scipy",
         "seaborn",
-        "setuptools",
+        "statsmodels",
         "taigapy",
-        "typing",
         "venn",
         ],  # external packages as dependencies
     classifiers=[
@@ -69,7 +71,8 @@ print("You might want to install Bowtie2, samtools, bwa and R to be able to use 
   https://github.com/lh3/bwa\n")
 
 print("trying to install R packages")
-os.system("R -e 'if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));'")
+os.system(
+    "R -e \"if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\", repos=\"http://cran.us.r-project.org\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));\"")
 print('if it did not work. please install R or check your R installation')
 print("once R is installed you need to install erccdashboard, GSEABase GSVA, DESeq2 to have access to all the functions")
 
