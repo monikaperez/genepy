@@ -450,47 +450,47 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
   print("found " + str(len(data)) + ' files:' + str(data.keys()))
   
   for k, val in data.items():
-      if len(set(val.Name)) != prev and prev != -2:
-          raise ValueError(
-              'we do not have the same number of genes in each file')
-      prev = len(set(val.Name))
+    if len(set(val.Name)) != prev and prev != -2:
+      raise ValueError(
+          'we do not have the same number of genes in each file')
+    prev = len(set(val.Name))
       
   # make dict for each unique gene of list of 0s per sample (can be multiple regions)
   readcounts = {i: [0] * len(data) for i in val.Name.unique()}
   tccounts = {i: [0] * len(data) for i in val.Name.unique()}
   
   for n, (_, val) in enumerate(data.items()):
-      val = val.sort_values(by="Name")        # make df rows ordered by gene name
-      j = 0
-      readcount = [val.iloc[0].ReadCount]     # get ReadCount at first row
-      tccount = [val.iloc[0].TcReadCount]     # get TcReadCount at first row
-      prevname = val.iloc[0].Name             # get row Name
-      
-      # repeat for all rows
-      for _, v in val.iloc[1:].iterrows():
-          if v.Name == 4609 and verbose:                  # MYC region (for QC purposes)
-              print("MYC Total counts: {}".format(v.ReadCount))
-              print("MYC T to C converted counts: {}".format(v.TcReadCount))
-              #print(readcount, tccount)
-          if v.Name == prevname:              # add counts to rows with the same name
-              readcount.append(v.ReadCount)
-              tccount.append(v.TcReadCount)
-          else:
-              readcounts[prevname][n] = np.sum(readcount) # sum read counts in rows with the same name
-              tccounts[prevname][n] = np.sum(tccount)
-              # if np.var(readcount) > flag_var:
-              #    print("pb with "+str(v.Name))
-              prevname = v.Name               # new gene name for region
-              j += 1
-              # print(j,end='\r')
-              readcount = [v.ReadCount]       # get read count for new region
-              tccount = [v.TcReadCount]
+    print(_.split("_tcount")[0])
+    val = val.sort_values(by="Name")        # make df rows ordered by gene name
+    j = 0
+    readcount = [val.iloc[0].ReadCount]     # get ReadCount at first row
+    tccount = [val.iloc[0].TcReadCount]     # get TcReadCount at first row
+    prevname = val.iloc[0].Name             # get row Name
+    
+    # repeat for all rows
+    for _, v in val.iloc[1:].iterrows():
+      if v.Name == 4609 and verbose:                  # MYC region (for QC purposes)
+          print("MYC (readcounts, tccounts): {}, {}".format(v.ReadCount, v.TcReadCount))
+          #print(readcount, tccount)
+      if v.Name == prevname:              # add counts to rows with the same name
+        readcount.append(v.ReadCount)
+        tccount.append(v.TcReadCount)
+      else:
+        readcounts[prevname][n] = np.sum(readcount) # sum read counts in rows with the same name
+        tccounts[prevname][n] = np.sum(tccount)
+        # if np.var(readcount) > flag_var:
+        #    print("pb with "+str(v.Name))
+        prevname = v.Name               # new gene name for region
+        j += 1
+        # print(j,end='\r')
+        readcount = [v.ReadCount]       # get read count for new region
+        tccount = [v.TcReadCount]
   
   files = [*data]
   readcounts = pd.DataFrame(
-      data=readcounts, columns=val.Name.unique(), index=data.keys()).T
+    data=readcounts, columns=val.Name.unique(), index=data.keys()).T
   tccounts = pd.DataFrame(
-      data=tccounts, columns=val.Name.unique(), index=data.keys()).T
+    data=tccounts, columns=val.Name.unique(), index=data.keys()).T
   
   # convert to gene symbols
   if convertTo:
