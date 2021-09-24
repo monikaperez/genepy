@@ -460,7 +460,6 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
   tccounts = {i: [0] * len(data) for i in val.Name.unique()}
   
   for n, (_, val) in enumerate(data.items()):
-      print(_.split("_tcount")[0])
       val = val.sort_values(by="Name")        # make df rows ordered by gene name
       j = 0
       readcount = [val.iloc[0].ReadCount]     # get ReadCount at first row
@@ -495,12 +494,11 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
   
   # convert to gene symbols
   if convertTo:
-    names, _ = convertGenes(readcounts.index.tolist(), 
-                            from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
+    names, _ = convertGenes(readcounts.index.tolist(
+    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     readcounts.index = names
-
-    names, _ = convertGenes(tccounts.index.tolist(), 
-                            from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
+    names, _ = convertGenes(tccounts.index.tolist(
+    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     tccounts.index = names
   
   nottodrop = np.argwhere(tccounts.values.var(1) >= # remove regions/genes with variance of 0 across samples
