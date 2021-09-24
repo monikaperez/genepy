@@ -56,47 +56,44 @@ def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
   return(tokeep)
 
 
-def convertGenes(listofgenes, from_idtype="ensembl_gene_id", to_idtype="symbol"):
+def convertGenes(listofgenes, from_idtype="ensemble_gene_id", to_idtype="hgnc_symbol"):
   """
-  Given a list of genes, provide the args where the genes are protein coding genes:
-
-  This functtion will use a file in taiga, you need taigapy installed
-
+  Given a list of genes, will convert to different ID type
+  
   Args:
   -----
     listofgenes: list of genes
-    from_idtype: one of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name", the gene name format
-    to_idtype: one of "symbol","uniprot_ids","pubmed_id","ensembl_gene_id","entrez_id","name", the gene name format
-
+    from_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
+    to_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
+  
   Returns:
   -------
     1: the new names for each genes that were matched else the same name
     2: the names of genes that could not be matched
   """
-  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
-  from taigapy import TaigaClient
-  tc = TaigaClient()
-
-  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
+  
+  gene_mapping = h.generateGeneNames()
+  
   not_parsed = []
   renamed = []
   b = 0
   to = {}
+  
   for i, val in gene_mapping.iterrows():
-    to[val[from_idtype]] = val[to_idtype]
+      to[val[from_idtype]] = val[to_idtype]
+      
   for i, val in enumerate(listofgenes):
-    if from_idtype == "ensembl_gene_id":
-      val = val.split(".")[0]
-    elif from_idtype == "hgnc_id":
-      val = "HGNC:" + str(val)
-    try:
-      a = to[val]
-      renamed.append(int(a) if to_idtype == 'entrez_id' else a)
-    except KeyError:
-      b += 1
-      not_parsed.append(val)
-      renamed.append(val)
-  print(str(b) + " could not be parsed... we don't have all genes already")
+      if from_idtype == "ensembl_gene_id":
+          val = val.split(".")[0]
+      elif from_idtype == "entrezgene_id":
+          try:
+              a = to[val]
+              renamed.append(a)
+          except KeyError:
+              b += 1
+              not_parsed.append(val)
+              renamed.append(val)
+  print(str(b) + " count not be parsed... we don't have all genes already")
   return(renamed, not_parsed)
 
 
@@ -422,72 +419,93 @@ def mergeSplicingVariants(df, defined='.'):
   df = df.drop(index=todrop)
   return df
 
-def readFromSlamdunk(loc='res/count/', flag_var=100, convertTo='symbol',
-                     minvar_toremove=0, mincount_toremove=5):
-  """
 
+def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
+                     minvar_toremove=0, mincount_toremove=5, verbose=True):
+    
+  """
+  Given a list of genes, provide the args where the genes are protein coding genes (or given biotype):
+  
   Args:
   -----
-
+    listofgenes: list of genes
+    from_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
+    to_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
+    gene_biotype: gene/transcript biotype
+    verbose: print total counts and t to c converted counts at MYC
+  
   Returns:
-  --------
-
+  -------
+    1: the new names for each genes that were matched else the same name
+    2: the names of genes that could not be matched
   """
-  files = os.listdir(loc)
-  files = [file for file in files if file.endswith('.tsv')]
+  
+  files = sorted(os.listdir(loc)) # sorted files
+  files = [file for file in files if file.endswith(".tsv")]
   data = {}
   for file in files:
-    data[file.split('/')[-1].split('.')[0]] = pd.read_csv(loc +
-                                                          file, sep='\t', comment='#', header=0)
+      data[file.split('/')[-1].split('.')[0]] = pd.read_csv(loc+file, sep='\t', comment='#', header=0)
+  
   prev = -2
   print("found " + str(len(data)) + ' files:' + str(data.keys()))
+  
   for k, val in data.items():
     if len(set(val.Name)) != prev and prev != -2:
       raise ValueError(
           'we do not have the same number of genes in each file')
     prev = len(set(val.Name))
+      
+  # make dict for each unique gene of list of 0s per sample (can be multiple regions)
   readcounts = {i: [0] * len(data) for i in val.Name.unique()}
   tccounts = {i: [0] * len(data) for i in val.Name.unique()}
+  
   for n, (_, val) in enumerate(data.items()):
-    val = val.sort_values(by="Name")
+    print(_.split("_tcount")[0])
+    val = val.sort_values(by="Name")        # make df rows ordered by gene name
     j = 0
-    #print('              ',end='\r')
-    readcount = [val.iloc[0].ReadCount]
-    tccount = [val.iloc[0].TcReadCount]
-    prevname = val.iloc[0].Name
+    readcount = [val.iloc[0].ReadCount]     # get ReadCount at first row
+    tccount = [val.iloc[0].TcReadCount]     # get TcReadCount at first row
+    prevname = val.iloc[0].Name             # get row Name
+    
+    # repeat for all rows
     for _, v in val.iloc[1:].iterrows():
-      if v.Name == 4609:
-        print(v.ReadCount, v.TcReadCount)
-        print(readcount, tccount)
-      if v.Name == prevname:
+      if v.Name == 4609 and verbose:                  # MYC region (for QC purposes)
+          print("MYC (readcounts, tccounts): {}, {}".format(v.ReadCount, v.TcReadCount))
+          #print(readcount, tccount)
+      if v.Name == prevname:              # add counts to rows with the same name
         readcount.append(v.ReadCount)
         tccount.append(v.TcReadCount)
       else:
-        readcounts[prevname][n] = np.sum(readcount)
+        readcounts[prevname][n] = np.sum(readcount) # sum read counts in rows with the same name
         tccounts[prevname][n] = np.sum(tccount)
         # if np.var(readcount) > flag_var:
         #    print("pb with "+str(v.Name))
-        prevname = v.Name
+        prevname = v.Name               # new gene name for region
         j += 1
         # print(j,end='\r')
-        readcount = [v.ReadCount]
+        readcount = [v.ReadCount]       # get read count for new region
         tccount = [v.TcReadCount]
+  
   files = [*data]
   readcounts = pd.DataFrame(
-      data=readcounts, columns=val.Name.unique(), index=data.keys()).T
+    data=readcounts, columns=val.Name.unique(), index=data.keys()).T
   tccounts = pd.DataFrame(
-      data=tccounts, columns=val.Name.unique(), index=data.keys()).T
+    data=tccounts, columns=val.Name.unique(), index=data.keys()).T
+  
+  # convert to gene symbols
   if convertTo:
     names, _ = convertGenes(readcounts.index.tolist(
-    ), from_idtype="entrez_id", to_idtype=convertTo)
+    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     readcounts.index = names
     names, _ = convertGenes(tccounts.index.tolist(
-    ), from_idtype="entrez_id", to_idtype=convertTo)
+    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     tccounts.index = names
-  nottodrop = np.argwhere(tccounts.values.var(1) >= minvar_toremove).ravel()
+  
+  nottodrop = np.argwhere(tccounts.values.var(1) >= # remove regions/genes with variance of 0 across samples
+                          minvar_toremove).ravel()
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
-  nottodrop = np.argwhere(readcounts.values.max(1) >=
+  nottodrop = np.argwhere(readcounts.values.max(1) >= # remove regions/genes with very low counts
                           mincount_toremove).ravel()
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
