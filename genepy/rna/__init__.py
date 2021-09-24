@@ -18,7 +18,7 @@ import numpy as np
 import subprocess
 
 
-def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
+def filterProteinCoding(listofgenes, from_idtype='ensemble_gene_id'):
   """
   Given a list of genes, provide the args where the genes are protein coding genes:
 
@@ -35,18 +35,14 @@ def filterProteinCoding(listofgenes, from_idtype='ensembl_gene_id'):
   """
   tokeep = []
   b = 0
-  print("you need access to taiga for this (https://pypi.org/project/taigapy/)")
-  from taigapy import TaigaClient
-  tc = TaigaClient()
+  gene_mapping = h.generateGeneNames()
 
-  gene_mapping = tc.get(name='hgnc-87ab', file='hgnc_complete_set')
   for i, val in enumerate(listofgenes):
-    if from_idtype == "ensembl_gene_id":
+    if from_idtype == "ensemble_gene_id":
       val = val.split(".")[0]
     elif from_idtype == "hgnc_id":
       val = "HGNC:" + str(val)
-    a = gene_mapping["locus_group"][gene_mapping[from_idtype]
-                                    == val].values
+    a = gene_mapping["locus_group"][gene_mapping[from_idtype] == val].values
     if len(a) > 0:
       if a[0] == "protein-coding gene":
         tokeep.append(i)
@@ -80,19 +76,19 @@ def convertGenes(listofgenes, from_idtype="ensemble_gene_id", to_idtype="hgnc_sy
   to = {}
   
   for i, val in gene_mapping.iterrows():
-      to[val[from_idtype]] = val[to_idtype]
-      
+    to[val[from_idtype]] = val[to_idtype]
+
   for i, val in enumerate(listofgenes):
-      if from_idtype == "ensembl_gene_id":
-          val = val.split(".")[0]
-      elif from_idtype == "entrezgene_id":
-          try:
-              a = to[val]
-              renamed.append(a)
-          except KeyError:
-              b += 1
-              not_parsed.append(val)
-              renamed.append(val)
+    if from_idtype == "ensemble_gene_id":
+      val = val.split(".")[0]
+    elif from_idtype == "entrezgene_id":
+      try:
+        a = to[val]
+        renamed.append(a)
+      except KeyError:
+        b += 1
+        not_parsed.append(val)
+        renamed.append(val)
   print(str(b) + " count not be parsed... we don't have all genes already")
   return(renamed, not_parsed)
 
@@ -439,51 +435,60 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
     1: the new names for each genes that were matched else the same name
     2: the names of genes that could not be matched
   """
-  
-  files = sorted(os.listdir(loc)) # sorted files
+  # sorted files
+  files = sorted(os.listdir(loc)) 
   files = [file for file in files if file.endswith(".tsv")]
   data = {}
   for file in files:
-      data[file.split('/')[-1].split('.')[0]] = pd.read_csv(loc+file, sep='\t', comment='#', header=0)
-  
+    data[file.split('/')[-1].split('.')[0]] = pd.read_csv(loc+file, sep='\t', comment='#', header=0)
+
   prev = -2
   print("found " + str(len(data)) + ' files:' + str(data.keys()))
-  
+
   for k, val in data.items():
     if len(set(val.Name)) != prev and prev != -2:
       raise ValueError(
-          'we do not have the same number of genes in each file')
+        'we do not have the same number of genes in each file')
     prev = len(set(val.Name))
-      
+
   # make dict for each unique gene of list of 0s per sample (can be multiple regions)
   readcounts = {i: [0] * len(data) for i in val.Name.unique()}
   tccounts = {i: [0] * len(data) for i in val.Name.unique()}
-  
+
   for n, (_, val) in enumerate(data.items()):
     print(_.split("_tcount")[0])
-    val = val.sort_values(by="Name")        # make df rows ordered by gene name
+    # make df rows ordered by gene name
+    val = val.sort_values(by="Name")
     j = 0
-    readcount = [val.iloc[0].ReadCount]     # get ReadCount at first row
-    tccount = [val.iloc[0].TcReadCount]     # get TcReadCount at first row
-    prevname = val.iloc[0].Name             # get row Name
-    
+    # get ReadCount at first row
+    readcount = [val.iloc[0].ReadCount]
+    # get TcReadCount at first row
+    tccount = [val.iloc[0].TcReadCount]
+    # get row Name
+    prevname = val.iloc[0].Name
+
     # repeat for all rows
     for _, v in val.iloc[1:].iterrows():
-      if v.Name == 4609 and verbose:                  # MYC region (for QC purposes)
-          print("MYC (readcounts, tccounts): {}, {}".format(v.ReadCount, v.TcReadCount))
-          #print(readcount, tccount)
-      if v.Name == prevname:              # add counts to rows with the same name
+      if v.Name == 4609 and verbose:
+        # MYC region (for QC purposes)
+        print("MYC (readcounts, tccounts): {}, {}".format(v.ReadCount, v.TcReadCount))
+      if v.Name == prevname:
+        # add counts to rows with the same name
         readcount.append(v.ReadCount)
         tccount.append(v.TcReadCount)
       else:
-        readcounts[prevname][n] = np.sum(readcount) # sum read counts in rows with the same name
+        # sum read counts in rows with the same name
+        readcounts[prevname][n] = np.sum(readcount) 
         tccounts[prevname][n] = np.sum(tccount)
-        # if np.var(readcount) > flag_var:
-        #    print("pb with "+str(v.Name))
-        prevname = v.Name               # new gene name for region
+        if np.var(readcount) > flag_var:
+          print("pb with "+str(v.Name))
+        # new gene name for region
+        prevname = v.Name
         j += 1
-        # print(j,end='\r')
-        readcount = [v.ReadCount]       # get read count for new region
+        if verbose:
+          print(j,end='\r')
+        # get read count for new region
+        readcount = [v.ReadCount]
         tccount = [v.TcReadCount]
   
   files = [*data]
@@ -494,18 +499,19 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
   
   # convert to gene symbols
   if convertTo:
-    names, _ = convertGenes(readcounts.index.tolist(
-    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
+    names, _ = convertGenes(readcounts.index.tolist(),
+      from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     readcounts.index = names
-    names, _ = convertGenes(tccounts.index.tolist(
-    ), from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
+    names, _ = convertGenes(tccounts.index.tolist(),
+      from_idtype = "entrezgene_id", to_idtype = "hgnc_symbol")
     tccounts.index = names
-  
-  nottodrop = np.argwhere(tccounts.values.var(1) >= # remove regions/genes with variance of 0 across samples
+  # remove regions/genes with variance of 0 across samples
+  nottodrop = np.argwhere(tccounts.values.var(1) >=
                           minvar_toremove).ravel()
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
-  nottodrop = np.argwhere(readcounts.values.max(1) >= # remove regions/genes with very low counts
+  # remove regions/genes with very low counts
+  nottodrop = np.argwhere(readcounts.values.max(1) >=
                           mincount_toremove).ravel()
   tccounts = tccounts.iloc[nottodrop]
   readcounts = readcounts.iloc[nottodrop]
