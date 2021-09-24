@@ -3,7 +3,6 @@
 # in 2019
 
 from __future__ import print_function
-from bokeh.core.enums import OutputBackend
 import venn as pyvenn
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -15,7 +14,7 @@ from bokeh.models import HoverTool, CustomJS, BasicTicker, ColorBar, PrintfTickF
 from bokeh.models import ColumnDataSource, LinearColorMapper, LogColorMapper
 from bokeh.util.hex import hexbin
 from bokeh.transform import linear_cmap
-from bokeh.io import show, export_svg, output_file
+from bokeh.io import show, export_svg
 from bokeh.plotting import *
 import bokeh
 import colorcet as cc
