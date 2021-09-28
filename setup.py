@@ -1,6 +1,7 @@
 from setuptools import setup
 import sys
 import os
+import io
 if sys.version_info.major < 3 or sys.version_info.minor < 2:
     raise ValueError("genepy is only compatible with Python 3.5 and above")
 if sys.version_info.minor < 5:
@@ -10,7 +11,7 @@ if sys.version_info.minor < 5:
 os.system('git submodule init && git submodule sync')
 
 with open("README.md", 'r') as f:
-    long_description = f.read()
+  long_description = f.read()
 
 
 def read(*paths, **kwargs):
