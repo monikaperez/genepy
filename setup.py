@@ -17,6 +17,7 @@ setup(
     version='1.0',
     description='A useful module for any CompBio',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     author='Jeremie Kalfon',
     author_email='jkobject@gmail.com',
     url="https://github.com/BroadInstitute/genepy",
