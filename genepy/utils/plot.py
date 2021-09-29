@@ -28,7 +28,7 @@ import pdb
 
 
 def scatter(data, labels=None, title='scatter plot', showlabels=False, folder='',
-            colors=None, xname='', yname="", importance=None, radi=5, alpha=0.8, **kwargs):
+            colors=None, xname='', yname="", importance=None, radi=5, alpha=0.8, colprovided=False,**kwargs):
   """
   Makes an interactive scatter plot using Bokeh
 
@@ -52,22 +52,24 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
     the bokeh object
   """
   TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,save,box_select,lasso_select,"
-
-  col = viridis(len(set(colors))) if colors is not None else [
-    '#29788E']  # (viridis1)
+  
   radii = []
   fill_alpha = []
   cols = []
+
+  col = viridis(len(set(colors))) if colors is not None else [
+    '#29788E']  # (viridis1)
   for i in range(data.shape[0]):
     radii.append(radi if importance is None else radi /
                   (1 + importance[i]))
     fill_alpha.append(
       alpha if importance is None else alpha - (0.2 * importance[i]))
     cols.append(col[0] if colors is None else col[int(colors[i])])
+
   di = dict(
     x=data[:, 0],
     y=data[:, 1],
-    fill_color=cols,
+    fill_color=cols if not colprovided else colors,
     fill_alpha=fill_alpha,
     radius=radii
   )

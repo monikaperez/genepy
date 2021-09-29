@@ -2,6 +2,7 @@ from setuptools import setup
 import sys
 import os
 import io
+import subprocess
 if sys.version_info.major < 3 or sys.version_info.minor < 2:
     raise ValueError("genepy is only compatible with Python 3.5 and above")
 if sys.version_info.minor < 5:
@@ -13,6 +14,12 @@ os.system('git submodule init && git submodule sync')
 with open("README.md", 'r') as f:
   long_description = f.read()
 
+print("trying to install R packages")
+subprocess.run(
+    'R -e \'if(!requireNamespace("BiocManager", quietly = TRUE)){install.packages("BiocManager", repos="http://cran.us.r-project.org")};BiocManager::install(c("GSEABase", "erccdashboard", "GSVA", "DESeq2"));\'',
+      shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+print('if it did not work. please install R or check your R installation')
+print("once R is installed you need to install erccdashboard, GSEABase GSVA, DESeq2 to have access to all the functions")
 
 def read(*paths, **kwargs):
   """Read the contents of a text file safely.
@@ -65,11 +72,5 @@ print("You might want to install Bowtie2, samtools, bwa and R to be able to use 
   http://bowtie-bio.sourceforge.net/bowtie2/index.shtml\n\
   http://www.htslib.org/\n\
   https://github.com/lh3/bwa\n")
-
-print("trying to install R packages")
-os.system(
-    'R -e "if(!requireNamespace(\"BiocManager\", quietly = TRUE)){install.packages(\"BiocManager\", repos=\"http://cran.us.r-project.org\")};BiocManager::install(c(\"GSEABase\", \"erccdashboard\", \"GSVA\", \"DESeq2\"));"')
-print('if it did not work. please install R or check your R installation')
-print("once R is installed you need to install erccdashboard, GSEABase GSVA, DESeq2 to have access to all the functions")
 
 print("Finished!")
