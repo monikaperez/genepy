@@ -64,7 +64,8 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
                   (1 + importance[i]))
     fill_alpha.append(
       alpha if importance is None else alpha - (0.2 * importance[i]))
-    cols.append(col[0] if colors is None else col[int(colors[i])])
+    if not colprovided:
+      cols.append(col[0] if colors is None else col[int(colors[i])])
 
   di = dict(
     x=data[:, 0],
