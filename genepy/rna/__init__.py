@@ -522,10 +522,20 @@ def DESeqSamples(data, experiments, scaling=None, keep=True, rescaling=None, res
                  spikecontrolscontain="ERCC-", threshforscaling=2):
   """
   Args:
-  ----
+    data (pd.dataframe): the expected counts with gene names as index and *Experiments[*rep], controlcontain[*rep] as columns
+    experiments (list): the names of the different conditions (should be part of your conditions column names)
+    scaling (dict(condition/control: float)|list|bool): if boolean, looks for ERCC genes to scale
+      if dict, will manually scale each columns condition, control to the provided value
+      if list, will use that list as a list of housekeeping genes to use as a reference for rescaling
+    keep ():
+    rescaling ():
+    controlcontain (str): the name of th control (should be part of your control column names).
+    spikecontrolscontain (str): the name of the ERCC genes. defaul to ERCC- (for ERCC-1, ERCC-2...)
+    threshforscaling (float): minimum scaling value to scale the data for (when scaling is dict)
 
   Returns:
   ------
+    (pd.dataframe): deseq results
 
   """
   from genepy.rna import pyDESeq2

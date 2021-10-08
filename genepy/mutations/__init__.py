@@ -92,7 +92,7 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[], **k
 
 def mafToMat(maf, mode="bool", freqcol='tumor_f',
              samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol",
-             minfreqtocall=0.1):
+             minfreqtocall=0.2):
   """
   turns a maf file into a matrix of mutations x samples (works with multiple sample file)
 
@@ -117,9 +117,7 @@ def mafToMat(maf, mode="bool", freqcol='tumor_f',
       'fake'], index=set(maf[mutNameCol])).astype(float)
   for i, val in enumerate(samples):
     h.showcount(i, len(samples))
-    if mode == "genotype":  # if mode:
-      import pdb
-      pdb.set_trace()
+    if mode == "genotype":
       mut = mut.join(maf[maf[samplesCol] == val].set_index(mutNameCol)[freqcol].groupby(
           mutNameCol).agg('sum').rename(val))
     else:
