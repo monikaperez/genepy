@@ -1,5 +1,5 @@
 # GCPFunction.py
-#
+
 from google.cloud import storage
 import os
 import subprocess
