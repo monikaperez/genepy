@@ -12,7 +12,7 @@ from genepy.utils import helper as h
 import math
 import os
 import seaborn as sns
-import gseapy
+#import gseapy
 import pandas as pd
 import numpy as np
 import subprocess
