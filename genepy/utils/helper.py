@@ -865,13 +865,3 @@ def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomar
           ]['clone_based_ensembl_gene']
 
   return res
-
-
-def loadGCTX():
-  """loadGCTX will load a GCTX file into annData
-
-  Returns:
-      [type]: [description]
-  """
-
-  return AnnData(v, CCLE_annotation)
