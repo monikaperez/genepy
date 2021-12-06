@@ -5,11 +5,11 @@ scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/au
          "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
 
 
-def dfToSheet(df, sheetid, secret='~/client_secret.json'):
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(secret, scope)
-    client = gspread.authorize(credentials)
-    spreadsheet = client.open(sheetid)
-    df.to_csv('/tmp/sheet.csv')
-    with open("/tmp/sheet.csv", 'r') as file_obj:
-        content = file_obj.read()
-        client.import_csv(spreadsheet.id, data=content)
+def dfToSheet(df, sheetid, secret='~/.credentials.json'):
+  credentials = ServiceAccountCredentials.from_json_keyfile_name(secret, scope)
+  client = gspread.authorize(credentials)
+  spreadsheet = client.open(sheetid)
+  df.to_csv('/tmp/sheet.csv')
+  with open("/tmp/sheet.csv", 'r') as file_obj:
+    content = file_obj.read()
+    client.import_csv(spreadsheet.id, data=content)

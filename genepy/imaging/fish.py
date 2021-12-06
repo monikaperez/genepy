@@ -7,7 +7,7 @@ import pandas as pd
 
 
 # make a plot of averaged binned signal strength by distance from locis
-def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="group", 
+def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="group",
                           sclass='green', signal="mean_green", area="area"):
   """
   """
@@ -26,7 +26,7 @@ def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="gro
         h.showcount(i, len(m))
         dist.append(
           distance_matrix(d[(d['class']==sclass)&
-                            (d[groupcol]==v[groupcol])][['x', "y", "z"]].values, 
+                            (d[groupcol]==v[groupcol])][['x', "y", "z"]].values,
                           np.array([v[['x_mean', "y_mean", "z_mean"]]])).T[0].astype(float))
         weight.append(d[(d['class'] == sclass)&(d[groupcol]==v[groupcol])][signal])
         dat = d[(d['class'] == sclass) &
@@ -42,9 +42,9 @@ def computeDistsFromClass(dots, seconddots, conds=['DMSO', 'VHL'], groupcol="gro
   return twodists, dists
 
 
-def drawDots(dists, scenter=False, size=1000, zsize=1000, 
+def drawDots(dists, scenter=False, size=1000, zsize=1000,
              folder="", signal="signal", levels=20,
-             area="area", vmin=None, vmax=None, 
+             area="area", vmin=None, vmax=None,
               norm=None, norm_dots=None, second=None,
             color="seagreen",
             seccolor=sns.light_palette("orange", as_cmap=True), **kwargs):
@@ -61,7 +61,7 @@ def drawDots(dists, scenter=False, size=1000, zsize=1000,
   for i, (k,a) in enumerate(dists.items()):
     a = a.copy()
     a[area] = ((a[area]/(3.14))**(1/2)).astype(float)
-    
+
     a = a[(abs(a.x)<size*sca) & (abs(a.y)<size*sca) & (abs(a.z)<zsize*sca)]
     #ax = sns.scatterplot(data=a, x='x', y='y', hue_norm=(None,max(m)) if norm is None else norm,
                       #	hue=signal, size=area, palette=color, **kwargs)
@@ -73,12 +73,12 @@ def drawDots(dists, scenter=False, size=1000, zsize=1000,
       n=None
     ax=sns.kdeplot(data=a[['x', 'y', signal]].astype(float),
                  x='x', fill=True, y='y', weights=signal, color=color,
-                  thresh=False, levels=levels, cbar=m[i] == max(m),
-                 hue_norm=n, 
-                 vmin=vmin/(m[i]/max(m)), vmax=vmax/(m[i]/max(m)))  # (None, max(sm)/sca) if norm is None else norm)
+                 thresh=False, levels=levels, cbar=m[i] == max(m),
+                 hue_norm=n, vmin=vmin/(m[i]/max(m)), vmax=vmax/(m[i]/max(m)))
+    # (None, max(sm)/sca) if norm is None else norm)
     if second is not None:
       print('adding second color')
-      ex = sns.scatterplot(data=a[second(a)].sort_values(by=signal), x='x', y='y', 
+      ex = sns.scatterplot(data=a[second(a)].sort_values(by=signal), x='x', y='y',
                         hue_norm=(None, max(sm)/sca) if norm_dots is None else norm_dots,
                         hue=signal, palette=seccolor, size=area, **kwargs)
       ex.legend(bbox_to_anchor=(2, 1), loc=1)
@@ -92,9 +92,12 @@ def drawDots(dists, scenter=False, size=1000, zsize=1000,
     plt.show()
     ax.get_figure().savefig(folder+k+"_scatter_representation_size_to_center.pdf")
 
+
 def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
               default_maxdist=None, distance_scale=1.2, areacol="area",
               mergedidcol='m_id'):
+  """
+  """
   idcount = 0
   merged = dots.copy()
   for group in set(dots[groupcol]):
@@ -103,9 +106,9 @@ def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
     gdot = dots[(dots[groupcol] == group)]
     maxdist = default_maxdist if default_maxdist else np.sqrt(
         gdot[areacol].mean() / 3.14) * distance_scale
-    
+
     gdot[mergedidcol]=None
-    
+
     pos = gdot[[xcol, ycol, zcol]].values
     dist = distance_matrix(pos, pos)
 
@@ -135,7 +138,7 @@ def colocalize(dots, groupcol='group', zcol='z', xcol="x", ycol="y",
     merged.loc[gdot.index.tolist(), mergedidcol] = gdot[mergedidcol].tolist()
   return merged
 
-def mergeAnnotated(annot, minzstack=2, groupdefault={}, todrop=[], coltocount="image", 
+def mergeAnnotated(annot, minzstack=2, groupdefault={}, todrop=[], coltocount="image",
                     id="m_id", colocName="cobinding"):
   """
   """

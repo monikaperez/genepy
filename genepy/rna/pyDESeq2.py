@@ -5,8 +5,6 @@
 ##################################################################
 
 from __future__ import print_function
-import pandas as pd
-import ipdb
 import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, Formula, numpy2ri
@@ -16,6 +14,7 @@ from rpy2.robjects.packages import importr
 deseq = importr('DESeq2')
 from rpy2.robjects.conversion import localconverter
 import rpy2.robjects as ro
+import sys
 '''
 Adopted from: https://stackoverflow.com/questions/41821100/running-deseq2-through-rpy2
 '''
@@ -43,10 +42,10 @@ class pyDESeq2:
   gene_column: column name of gene id columns, exmplae "id"
   '''
 
-  def __init__(self, count_matrix, design_matrix, design_formula, gene_column='id'):
+  def __init__(self, count_matrix, design_matrix, design_formula, gene_column='gene_id'):
     print("you need to have R installed with the DESeq2 library installed")
     try:
-      assert gene_column in count_matrix.columns, 'Wrong gene id column name'
+      assert gene_column == count_matrix.columns[0], 'no $gene_column name in 1st column\'s name'
       gene_id = count_matrix[gene_column]
     except AttributeError:
       sys.exit('Wrong Pandas dataframe?')

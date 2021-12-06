@@ -4,15 +4,13 @@
 
 from __future__ import print_function
 
-import pdb
-import ipdb
 import pandas as pd
 import numpy as np
+from genepy.utils import helper as h
+import gzip
+import seaborn as sns
 
-from taigapy import TaigaClient
-tc = TaigaClient()
-
-def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
+def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[], **kwargs):
   """
   transforms a vcf file into a dataframe file as best as it can
 
@@ -58,8 +56,12 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   names = ['chr', 'pos', 'id', 'ref', 'alt', 'qual']
   names += ['filter'] if hasfilter else ['strand']
   names += ['data', 'format'] + samples
-  a = pd.read_csv(path, sep='\t', comment="#", header=None,
-                  names=names, index_col=False)
+  csvkwargs = {'sep': '\t', 
+              'index_col': False, 
+              'header': None, 
+              #'names': names, 
+              'comment': "#"}
+  a = pd.read_csv(path, **csvkwargs)
   print(description)
   try:
     for j, val in enumerate(a.data.str.split(';').values.tolist()):
@@ -70,6 +72,8 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   except ValueError:
     print(val)
     raise ValueError('unknown field')
+  except:
+    import pdb; pdb.set_trace()
   a = pd.concat([a.drop(columns='data'), pd.DataFrame(
       data=fields, index=a.index)], axis=1)
   for sample in samples:
@@ -86,8 +90,9 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[]):
   return a.drop(columns='format'), description
 
 
-
-def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol"):
+def mafToMat(maf, mode="bool", freqcol='tumor_f',
+             samplesCol="DepMap_ID", mutNameCol="Hugo_Symbol",
+             minfreqtocall=0.2):
   """
   turns a maf file into a matrix of mutations x samples (works with multiple sample file)
 
@@ -95,26 +100,40 @@ def mafToMat(maf, boolify=False, freqcol='tumor_f', samplesCol="DepMap_ID", mutN
   -----
     maf: dataframe of the maf file
     sample_col: str colname for samples
-    boolify: bool whether or not to convert the matrix into a boolean (mut/no mut)
+    mode: flag  "bool" to convert the matrix into a boolean (mut/no mut)
+                "float" to keep the allele frequencies as is (0.x)
+                "genotype" to have either 1, 0.5 or 0
     freqcol: str colname where ref/alt frequencies are stored
-    mutNameCol: str colname where mutation names are stored
+    mutNameCol: str colname where mutation names are stored, will merge things over that column name
 
   Returns:
   --------
     the dataframe matrix
   """
-  maf = maf.sort_values(by=mutNameCol)
   samples = set(maf[samplesCol])
+  maf = maf[maf[freqcol] >= minfreqtocall]
+  maf = maf.sort_values(by=mutNameCol)
   mut = pd.DataFrame(data=np.zeros((len(set(maf[mutNameCol])), 1)), columns=[
-                      'fake'], index=set(maf[mutNameCol])).astype(float)
+      'fake'], index=set(maf[mutNameCol])).astype(float)
   for i, val in enumerate(samples):
     h.showcount(i, len(samples))
-    mut = mut.join(maf[maf[samplesCol] == val].drop_duplicates(
-        mutNameCol).set_index(mutNameCol)[freqcol].rename(val))
-  return mut.fillna(0).astype(bool if boolify else float).drop(columns=['fake'])
+    if mode == "genotype":
+      mut = mut.join(maf[maf[samplesCol] == val].set_index(mutNameCol)[freqcol].groupby(
+          mutNameCol).agg('sum').rename(val))
+    else:
+      mut = mut.join(maf[maf[samplesCol] == val].drop_duplicates(
+          mutNameCol).set_index(mutNameCol)[freqcol].rename(val))
+  mut = mut.fillna(0).astype(
+      bool if mode == "bool" else float).drop(columns=['fake'])
+  if mode == "genotype":
+    mut[(mut > 1.3)] = 3
+    mut[(mut >= 0.7) & (mut <= 1.3)] = 2
+    mut[(mut > .3) & (mut < .7)] = 1
+    mut[mut <= .3] = 0
+  return mut
 
 
-def mergeAnnotations(firstmaf, additionalmaf, Genome_Change="Genome_Change",
+def mergeAnnotations(firstmaf, additionalmaf, mutcol="mutation", Genome_Change="Genome_Change",
 Start_position="Start_position", Chromosome="Chromosome", samplename="DepMap_ID",
 useSecondForConflict=True, dry_run=False):
   """
@@ -166,7 +185,11 @@ useSecondForConflict=True, dry_run=False):
             set(subother.ind))]
       mutations = mutations.append(additionalmaf[additionalmaf['ind'].isin(
           set(additionalmaf['ind']) - set(mutations['ind']))])
-    return mutations.drop(columns=['loci', 'ind']).sort_values(by=[samplename, Chromosome, Start_position])
+    subother = additionalmaf[additionalmaf.loci.isin(
+        inboth) & ~additionalmaf.ind.isin(notineach)].set_index("ind")
+    mutations = mutations.set_index("ind")
+    mutations.loc[subother.index.tolist(), mutcol] = subother[mutcol].tolist()
+    return mutations.drop(columns=['loci']).sort_values(by=[samplename, Chromosome, Start_position]).reset_index(drop=True)
   else:
     return issues
 
@@ -243,7 +266,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
       # we extend the previous segment (last of the prev chrom) to.. way enough
       if len(l) > 0:
         l[-1][2] = 1000000000 if cyto is None else cyto[cyto['chrom']
-                                                        == prevchr]['end'].values[-1]
+                                                      == prevchr]['end'].values[-1]
       # we extend the first segment to 0
       l.append([val[Chromosome], 0, val[End]])
     else:
@@ -255,6 +278,7 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
         # the rest to the other
         l.append([val[Chromosome], val[Start] - int(sizeofgap / 2), val[End]])
       elif val[Start] < prevend:  # this should never happen
+        # import pdb; pdb.set_trace()
         raise ValueError("start comes after end")
       else:
         l.append([val[Chromosome], val[Start], val[End]])
@@ -264,10 +288,10 @@ def manageGapsInSegments(segtocp, Chromosome='Chromosome', End="End", Start="Sta
   l[-1][2] = 1000000000 if cyto is None else cyto[cyto['chrom']
                                                   == prevchr]['end'].values[-1]
   segments[[Chromosome, Start, End]] = l
-  return segments
+  return segments.reset_index(drop=True)
 
 
-def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
+def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y'], gene_names_col='gene_name'):
   """
   makes a geneXsample matrix from segment level copy number (works with multiple sample file)
 
@@ -291,13 +315,17 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
     j = 0
     h.showcount(i, len(samples))
     for k, gene in enumerate(gene_mapping[['Chromosome', 'start', 'end']].values):
+        #print(i,j)
         if gene[0] in hasmissing:
           data[i, k] = np.nan
           continue
-        while gene[0] != segs[j][0] or gene[1] >= segs[j][2]:
-          #print("went beyong",gene, segs[j])
-          j += 1
-        # some genes are within other genes, we need to go back in the list of segment in that case
+        try:
+          while gene[0] != segs[j][0] or gene[1] >= segs[j][2]:
+            #print("went beyong",gene, segs[j])
+            j += 1
+          # some genes are within other genes, we need to go back in the list of segment in that case
+        except:
+          raise ValueError('forgot to sort one of the DF?')
         while gene[1] < segs[j][1]:
           j -= 1
           #print("decrease gene",gene)
@@ -311,7 +339,7 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
           # print('coef',coef)
           val = segs[j][3] * coef if style == "weighted" else segs[j][3]
           end = segs[j][2]
-          # until the end of a segments goes beyon the end of the gene (say if we have X segments within the gene)
+          # until the end of a segments goes beyond the end of the gene (say if we have X segments within the gene)
           while end < gene[2]:
             # pdb.set_trace()
             j += 1
@@ -331,7 +359,7 @@ def toGeneMatrix(segments, gene_mapping, style='weighted', missingchrom=['Y']):
             end = segs[j][2]
             coef = ncoef
           data[i, k] = val if style == "weighted" else val / c
-  return pd.DataFrame(data=data, index=samples, columns=[i['symbol'] + ' (' + str(i['ensembl_id']) + ')' for _, i in gene_mapping.iterrows()])
+  return pd.DataFrame(data=data, index=samples, columns=gene_mapping[gene_names_col])
 
 
 def checkAmountOfSegments(segmentcn, thresh=850, samplecol="DepMap_ID"):
@@ -346,7 +374,6 @@ def checkAmountOfSegments(segmentcn, thresh=850, samplecol="DepMap_ID"):
     thresh: max ok amount
   """
   failed = []
-  segmentcn = renameColumns(segmentcn)
   celllines = set(segmentcn[samplecol].tolist())
   amounts = []
   for cellline in celllines:
@@ -372,3 +399,16 @@ def checkGeneChangeAccrossAll(genecn, thresh=0.2):
     thresh: threshold in logfold change accross all of them
   """
   return genecn.columns[genecn.var()<thresh].tolist()
+
+def renameColumns(df):
+  """
+  rename some of the main columns names from RSEM, GATK.. to more readable column names
+  Args:
+  -----
+    df: the df to rename
+  Returns:
+  ------
+    df the renamed df
+  """
+  return(df.rename(columns={'Sample': 'DepMap_ID', 'CONTIG': 'Chromosome', 'START': 'Start',
+                            'END': 'End', 'seqnames': 'Chromosome', 'start': 'Start', 'end': 'End'}))
