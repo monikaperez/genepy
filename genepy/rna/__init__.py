@@ -480,7 +480,7 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
         # sum read counts in rows with the same name
         readcounts[prevname][n] = np.sum(readcount) 
         tccounts[prevname][n] = np.sum(tccount)
-        if np.var(readcount) > flag_var:
+        if (np.var(readcount) > flag_var) & verbose:
           print("pb with "+str(v.Name))
         # new gene name for region
         prevname = v.Name
