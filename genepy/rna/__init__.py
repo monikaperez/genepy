@@ -834,3 +834,17 @@ def findClosestMatching(repprofiles, goodprofile, closest=False, returncorr=Fals
     return match, corr
   else:
     return match
+
+def loadGCTXasAnnData(path):
+  val = path[:-5]
+  rcmd = 'library("cmapR"); my_ds <- parse_gctx("'+val+'.gctx"); write.csv(my_ds@rdesc, "'+val+'_rdesc.csv"); write.csv(my_ds@cdesc, "'+val+'_cdesc.csv"); write.csv(my_ds@mat, file=gzfile("'+val+'_mat.csv.gz"))'
+  res = subprocess.run("R -e '"+rcmd+"'", shell=True, capture_output=True)
+  print(res)
+  rdesc = pd.read_csv(val+"_rdesc.csv", index_col=0).set_index("id")
+  cdesc = pd.read_csv(val+"_cdesc.csv", index_col=0).set_index("id")
+  # read as gz csv
+  mat = pd.read_csv(val+"_mat.csv.gz", index_col=0, compression='gzip')
+  res = AnnData(X=mat, var=cdesc, obs=rdesc)
+  cmd = "rm "+val+"_mat.csv.gz & rm "+val+"_rdesc.csv & rm "+val+"_cdesc.csv"
+  os.system(cmd)
+  return res

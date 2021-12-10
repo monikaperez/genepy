@@ -283,6 +283,7 @@ def parrun(cmds, cores, add=[]):
     raise ValueError("we would want them to be the same size")
   else:
     addexe = ''
+  fullres = []
   for i, cmd in enumerate(cmds):
     count += 1
     exe += cmd
@@ -304,6 +305,8 @@ def parrun(cmds, cores, add=[]):
           raise ValueError(
             'issue with the command: ' + str(res.stderr))
         addexe = ''
+      fullres.append(res.stdout.decode('utf-8'))
+  return fullres
 
 
 def askif(quest):
@@ -531,7 +534,10 @@ def readXMLs(folder=None, file=None, rename=None):
   return df
 
 def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt",
-                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',]):
+                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',],
+                          ancestry = {'African':[], 'Native American':[], 'East Asian, North':[], 
+                          'East Asian, South': [], "South Asian":[],  "European, North":[], 
+                          'European, South':[]}):
   """
   make a df from cellosaurus' human cancer cell line data
 
@@ -581,10 +587,20 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
   ID = ""
   SY = ""
   DI = ""
+  atcclink = ""
+  dsmzlink = ""
+  doublingt = ""
+  hasebv = False
+  origin = ""
+  isMeta = False
+  characteristics = ""
+  ancestry = ""
+  issue = ""
+  instability = ""
+  transfected = ""
   depmap = set()
   lid = None
   individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-  hasIssues=False
   comments=[""]
   tofind={}
   cl = {}
@@ -619,8 +635,18 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
         v.append(parent)
         v.append(date)
         v.append(SY)
-        v.append(hasIssues)
         v.append(' | '.join(comments))
+        v.append(atcclink)
+        v.append(dsmzlink)
+        v.append(doublingt)
+        v.append(hasebv)
+        v.append(origin)
+        v.append(isMeta)
+        v.append(characteristics)
+        v.append(ancestry)
+        v.append(issue)
+        v.append(instability)
+        v.append(transfected)
         cl.update({lid: v})
       v = []
       CL=False
@@ -632,10 +658,20 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       ID = ""
       SY = ""
       DI = ""
+      atcclink = ""
+      dsmzlink = ""
+      doublingt = ""
+      hasebv = False
+      origin = ""
+      isMeta = False
+      characteristics = ""
+      ancestry = ""
+      issue = ""
+      instability = ""
+      transfected = ""
       depmap = set()
       lid = None
       individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-      hasIssues=False
       comments=[""]
     elif line[:2] == "HI":
       parent = line[5:].split(' !')[0]
@@ -658,27 +694,79 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
     elif line[:2] == "SY":
       SY = line[5:]
     elif line[:2] == "DI":
-      DI = line[5:]
+      DI += line[5:] + "; "
     elif line[:2] == "DT":
       date = line.split("Created: ")[-1].split(";")[0]
     elif line[:2] == "DR":
       if 'DepMap; ' in line:
         depmap.add(line.split('DepMap; ')[-1])
+      if "ATCC" in line:
+        atcclink = line.split('; ')[-1]
+      if "DSMZ" in line:
+        dsmzlink = line.split('; ')[-1]
     elif line[:2] == "CA":
       if 'Cancer cell line' in line:
         CL=True
     elif line[:2] == "AG":
       age = line[5:]
+      i = age.split('Y')[0]
+      if i.endswith('FW'):
+        #foetus
+        i = "Fetus"
+      elif i=="C":
+        i="Children"
+      elif i in ['Embryonic stage', 'Late embryonic stage', "Blastocyst stage", "Neonate larva"]:
+        i='Embryo'
+      elif i=="Age unspecified":
+        i="U"
+      elif i not in ['Adult', "Children", "Fetus", "Embryo"]:
+        if i.endswith('M') or i.endswith('W') or i.endswith('D'):
+          # 0Y
+          i=0
+        elif i.endswith('Y'):
+          i = i.split('-')[0].split('<')[-1].split('>')[-1]
+          i = float(i)
+      age = i
     elif line[:2] == "SX":
       sex = line[5:]
+      if sex == "":
+        sex="U"
+      if sex == 'Sex unspecified':
+        sex="U"
     elif line[:2] == "CC":
       comments.append(line[5:])
       if 'Problematic cell line:' in line:
-        hasIssues=True
+        issue += line.split("Problematic cell line: ")[-1] + " "
       if 'Discontinued: DepMap; ' in line:
-        hasIssues=True
+        issue += "Removed from DepMap; "
         depmap.remove(line.split(';')[1][1:])
+      if "Doubling time: " in line:
+        doublingt = line.split("Doubling time: ")[-1].split('(')[0]
+        if 'everal week' in doublingt:
+          t = 13*24
+        else:
+          t = float(doublingt.split(' ')[0].split('-')[0].split('~')[-1].split('>')[-1].split('=')[-1].split('<')[-1])
+          if 'day' in doublingt:
+            t = t*24
+        doublingt = int(t)
+      if "Epstein-Barr virus (EBV)" in line:
+        hasebv = True
+      if "Derived from sampling site: " in line:
+        origin = line.split("Derived from sampling site: ")[-1][:-1]
+      if "Derived from metastatic site:" in line:
+        origin = line.split("Derived from metastatic site: ")[-1][:-1]
+        isMeta = True
+      if "Characteristics: " in line:
+        characteristics = line.split("Characteristics: ")[-1][:-1]
+      if "Genome ancestry: " in line:
+        ancestry = line.split("Genome ancestry: ")[-1][:-1]
 
+      if "Caution: " in line:
+        issue = line.split("Caution: ")[-1][:-1]
+      if "Microsatellite instability: " in line:
+        instability = line.split(" (")[1].split(')')[0]
+      if "Transfected with: " in line:
+        transfected += line.split("Transfected with: ")[-1][:-1] + ' | '
   l.close()
   for k, v in tofind.items():
     if k in cl and v in cl:
@@ -692,9 +780,42 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
                                       "parent_id",
                                       "date",
                                       "synonyms",
-                                      "has_issues",
-                                      "comments"], index=cl.keys())
+                                      "comments",
+                                      "atcclink",
+                                      "dsmzlink",
+                                      "doublingt",
+                                      "hasebv",
+                                      "origin",
+                                      "isMeta",
+                                      "characteristics",
+                                      "ancestry",
+                                      "issue",
+                                      "instability",
+                                      "transfected"], index=cl.keys())
   return cld
+
+def getAncestry(df, col="ancestry", ancestry = {'African':[], 'Native American':[], 'East Asian, North':[],
+  'East Asian, South': [], "South Asian":[], "European, North":[], 'European, South':[]}):
+  """getAncestry returns a df with the ancestries
+
+  Args:
+      df ([type]): [description]
+      col (str, optional): [description]. Defaults to "ancestry".
+      ancestry (dict, optional): [description]. Defaults to {'African':[], 'Native American':[], 'East Asian, North':[], 'East Asian, South': [], "South Asian":[], "European, North":[], 'European, South':[]}.
+
+  Returns:
+      pd.DataFrame: [description]
+  """
+  name = []
+  for i, anc in df[col].iteritems():
+    if anc=="":
+      continue
+    for place in anc.split('; '):
+      ori, perc = place.split('%')[0].split('=')
+      ancestry[ori].append(float(perc))
+    name.append(i)
+  return pd.DataFrame(data=ancestry, index=name)
+    
 
 def _fetchFromServer(ensemble_server, attributes):
   server = BiomartServer(ensemble_server)

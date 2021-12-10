@@ -763,6 +763,7 @@ async def cleanWorkspace(workspaceid, only=[], toleave=[], defaulttoleave=['work
   removes all processing folder in a terra workspace easily
 
   args:
+    only: list of strings to keep
     workspaceid: str, the workspace
     toleave: a list of first order folder in the bucket that you don't want to be deleted
     defaulttoleave: it should contain non processing folders that contain metadata and files for the workspace

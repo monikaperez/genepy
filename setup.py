@@ -46,25 +46,25 @@ def read_requirements(path):
   ]
 
 setup(
-    name='Broad-genepy',
-    version=read("genepy", "VERSION"),
-    description='A useful module for any CompBio',
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    author='Jeremie Kalfon',
-    author_email='jkobject@gmail.com',
-    url="https://github.com/BroadInstitute/genepy",
-    packages=['genepy/cell_line_mapping-master/python/cell_line_mapper',
-              'genepy/epigenetics', 'genepy/mutations', 'genepy/google', 'genepy/sequencing/',
-              'genepy/terra', 'genepy/rna', 'genepy/utils'],
-    package_data={'genepy': ['data/*']},
-    python_requires='>=3.5',
-    install_requires=read_requirements("requirements.txt"),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "Intended Audience :: Science/Research",
-        "Topic :: Scientific/Engineering :: Bio-Informatics",
-    ],
+  name='Broad-genepy',
+  version=read("genepy", "VERSION"),
+  description='A useful module for any CompBio',
+  long_description=long_description,
+  long_description_content_type="text/markdown",
+  author='Jeremie Kalfon',
+  author_email='jkobject@gmail.com',
+  url="https://github.com/BroadInstitute/genepy",
+  packages=['genepy/cell_line_mapping-master/python/cell_line_mapper',
+            'genepy/epigenetics', 'genepy/mutations', 'genepy/google', 'genepy/sequencing/',
+            'genepy/terra', 'genepy/rna', 'genepy/utils'],
+  package_data={'genepy': ['data/*']},
+  python_requires='>=3.5',
+  install_requires=read_requirements("requirements.txt"),
+  classifiers=[
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+  ],
 )
 
 
