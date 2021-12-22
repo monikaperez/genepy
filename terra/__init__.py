@@ -10,10 +10,11 @@ import numpy as np
 import os
 import re
 import signal
-from genepy.utils import helper as h
-from genepy.google import gcp
+from JKBio.utils import helper as h
+from JKBio.google import gcp
+import pdb
+import subprocess
 from gsheets import Sheets
-from dalmatian.core import MethodNotFound
 
 
 def createManySubmissions(
@@ -25,6 +26,8 @@ def createManySubmissions(
     Args:
     ----
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       references: list(str) a list of name of the row in this entity
       entity: str terra csv type (sample_id...)
       expresson: str to use if want to compute on the direct value of the entity or on values of values
@@ -44,15 +47,17 @@ def createManySubmissions(
     return submission_ids
 
 
-async def waitForSubmission(workspace, submissions, raise_errors=True):
+def waitForSubmission(workspace, submissions, raise_errors=True):
     """
     wrapper to create many submissions for a workflow
 
     Args:
     -----
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       submissions: list[str] of submission ids
-      raise_errors: bool to true if errors should stop your code
+      raise_errors: to true if errors should stop your code
 
     Returns:
     -------
@@ -124,7 +129,7 @@ def removeSamples(workspace, samples):
 
     Args:
     -----
-      workspace: str workspace name
+      workspace: workspace name
       samples: list of samples
     """
     wm = dm.WorkspaceManager(workspace).disable_hound()
@@ -133,11 +138,10 @@ def removeSamples(workspace, samples):
     except:
         print("we had pairs.")
         pairs = wm.get_pairs()
-        if len(pairs) > 0:
-            pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
-            for k, val in wm.get_pair_sets().iterrows():
-                wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
-            wm.delete_pair(pairid)
+        pairid = pairs[pairs.case_sample.isin(samples)].index.tolist()
+        for k, val in wm.get_pair_sets().iterrows():
+            wm.update_pair_set(k, set(val.tolist()[0]) - set(pairid))
+        wm.delete_pair(pairid)
         wm.delete_sample(samples)
 
 
@@ -169,15 +173,13 @@ def uploadFromFolder(
       gcpfolder: a gs folder path
       prefix: str the folder path
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       sep: str the separator (only takes the first part of the name before the sep character)
       fformat bambai, fastq12, fastqR1R2 given the set of files in the folder (they need to be in this naming format)
               e.g. name.bam name.bai / name1.fastq name2.fastq / name_R1.fastq name_R2.fastq
       newsamples: DONT USE
       samplesetname: str all uploaded samples should be part of a sampleset with name..
-
-    Returns:
-    --------
-      the uploaded dataframe
     """
     wm = dm.WorkspaceManager(workspace)
     print(
@@ -317,7 +319,7 @@ def uploadFromFolder(
         return df
 
 
-def updateAllSampleSet(workspace, newsample_setname, Allsample_setname="all"):
+def updateAllSampleSet(workspace, newsample_setname, Allsample_setname="All_samples"):
     """
     update the previous All Sample sample_set with the new samples that have been added.
 
@@ -326,6 +328,8 @@ def updateAllSampleSet(workspace, newsample_setname, Allsample_setname="all"):
     Args:
     ----
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       newsample_setname: str name of sampleset to add to All_samples
     """
     prevsamples = list(
@@ -416,7 +420,7 @@ def saveOmicsOutput(
     pathto_cnvpng="segmented_copy_ratio_img",
     pathto_stats="sample_statistics",
     specific_cohorts=[],
-    specific_celllines=[],
+    speicifc_celllines=[],
     is_from_pairs=True,
     pathto_snv="filtered_variants",
     pathto_seg="cnv_calls",
@@ -432,7 +436,7 @@ def saveOmicsOutput(
       pathto_cnvpng: sample col of the CNV plot results
       pathto_stats: sample col of the bam QC results
       specific_cohorts: if provided, will only look for this specific
-      specific_celllines: if need to rrun on specific cell lines
+      speicifc_celllines: if need to rrun on specific cell lines
       is_from_pairs: if we process on pairs or samples data
       pathto_snv: sample col of the snv files
       pathto_seg: sample col of the segment files
@@ -476,7 +480,7 @@ def changeGSlocation(
     par=20,
 ):
     """
-  Function to move data around from one workspace to a bucket or to another workspace.
+  Function to move data around from one workspace to a bucket or to another workspace. 
 
   can also work on dataframes containing lists of paths
 
@@ -488,7 +492,7 @@ def changeGSlocation(
     of just updating the same one (usefull to copy one workspace to another)
     prevgslist: if providded, will only move files that are in the set of google bucket listed here
     index_func: *WIP* unused
-    flag_non_matching: if set to true and prevgslist is set to some value, will return a list of samples that were not
+    flag_non_matching: if set to true and prevgslist is set to some value, will return a list of samples that were not 
     matched to anything in the prevgslist
     onlycol: do this only on a subset of columns in terra workspace
     entity: the entity in the terra workspace on which to do this
@@ -578,13 +582,15 @@ def changeGSlocation(
                 )
             else:
                 print("mv " + str(a[col].tolist()) + " " + newgs)
+    if workspaceto is None:
+        wmto = wmfrom
+    else:
+        wmto = dm.WorkspaceManager(workspaceto)
     torename = pd.DataFrame(
         data=torename, index=[i for i in a.index.tolist() if i != "nan"]
     )
-    if workspaceto is not None:
-        wmto = dm.WorkspaceManager(workspaceto)
-        if not dry_run:
-            wmto.disable_hound().update_entity_attributes(entity, torename)
+    if not dry_run:
+        wmto.disable_hound().update_entity_attributes(entity, torename)
     return torename, flaglist
 
 
@@ -667,7 +673,7 @@ def renametsvs(workspace, wmto=None, index_func=None):
                 wmto.update_sample_set(i, val.samples)
 
 
-async def findBackErasedDuplicaBamteFromTerraBucket(
+def findBackErasedDuplicaBamteFromTerraBucket(
     workspace, gsfolder, bamcol="WES_bam", baicol="WES_bai"
 ):
     """
@@ -679,9 +685,9 @@ async def findBackErasedDuplicaBamteFromTerraBucket(
     Args:
     ----
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       gsfolder: str the gsfolder where the bam files are
-      bamcol: str colname of the bam
-      baicol: str colname of the bai
     """
     # get ls of all files folder
     samples = os.popen("gsutil -m ls -al " + gsfolder + "**.bai").read().split("\n")
@@ -747,12 +753,11 @@ async def findBackErasedDuplicaBamteFromTerraBucket(
             print("no data for " + str(k))
 
 
-async def shareTerraBams(
-    samples,
+def shareTerraBams(
     users,
     workspace,
+    samples,
     bamcols=["internal_bam_filepath", "internal_bai_filepath"],
-    unshare=False,
 ):
     """
     will share some files from gcp with a set of users using terra as metadata repo.
@@ -764,8 +769,10 @@ async def shareTerraBams(
     ----
       users: list[str] of users' google accounts
       workspace: str namespace/workspace from url typically
+        namespace (str): project to which workspace belongs
+        workspace (str): Workspace name
       samples list[str] of samples_id for which you want to share data
-      bamcols: list[str] list of column names of gsfiles to share
+      bamcols: list[str] list of column names
 
     Returns:
     --------
@@ -775,14 +782,11 @@ async def shareTerraBams(
         users = [users]
     wm = dm.WorkspaceManager(workspace)
     togiveaccess = np.ravel(wm.get_samples()[bamcols].loc[samples].values)
-    key = "-rd " if unshare else "-ru "
     for user in users:
         files = ""
         for i in togiveaccess:
             files += " " + i
-        code = os.system(
-            "gsutil -m acl ch " + key + user + (" " if unshare else ":R ") + files
-        )
+        code = os.system("gsutil -m acl ch -ru " + user + ":R " + files)
         if code == signal.SIGINT:
             print("Awakened")
             break
@@ -794,16 +798,16 @@ async def shareTerraBams(
     return togiveaccess
 
 
-async def shareCCLEbams(
+def shareCCLEbams(
+    users,
     samples,
-    users=[],
     groups=[],
     raise_error=True,
     arg_max_length=100000,
     bamcols=["internal_bam_filepath", "internal_bai_filepath"],
-    refsheet_url="https://docs.google.com/spreadsheets/d/1Pgb5fIClGnErEqzxpU7qqX6ULpGTDjvzWwDN8XUJKIY",
+    refsheet_url="https://docs.google.com/spreadsheets/d/1XkZypRuOEXzNLxVk9EOHeWRE98Z8_DBvL4PovyM01FE",
     privacy_sheeturl="https://docs.google.com/spreadsheets/d/115TUgA1t_mD32SnWAGpW9OKmJ2W5WYAOs3SuSdedpX4",
-    unshare=False,
+    requesterpays_project="",
 ):
     """
     same as shareTerraBams but is completed to work with CCLE bams from the CCLE sample tracker
@@ -819,7 +823,7 @@ async def shareCCLEbams(
       raise_error: whether or not to raise an error if we find blacklisted lines
       refsheet_url: the google spreadsheet where the samples are stored
       privacy_sheeturl: the google spreadsheet where the samples are stored
-
+      requesterpays_project: the google project where the requester pays bucket is located
     Returns:
     --------
       a list of the gs path we have been giving access to
@@ -834,7 +838,7 @@ async def shareCCLEbams(
     blacklisted = set(blacklist) & set(samples)
     print("we have " + str(len(blacklist)) + " blacklisted files")
     if len(blacklisted):
-        print("these lines are blacklisted " + str(blacklisted))
+        print("these lines are blacklisted " + blacklisted)
         if raise_error:
             raise ValueError("blacklistedlines")
     if type(users) is str:
@@ -843,29 +847,28 @@ async def shareCCLEbams(
     togiveaccess = np.ravel(refdata[bamcols].loc[samples].values)
     usrs = ""
     for group in groups:
-        usrs += (" -d " if unshare else " -g") + group + (":R" if not unshare else "")
+        usrs += " -g " + group + ":R"
     for user in users:
-        usrs += (" -d " if unshare else " -u ") + user + (":R" if not unshare else "")
-    cmd_prefix = "gsutil -m acl ch" + usrs
+        usrs += " -u " + user + ":R"
+    requesterpays_cmd = (
+        "" if requesterpays_project == "" else "-u " + requesterpays_project
+    )
+    cmd_prefix = "gsutil {} -m acl ch ".format(requesterpays_cmd) + usrs
     cmd = cmd_prefix
     for n, filename in enumerate(togiveaccess):
-        if type(filename) is str and filename:
-            oldcmd = cmd
-            cmd += " " + filename
-            if (len(cmd) > arg_max_length) | (n == len(togiveaccess) - 1):
-                if n < len(togiveaccess) - 1:
-                    cmd = oldcmd
-                if unshare:
-                    print("preventing access to {:d} files".format(n + 1))
-                else:
-                    print("granting access to {:d} files".format(n + 1))
-                with open("/tmp/grantaccess{:d}.sh".format(n), "w") as f:
-                    f.write(cmd)
-                code = os.system(cmd)
-                cmd = cmd_prefix + " " + filename
-                if code == signal.SIGINT:
-                    print("Awakened")
-                    return
+        oldcmd = cmd
+        cmd += " " + filename
+        if (len(cmd) > arg_max_length) | (n == len(togiveaccess) - 1):
+            if n < len(togiveaccess) - 1:
+                cmd = oldcmd
+            print("granting access to {:d} files".format(n))
+            with open("/tmp/grantaccess{:d}.sh".format(n), "w") as f:
+                f.write(cmd)
+            code = os.system(cmd)
+            cmd = cmd_prefix + " " + filename
+            if code == signal.SIGINT:
+                print("Awakened")
+                return
 
     print("the files are stored here:\n\n" + refsheet_url)
     print("\n\njust install and use gsutil to copy them")
@@ -874,7 +877,7 @@ async def shareCCLEbams(
     return togiveaccess
 
 
-def saveWorkspace(workspace, folderpath):
+def saveConfigs(workspace, filepath):
     """
     will save everything about a workspace into a csv and json file
 
@@ -883,47 +886,21 @@ def saveWorkspace(workspace, folderpath):
       workspace: str namespace/workspace from url typically
         namespace (str): project to which workspace belongs
         workspace (str): Workspace name
-      folderpath: str path to save files
+      filepath to save files
     """
     wm = dm.WorkspaceManager(workspace)
-    h.createFoldersFor(folderpath)
+    h.createFoldersFor(filepath)
 
     conf = wm.get_configs()
-    for k, val in conf.iterrows():
-        with open(folderpath + val["name"] + ".wdl", "w") as f:
-            if val.sourceRepo == "dockstore":
-                name = (
-                    "dockstore.org/"
-                    + "/".join(val["methodPath"].split("/")[2:4])
-                    + "/"
-                    + val["methodVersion"]
-                )
-            else:
-                name = "/".join(
-                    val[["methodNamespace", "methodName", "methodVersion"]]
-                    .astype(str)
-                    .tolist()
-                )
-            try:
-                f.write(dm.get_wdl(name))
-            except MethodNotFound:
-                print(name + " could not be found")
-    conf.to_csv(folderpath + "worflow_list.csv")
+    conf.to_csv(filepath + ".csv")
     params = {}
     params["GENERAL"] = wm.get_workspace_metadata()
     for k, val in conf.iterrows():
         params[k] = wm.get_config(val["name"])
-        h.dictToFile(
-            params[k]["inputs"], folderpath + "inputs_" + val["name"] + ".json"
-        )
-        h.dictToFile(params[k], folderpath + "conf_" + val["name"] + ".json")
-        h.dictToFile(
-            params[k]["outputs"], folderpath + "outputs_" + val["name"] + ".json"
-        )
-    h.dictToFile(params, folderpath + "all_configs.json")
+    h.dictToFile(params, filepath + ".json")
 
 
-async def cleanWorkspace(
+def cleanWorkspace(
     workspaceid,
     only=[],
     toleave=[],
@@ -943,7 +920,6 @@ async def cleanWorkspace(
     removes all processing folder in a terra workspace easily
 
     args:
-      only: list of strings to keep
       workspaceid: str, the workspace
       toleave: a list of first order folder in the bucket that you don't want to be deleted
       defaulttoleave: it should contain non processing folders that contain metadata and files for the workspace
@@ -976,7 +952,7 @@ def changeToBucket(
     values=["bam", "bai"],
     filetypes=None,
     catchdup=False,
-    dryrun=True,
+    test=True,
 ):
     """
     moves all bam/bai files in a sampleList from Terra, to another gs bucket and rename them in the sample list
@@ -988,9 +964,7 @@ def changeToBucket(
       samples: pandas.dataframe with columns to move
       gsfolderto: the bucket path to move the data to
       values: list of the cols in the dataframe containing the gs object path to be moved
-      filetypes: list[str] of size values for each columns, give a suffix (.txt, .bam, ...)
       catchdup: if false will prepend a random string to the names before moving them, else will flag duplicate names
-      dryrun: only shows the output but does not move the files
 
     Returns:
     --------
@@ -1007,7 +981,7 @@ def changeToBucket(
                 else filetypes[j]
             )
             if name_col is None:
-                name = val[ntype].split("/")[-1].split(".")[0]
+                name = val[ntype[0]].split("/")[-1].split(".")[0]
             elif name_col == "index":
                 name = val.name
             else:
@@ -1017,7 +991,7 @@ def changeToBucket(
             )
             if not gcp.exists(gsfolderto + name) or not catchdup:
                 cmd = "gsutil cp " + val[ntype] + " " + gsfolderto + name
-                if dryrun:
+                if test:
                     print(cmd)
                 else:
                     res = subprocess.run(cmd, shell=True, capture_output=True)
@@ -1029,23 +1003,14 @@ def changeToBucket(
                 print(gcp.lsFiles([gsfolderto + name], "-la"))
     return samples
 
+    # delete submissions
 
-def deleteJob(workspaceid, subid, taskid, deleteCurrent=False, dryrun=True):
-    """
-    removes files generated by a job on Terra
 
-    Args:
-    -----
-      workspaceid: str wokspace name
-      subid: str the name of the job
-      taskid: str the name of the task in this job
-      DeleteCurrent: bool whether or not to delete files if they appear in one of the sample/samplesets/pairs data tables
-      dryrun: bool just plot the commands but don't execute them
-    """
+def delete_job(workspaceid, subid, taskid, DeleteCurrent=False, dryrun=True):
     wm = dm.WorkspaceManager(workspaceid)
     bucket = wm.get_bucket_id()
     data = []
-    if deleteCurrent:
+    if DeleteCurrent:
         if dryrun:
             print("gsutil -m rm gs://" + bucket + "/" + subid + "/*/" + taskid + "/**")
         else:
@@ -1086,18 +1051,6 @@ def deleteJob(workspaceid, subid, taskid, deleteCurrent=False, dryrun=True):
 def removeFromFailedWorkflows(
     workspaceid, maxtime="2020-06-10", everythingFor=[], dryrun=False
 ):
-    """
-    Lists all files from all jobs that have failed and deletes them.
-
-    Can be very long
-
-    Args:
-    -----
-      workspaceid: str the workspace name
-      maxtime: str date format (eg. 2020-06-10) does not delete files generated past this date
-      everythingFor: list[str] removes from these workflows even if not failed
-      dryrun: bool whether or not to execute or just print commands
-    """
     wm = dm.WorkspaceManager(workspaceid)
     for k, val in wm.get_submission_status(filter_active=False).iterrows():
         if (
@@ -1110,18 +1063,10 @@ def removeFromFailedWorkflows(
                     # else it was not even run
                     except:
                         continue
-                    deleteJob(workspaceid, val.submission_id, a, dryrun=dryrun)
+                    delete_job(workspaceid, val.submission_id, a, dryrun=dryrun)
 
 
-async def deleteHeavyFiles(workspaceid, unusedOnly=True):
-    """
-    deletes all files above a certain size in a workspace (that are used or unused)
-
-    Args:
-    ----
-      workspaceid: str the name off the workspace
-      unusedOnly: bool whether to delete used files as well (files that appear in one of the sample/samplesets/pairs data tables)
-    """
+def listHeavyFiles(workspaceid, unusedOnly=True):
     wm = dm.WorkspaceManager(workspaceid)
     bucket = wm.get_bucket_id()
     sizes = gcp.get_all_sizes("gs://" + bucket + "/")
@@ -1150,17 +1095,7 @@ async def deleteHeavyFiles(workspaceid, unusedOnly=True):
     return torm
 
 
-def findFilesInWorkspaces(names=[], lookup=["**", "*.", ".*"]):
-    """
-    given All your terra workspaces, find a given gs filename
-
-    Args:
-    -----
-      names: list[str] of filenames to find
-      lookup: list[str] a set of flags giving how to look
-        [** through all folders, *. can be preprended with anything,
-        .* can be appended with anything]
-    """
+def findFilesInWorkspaces(names=0, lookup=["**", "*.", ".*"]):
     ws = dm.list_workspaces()
     print("listing workspacs")
     file = []
@@ -1199,6 +1134,12 @@ def findFilesInWorkspaces(names=[], lookup=["**", "*.", ".*"]):
             if "TOTAL:" in res[-1]:
                 res = res[:-1]
     return res
+
+
+def updateWorkflows(workflowIDs, path):
+    """
+    will download the latest version of workflows (from a list of workflowIDs) to a folder paths
+    """
 
 
 def uploadWorkflows(workspaceID, workflows, path=None):
