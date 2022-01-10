@@ -313,7 +313,7 @@ def runERCC(ERCC, experiments, featurename="Feature", issingle=False, dilution=1
   ipython.magic("R -i control sample2Name = control")
   # name of ERCC mixture design, "RatioPair" is default
   ipython.magic(
-      "R -i issingle erccmix <- if(issingle) 'Single' else 'RatioPair'")
+    "R -i issingle erccmix <- if(issingle) 'Single' else 'RatioPair'")
   # dilution factor used for Ambion spike-in mixtures
   ipython.magic("R -i dilution erccdilution = dilution")
   # volume (in microliters) of diluted spike-in mixture added to total RNA mass
@@ -821,13 +821,13 @@ def findClosestMatching(repprofiles, goodprofile, closest=False, returncorr=Fals
   ind = goodprofile.index.tolist()
   corr = []
   for i, (k, v) in enumerate(repprofiles[a].iterrows()):
-      h.showcount(i, len(repprofiles))
-      res = np.array([np.corrcoef(v, w)[0, 1]
-                      for _, w in goodprofile[a].iterrows()])
-      if max(res) == 1 or closest:
-          match[k] = ind[np.argmax(res)]
-      if returncorr:
-        corr.append(res)
+    h.showcount(i, len(repprofiles))
+    res = np.array([np.corrcoef(v, w)[0, 1]
+                    for _, w in goodprofile[a].iterrows()])
+    if max(res) == 1 or closest:
+        match[k] = ind[np.argmax(res)]
+    if returncorr:
+      corr.append(res)
   if returncorr:
     corr = pd.DataFrame(data=corr, index=repprofiles.index.tolist(
     ), columns=goodprofile.index.tolist())
