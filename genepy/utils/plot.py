@@ -105,6 +105,7 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
         shaplot[shape_encoder[val]]('x', 'y', color='fill_color',
                     fill_alpha='fill_alpha', 
                     line_width=0,
+                    size='radius',
                     source=source)
     p.xaxis[0].axis_label = xname
     p.yaxis[0].axis_label = yname
@@ -119,7 +120,10 @@ def scatter(data, labels=None, title='scatter plot', showlabels=False, folder=''
         show(p)
     if folder:
         save(p, folder + title.replace(' ', "_") + "_scatter.html")
-        export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
+        try:
+            export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
+        except RuntimeError:
+            print("You need to install Selenium to save the svg!")
     return p
 
 
@@ -179,7 +183,10 @@ def bigScatter(data, precomputed=False, logscale=False, features=False,
         show(p)
     if folder:
         save(p, folder + title.replace(' ', "_") + "_scatter.html")
-        export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
+        try:
+            export_svg(p, filename=folder + title.replace(' ', "_") + "_scatter.svg")
+        except RuntimeError:
+            print("You need to install Selenium to save the svg!")
     return p
 
 
@@ -250,7 +257,10 @@ def CNV_Map(df, sample_order=[], title="CN heatmaps sorted by SMAD4 loss, pointi
     p.output_backend = "svg"
     if folder:
         save(p, folder + title.replace(' ', "_") + "_cn_plot.html")
-        export_svg(p, filename=folder + title.replace(' ', "_") + "_cn_plot.svg")
+        try:
+            export_svg(p, filename=folder + title.replace(' ', "_") + "_cn_plot.svg")
+        except RuntimeError:
+            print("You need to install Selenium to save the svg!")
     show(p)      # show the plot
     return p
 
@@ -326,7 +336,10 @@ def volcano(data, folder='', tohighlight=None, tooltips=[('gene', '@gene_id')],
     p.output_backend = "svg"
     if folder:
         save(p, folder + title.replace(' ', "_") + "_volcano.html")
-        export_svg(p, filename=folder + title.replace(' ', "_") + "_volcano.svg")
+        try:
+            export_svg(p, filename=folder + title.replace(' ', "_") + "_volcano.svg")
+        except RuntimeError:
+            print("You need to install Selenium to save the svg!")
     try:
         show(p)
     except:
@@ -511,7 +524,10 @@ def correlationMatrix(data, names, colors=None, pvals=None, maxokpval=10**-9, ot
             color='colors', alpha='alphas', line_color=None,
             hover_line_color='black', hover_color='colors')
     save(p, folder + title.replace(' ', "_") + "_correlation.html")
-    export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
+    try:
+        export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
+    except RuntimeError:
+        print("You need to install Selenium to save the svg!")
     try:
       show(p)
     except:
@@ -641,7 +657,10 @@ def heatmap(data, colors=None, title="correlation Matrix", size=40,
             color='colors', alpha='alphas', line_color=None,
             hover_line_color='black', hover_color='colors')
     save(p, folder + title.replace(' ', "_") + "_heatmap.html")
-    export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
+    try:
+        export_svg(p, filename=folder + title.replace(' ', "_") + "_correlation.svg")
+    except RuntimeError:
+        print("You need to install Selenium to save the svg!")
     try:
       show(p)
     except:
