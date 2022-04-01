@@ -17,6 +17,9 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import subprocess
+from sklearn.decomposition import PCA, IncrementalPCA
+import umap.umap_ as umap
+from genepy.utils import plot as hplot
 
 
 def filterProteinCoding(listofgenes, from_idtype="ensemble_gene_id"):
@@ -1183,3 +1186,50 @@ def loadGCTXasAnnData(path):
     )
     os.system(cmd)
     return res
+
+
+def plot(
+    tpm,
+    ann,
+    color_column="tissue_type",
+    pca_comp=70,
+    n_neighbors=10,
+    min_dist=0.5,
+    metric="euclidean",
+    clusts=None,
+    low_mem=False,
+    colortable=None,
+    **plot_kwargs,
+):
+    if len(tpm) > 50_000:
+        print("lowmem mode")
+        low_mem = True
+
+    print("PCA...")
+    tpm = (
+        PCA(n_components=pca_comp).fit_transform(tpm)
+        if not low_mem
+        else IncrementalPCA(n_components=pca_comp)
+    )
+    print("UMAP...")
+    tpm = umap.UMAP(
+        n_neighbors=n_neighbors, min_dist=min_dist, metric=metric, n_components=2
+    ).fit_transform(tpm)
+    if ann is not None:
+        # annotations to dict
+        plot_kwargs["labels"] = {k: list(v) for k, v in ann.T.iterrows()}
+    if clusts is not None:
+        plot_kwargs["labels"].update({"clusters": clusts})
+    if "colors" not in plot_kwargs:
+        if clusts is not None:
+            col = {l: i for i, l in enumerate(set(clusts))}
+            plot_kwargs.update({"colors": [col[x] for x in clusts]})
+        else:
+            if colortable is None:
+                col = {l: i for i, l in enumerate(set(ann[color_column]))}
+            else:
+                col = colortable
+                plot_kwargs.update({"colprovided": True})
+            plot_kwargs.update({"colors": [col[x] for x in ann[color_column].tolist()]})
+    print("plot...")
+    hplot.scatter(tpm, **plot_kwargs)
