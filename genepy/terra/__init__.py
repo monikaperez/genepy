@@ -15,6 +15,13 @@ from genepy.google import gcp
 from gsheets import Sheets
 from dalmatian.core import MethodNotFound
 
+from agutil.parallel import parallelize
+from agutil import status_bar
+import firecloud.api
+import requests
+from dalmatian.core import set_timeout, DEFAULT_SHORT_TIMEOUT, APIException
+import sys
+
 
 def createManySubmissions(
     workspace, workflow, references, entity=None, expression=None, use_callcache=True
@@ -1133,3 +1140,92 @@ def uploadWorkflows(workspaceID, workflows, path=None):
     method_folder = "src/"
     methods = [""]
     dm.update_method()
+
+
+def update_entities(workspace, etype, oetype, target_set=None):
+    """Attach entities (samples or pairs) to participants"""
+    wm = dm.WorkspaceManager(workspace)
+    # get etype -> participant mapping
+    df = wm.get_entities(etype)
+    if oetype + "_id" not in df.columns:
+        raise ValueError("{}_id column not found in samples".format(oetype))
+    df = df[[oetype + "_id"]].astype(str)
+
+    entities_dict = {k: g.index.values for k, g in df.groupby(oetype + "_id")}
+    oe_ids = np.unique(df[oetype + "_id"])
+
+    column = "{}s_{}".format(etype, (target_set if target_set is not None else ""))
+    last_result = 0
+
+    @parallelize(4)
+    def update_mc(oe_id):
+        attr_dict = {
+            column: {
+                "itemsType": "EntityReference",
+                "items": [
+                    {"entityType": etype, "entityName": i} for i in entities_dict[oe_id]
+                ],
+            }
+        }
+        attrs = [firecloud.api._attr_set(i, j) for i, j in attr_dict.items()]
+        # It adds complexity to put the context manager here, but
+        # since the timeout is thread-specific it needs to be set within
+        # the thread workers
+        with set_timeout(DEFAULT_SHORT_TIMEOUT):
+            try:
+                r = firecloud.api.update_entity(
+                    wm.namespace, wm.workspace, oetype, oe_id, attrs
+                )
+                if r.status_code != 200:
+                    last_result = r.status_code
+            except requests.ReadTimeout:
+                return oe_id, 503  # fake a bad status code to requeue
+        return oe_id, r.status_code
+
+    n_oes = len(oe_ids)
+
+    with wm.hound.batch():
+        with wm.hound.with_reason(
+            "<Automated> Populating attribute from entity references"
+        ):
+            for attempt in range(5):
+                retries = []
+
+                for k, status in status_bar.iter(
+                    update_mc(oe_ids),
+                    len(oe_ids),
+                    prepend="Updating {}s for {} ".format(etype, oetype),
+                ):
+                    if status >= 400:
+
+                        retries.append(k)
+                    else:
+                        wm.hound.update_entity_meta(
+                            oetype, k, "Updated {} membership".format(column)
+                        )
+                        wm.hound.update_entity_attribute(
+                            oetype, k, column, list(entities_dict[k])
+                        )
+
+                if len(retries):
+                    if attempt >= 4:
+                        print(
+                            "\nThe following",
+                            len(retries),
+                            " " + oetype + " could not be updated:",
+                            ", ".join(retries),
+                            file=sys.stderr,
+                        )
+                        raise APIException(
+                            "{} {} could not be updated after 5 attempts".format(
+                                len(retries), oetype
+                            ),
+                            last_result,
+                        )
+                    else:
+                        print("\nRetrying remaining", len(retries), " " + oetype)
+                        oe_ids = [item for item in retries]
+                else:
+                    break
+
+        print("\n    Finished attaching {}s to {} {}".format(etype, n_oes, oetype))
