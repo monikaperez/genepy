@@ -55,26 +55,26 @@ def filterProteinCoding(listofgenes, from_idtype='ensemble_gene_id'):
 def convertGenes(listofgenes, from_idtype="ensemble_gene_id", to_idtype="hgnc_symbol"):
   """
   Given a list of genes, will convert to different ID type
-  
+
   Args:
   -----
     listofgenes: list of genes
     from_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
     to_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
-  
+
   Returns:
   -------
     1: the new names for each genes that were matched else the same name
     2: the names of genes that could not be matched
   """
-  
+
   gene_mapping = h.generateGeneNames()
-  
+
   not_parsed = []
   renamed = []
   b = 0
   to = {}
-  
+
   for i, val in gene_mapping.iterrows():
     to[val[from_idtype]] = val[to_idtype]
 
@@ -418,10 +418,10 @@ def mergeSplicingVariants(df, defined='.'):
 
 def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
                      minvar_toremove=0, mincount_toremove=5, verbose=True):
-    
+
   """
   Given a list of genes, provide the args where the genes are protein coding genes (or given biotype):
-  
+
   Args:
   -----
     listofgenes: list of genes
@@ -429,14 +429,14 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
     to_idtype: one of "ensemble_gene_id","clone_based_ensembl_gene","hgnc_symbol","gene_biotype","entrezgene_id", the gene name format
     gene_biotype: gene/transcript biotype
     verbose: print total counts and t to c converted counts at MYC
-  
+
   Returns:
   -------
     1: the new names for each genes that were matched else the same name
     2: the names of genes that could not be matched
   """
   # sorted files
-  files = sorted(os.listdir(loc)) 
+  files = sorted(os.listdir(loc))
   files = [file for file in files if file.endswith(".tsv")]
   data = {}
   for file in files:
@@ -478,7 +478,7 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
         tccount.append(v.TcReadCount)
       else:
         # sum read counts in rows with the same name
-        readcounts[prevname][n] = np.sum(readcount) 
+        readcounts[prevname][n] = np.sum(readcount)
         tccounts[prevname][n] = np.sum(tccount)
         if np.var(readcount) > flag_var:
           print("pb with "+str(v.Name))
@@ -490,13 +490,13 @@ def readFromSlamdunk(loc="res/count/", flag_var=100, convertTo="hgnc_symbol",
         # get read count for new region
         readcount = [v.ReadCount]
         tccount = [v.TcReadCount]
-  
+
   files = [*data]
   readcounts = pd.DataFrame(
     data=readcounts, columns=val.Name.unique(), index=data.keys()).T
   tccounts = pd.DataFrame(
     data=tccounts, columns=val.Name.unique(), index=data.keys()).T
-  
+
   # convert to gene symbols
   if convertTo:
     names, _ = convertGenes(readcounts.index.tolist(),
@@ -601,7 +601,7 @@ async def gsva(data, geneset_file, method='ssgsea', recompute=True):
     return pd.read_csv("/tmp/res_genepy_ssGSEA.tsv", sep='\t')
   data.to_csv('/tmp/data_genepyhelper_gsva.csv')
   cmd = "Rscript "+pathtogenepy + \
-      "genepy/genepy/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
+      "/ssGSEA.R /tmp/data_genepyhelper_gsva.csv " + geneset_file + " " + method
   res = subprocess.run(cmd, shell=True, capture_output=True)
   if res.returncode != 0:
     raise ValueError('issue with the command: ' + str(res))

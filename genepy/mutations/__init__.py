@@ -41,9 +41,15 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[], **k
           description.update({res: desc})
         if 'INFO' in l[:20]:
           res = l.split('ID=')[1].split(',')[0]
-          desc = l.split('Description=')[1][:-2]
-          description.update({res: desc})
-          fields.update({res: []})
+          if res == 'FUNCOTATION':
+            print('parsing funcotator special')
+            for val in l.split('Description=')[1][:-2].split('|'):
+              fields.update({val: []})
+              description.update({val: 'Funcotaror: '+val})
+          else:
+            desc = l.split('Description=')[1][:-2]
+            description.update({res: desc})
+            fields.update({res: []})
       else:
         break
     return fields, description
@@ -56,10 +62,10 @@ def vcf_to_df(path, hasfilter=False, samples=['sample'], additional_cols=[], **k
   names = ['chr', 'pos', 'id', 'ref', 'alt', 'qual']
   names += ['filter'] if hasfilter else ['strand']
   names += ['data', 'format'] + samples
-  csvkwargs = {'sep': '\t', 
-              'index_col': False, 
-              'header': None, 
-              #'names': names, 
+  csvkwargs = {'sep': '\t',
+              'index_col': False,
+              'header': None,
+              #'names': names,
               'comment': "#"}
   a = pd.read_csv(path, **csvkwargs)
   print(description)

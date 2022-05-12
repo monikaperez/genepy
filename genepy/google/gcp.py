@@ -173,7 +173,7 @@ def rmFiles(files, group=50, add='', dryrun=True):
 
 def recoverFiles(files, cores=1):
   """
-  recover a set of files in parallel that were erased 
+  recover a set of files in parallel that were erased
 
   files need to have their #id appended found using ls -al file
 
@@ -194,9 +194,9 @@ def folderRN(gspath, newpath, cores=1):
     h.parrun(['gsutil -m mv ' + val + " " + newpath for val in lis], cores=cores)
   else:
     raise ValueError('no such folder')
-        
 
-def patternRN(rename_dict, location, wildcards, types=[], dryrun=True, 
+
+def patternRN(rename_dict, location, wildcards, types=[], dryrun=True,
   check_dependencies=True, cores=1):
   """
   rename/move a bunch of GCP objects found in some specific places
@@ -205,7 +205,7 @@ def patternRN(rename_dict, location, wildcards, types=[], dryrun=True,
   -----
       rename_dict: dict(prevName,newName)
       location:
-      wildcards: list[str] can be one of  ['**', '.*', '*.','-.*'] if needs to be 
+      wildcards: list[str] can be one of  ['**', '.*', '*.','-.*'] if needs to be
                   ** means any occurence of this file in any folder will change its name
                   .* means all file unregarding of the suffix, will rename them all a.bam [a]da.bai to b.bam, [b]da.bai
                   *. means all files with the suffix, will change the suffix of these files from a to b
@@ -242,7 +242,7 @@ def patternRN(rename_dict, location, wildcards, types=[], dryrun=True,
 
 def get_all_sizes(folder, suffix='*'):
   """
-  will sort and list all the files by their sizes. 
+  will sort and list all the files by their sizes.
 
   If some files have the same size, will list them together
 
@@ -342,3 +342,4 @@ async def shareFiles(flist, users):
   print('\n\njust install and use gsutil to copy them')
   print('https://cloud.google.com/storage/docs/gsutil_install')
   print('https://cloud.google.com/storage/docs/gsutil/commands/cp')
+
