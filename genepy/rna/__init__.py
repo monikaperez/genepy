@@ -761,7 +761,7 @@ async def gsva(data, geneset_file, method="ssgsea", recompute=True):
     cmd = (
         "Rscript "
         + pathtogenepy
-        + "genepy/genepy/rna/ssGSEA.R /tmp/data_genepyhelper_gsva.csv "
+        + "/ssGSEA.R /tmp/data_genepyhelper_gsva.csv "
         + geneset_file
         + " "
         + method

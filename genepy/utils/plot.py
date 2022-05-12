@@ -561,7 +561,7 @@ def correlationMatrix(
     names,
     colors=None,
     pvals=None,
-    maxokpval=10 ** -9,
+    maxokpval=10**-9,
     other=None,
     title="correlation Matrix",
     dataIsCorr=False,
@@ -740,7 +740,7 @@ def heatmap(
     folder="",
     interactive=False,
     pvals=None,
-    maxokpval=10 ** -9,
+    maxokpval=10**-9,
     maxval=None,
     minval=None,
 ):

@@ -1143,7 +1143,15 @@ def uploadWorkflows(workspaceID, workflows, path=None):
 
 
 def update_entities(workspace, etype, oetype, target_set=None):
-    """Attach entities (samples or pairs) to participants"""
+    """Attach entities (samples or pairs) to participants
+
+    Args:
+    -----
+        workspace: str the workspace name
+        etype: str the entity type to attach
+        oetype: str the entity type to attach to
+        target_set: str the set to attach to. If None, won't attach to a set
+    """
     wm = dm.WorkspaceManager(workspace)
     # get etype -> participant mapping
     df = wm.get_entities(etype)
