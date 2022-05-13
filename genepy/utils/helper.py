@@ -85,7 +85,6 @@ def batchMove(l, pattern=['*.', '.*'], folder='', add=''):
   moves a set of files l into a folder:
 
   Args:
-  -----
     l: file list
     pattern: if files are a set of patterns to match
     folder: folder to move file into
@@ -111,9 +110,8 @@ def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
   Given a dict renames corresponding files in a folder
 
   Args:
-  ----
-    dt: dict(currentName:newName) renaming dictionnary
-    folder: folder to look into
+    dt (dict): dict(currentName:newName) renaming dictionnary
+    folder (str): folder to look into
     add: some additional mv parameters
   """
   cmd = 'ls -R ' + folder if doAll else 'ls ' + folder
@@ -155,6 +153,7 @@ def batchRename(dt, folder='', sudo=False, doAll=False, add='', dryrun=False):
 def grouped(iterable, n):
   """
   iterate over element of list 2 at a time python
+
   s -> (s0,s1,s2,...sn-1), (sn,sn+1,sn+2,...s2n-1), (s2n,s2n+1,s2n+2,...s3n-1), ...
   """
   it = iter(iterable)
@@ -166,7 +165,8 @@ def grouped(iterable, n):
 
 
 def overlap(interval1, interval2):
-  """
+  """computed overlap
+
   Given [0, 4] and [1, 10] returns [1, 4]
   Given [0, 4] and [8, 10] returns False
   """
@@ -222,14 +222,12 @@ def randomString(stringLength=6, stype='all', withdigits=True):
   Generate a random string of letters and digits
 
   Args:
-  -----
-    stringLength: the amount of char
-    stype: one of lowercase, uppercase, all
-    withdigits: digits allowed in the string?
+    stringLength (int, optional): the amount of char. Defaults to 6.
+    stype (str, optional): one of lowercase, uppercase, all. Defaults to 'all'.
+    withdigits (bool, optional): digits allowed in the string? Defaults to True.
 
   Returns:
-  -------
-    the string
+    str: random string
   """
   if stype == 'lowercase':
     lettersAndDigits = string.ascii_lowercase
@@ -275,7 +273,6 @@ def parrun(cmds, cores, add=[]):
   runs a set of commands in parallel using the "&" command
 
   Args:
-  -----
     cmds: the list of commands
     cores: number of parallel execution
     add: an additional list(len(cmds)) of command to run in parallel at the end of each parallel run
@@ -286,6 +283,7 @@ def parrun(cmds, cores, add=[]):
     raise ValueError("we would want them to be the same size")
   else:
     addexe = ''
+  fullres = []
   for i, cmd in enumerate(cmds):
     count += 1
     exe += cmd
@@ -307,6 +305,8 @@ def parrun(cmds, cores, add=[]):
           raise ValueError(
             'issue with the command: ' + str(res.stderr))
         addexe = ''
+      fullres.append(res.stdout.decode('utf-8'))
+  return fullres
 
 
 def askif(quest):
@@ -328,7 +328,6 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
     transforms an int representing days into a date
 
     Args:
-    ----
       i: the int
       lim: the limited year below which we have a mistake
       unknown: what to return when unknown (date is bellow the limited year)
@@ -337,7 +336,7 @@ def inttodate(i, lim=1965, unknown='U', sep='-', order="asc", startsatyear=0):
       startsatyear: when is the year to start counting for this int
 
     Returns:
-      the date or unknown
+      str: the date or unknown
     """
     a = int(i // 365)
     if a > lim:
@@ -357,13 +356,14 @@ def datetoint(dt, split='-', unknown='U', order="des"):
 
   starts at 0y,0m,0d
 
-  dt: the date string
-  split: the splitter in the string (e.g. /,-,...)
-  unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
-  order: if 'asc', do d,m,y else do y,m,d
+  Args:
+    dt: the date string
+    split: the splitter in the string (e.g. /,-,...)
+    unknown: maybe the some dates are 'U' or 0 and the program will output 0 for unknown instead of crashing
+    order: if 'asc', do d,m,y else do y,m,d
 
   Returns:
-    the date
+    int: the date
   """
   arr = np.array(dt[0].split(split) if dt[0] !=
                   unknown else [0, 0, 0]).astype(int)
@@ -425,7 +425,6 @@ def makeCombinations(size, proba):
   given binomial probabilities of each event occuring and the number of trials
 
   Args:
-  -----
     size: int number of trials
     proba: list[float] probabilities of each event occuring
   """
@@ -535,17 +534,18 @@ def readXMLs(folder=None, file=None, rename=None):
   return df
 
 def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt",
-                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',]):
+                          reload=False, dropped=["ACH-002260", "ACH-001741",'ACH-001189',],
+                          ancestry = {'African':[], 'Native American':[], 'East Asian, North':[], 
+                          'East Asian, South': [], "South Asian":[],  "European, North":[], 
+                          'European, South':[]}):
   """
   make a df from cellosaurus' human cancer cell line data
 
   Args:
-  -----
-    ftp str the ftp link to the cellosaurus latest txt db export
+    ftp (str): the ftp link to the cellosaurus latest txt db export
 
   Returns:
-  -------
-    pd.DataFrame indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
+    pd.DataFrame: indexed by cellosaurus id and with "depmap_id", "id", "disease", "age", 
     "sex", "patient_id", "parent_id", "date", "synonyms", "has_issues", "comments"
   """
   print('make sure to have wget installed')
@@ -587,10 +587,20 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
   ID = ""
   SY = ""
   DI = ""
+  atcclink = ""
+  dsmzlink = ""
+  doublingt = ""
+  hasebv = False
+  origin = ""
+  isMeta = False
+  characteristics = ""
+  ancestry = ""
+  issue = ""
+  instability = ""
+  transfected = ""
   depmap = set()
   lid = None
   individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-  hasIssues=False
   comments=[""]
   tofind={}
   cl = {}
@@ -625,8 +635,18 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
         v.append(parent)
         v.append(date)
         v.append(SY)
-        v.append(hasIssues)
         v.append(' | '.join(comments))
+        v.append(atcclink)
+        v.append(dsmzlink)
+        v.append(doublingt)
+        v.append(hasebv)
+        v.append(origin)
+        v.append(isMeta)
+        v.append(characteristics)
+        v.append(ancestry)
+        v.append(issue)
+        v.append(instability)
+        v.append(transfected)
         cl.update({lid: v})
       v = []
       CL=False
@@ -638,10 +658,20 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
       ID = ""
       SY = ""
       DI = ""
+      atcclink = ""
+      dsmzlink = ""
+      doublingt = ""
+      hasebv = False
+      origin = ""
+      isMeta = False
+      characteristics = ""
+      ancestry = ""
+      issue = ""
+      instability = ""
+      transfected = ""
       depmap = set()
       lid = None
       individual= "ID-"+randomString(stringLength=6, stype='all', withdigits=True)
-      hasIssues=False
       comments=[""]
     elif line[:2] == "HI":
       parent = line[5:].split(' !')[0]
@@ -664,27 +694,79 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
     elif line[:2] == "SY":
       SY = line[5:]
     elif line[:2] == "DI":
-      DI = line[5:]
+      DI += line[5:] + "; "
     elif line[:2] == "DT":
       date = line.split("Created: ")[-1].split(";")[0]
     elif line[:2] == "DR":
       if 'DepMap; ' in line:
         depmap.add(line.split('DepMap; ')[-1])
+      if "ATCC" in line:
+        atcclink = line.split('; ')[-1]
+      if "DSMZ" in line:
+        dsmzlink = line.split('; ')[-1]
     elif line[:2] == "CA":
       if 'Cancer cell line' in line:
         CL=True
     elif line[:2] == "AG":
       age = line[5:]
+      i = age.split('Y')[0]
+      if i.endswith('FW'):
+        #foetus
+        i = "Fetus"
+      elif i=="C":
+        i="Children"
+      elif i in ['Embryonic stage', 'Late embryonic stage', "Blastocyst stage", "Neonate larva"]:
+        i='Embryo'
+      elif i=="Age unspecified":
+        i="U"
+      elif i not in ['Adult', "Children", "Fetus", "Embryo"]:
+        if i.endswith('M') or i.endswith('W') or i.endswith('D'):
+          # 0Y
+          i=0
+        elif i.endswith('Y'):
+          i = i.split('-')[0].split('<')[-1].split('>')[-1]
+          i = float(i)
+      age = i
     elif line[:2] == "SX":
       sex = line[5:]
+      if sex == "":
+        sex="U"
+      if sex == 'Sex unspecified':
+        sex="U"
     elif line[:2] == "CC":
       comments.append(line[5:])
       if 'Problematic cell line:' in line:
-        hasIssues=True
+        issue += line.split("Problematic cell line: ")[-1] + " "
       if 'Discontinued: DepMap; ' in line:
-        hasIssues=True
+        issue += "Removed from DepMap; "
         depmap.remove(line.split(';')[1][1:])
+      if "Doubling time: " in line:
+        doublingt = line.split("Doubling time: ")[-1].split('(')[0]
+        if 'everal week' in doublingt:
+          t = 13*24
+        else:
+          t = float(doublingt.split(' ')[0].split('-')[0].split('~')[-1].split('>')[-1].split('=')[-1].split('<')[-1])
+          if 'day' in doublingt:
+            t = t*24
+        doublingt = int(t)
+      if "Epstein-Barr virus (EBV)" in line:
+        hasebv = True
+      if "Derived from sampling site: " in line:
+        origin = line.split("Derived from sampling site: ")[-1][:-1]
+      if "Derived from metastatic site:" in line:
+        origin = line.split("Derived from metastatic site: ")[-1][:-1]
+        isMeta = True
+      if "Characteristics: " in line:
+        characteristics = line.split("Characteristics: ")[-1][:-1]
+      if "Genome ancestry: " in line:
+        ancestry = line.split("Genome ancestry: ")[-1][:-1]
 
+      if "Caution: " in line:
+        issue = line.split("Caution: ")[-1][:-1]
+      if "Microsatellite instability: " in line:
+        instability = line.split(" (")[1].split(')')[0]
+      if "Transfected with: " in line:
+        transfected += line.split("Transfected with: ")[-1][:-1] + ' | '
   l.close()
   for k, v in tofind.items():
     if k in cl and v in cl:
@@ -698,13 +780,53 @@ def makeCellosaurusExport(ftp = "https://ftp.expasy.org/databases/cellosaurus/ce
                                       "parent_id",
                                       "date",
                                       "synonyms",
-                                      "has_issues",
-                                      "comments"], index=cl.keys())
+                                      "comments",
+                                      "atcclink",
+                                      "dsmzlink",
+                                      "doublingt",
+                                      "hasebv",
+                                      "origin",
+                                      "isMeta",
+                                      "characteristics",
+                                      "ancestry",
+                                      "issue",
+                                      "instability",
+                                      "transfected"], index=cl.keys())
   return cld
 
+def getAncestry(df, col="ancestry", ancestry = {'African':[], 'Native American':[], 'East Asian, North':[],
+  'East Asian, South': [], "South Asian":[], "European, North":[], 'European, South':[]}):
+  """getAncestry returns a df with the ancestries
+
+  Args:
+      df ([type]): [description]
+      col (str, optional): [description]. Defaults to "ancestry".
+      ancestry (dict, optional): [description]. Defaults to {'African':[], 'Native American':[], 'East Asian, North':[], 'East Asian, South': [], "South Asian":[], "European, North":[], 'European, South':[]}.
+
+  Returns:
+      pd.DataFrame: [description]
+  """
+  name = []
+  for i, anc in df[col].iteritems():
+    if anc=="":
+      continue
+    for place in anc.split('; '):
+      ori, perc = place.split('%')[0].split('=')
+      ancestry[ori].append(float(perc))
+    name.append(i)
+  return pd.DataFrame(data=ancestry, index=name)
+    
+
+def _fetchFromServer(ensemble_server, attributes):
+  server = BiomartServer(ensemble_server)
+  ensmbl = server.datasets['hsapiens_gene_ensembl']
+  res = pd.read_csv(io.StringIO(ensmbl.search({
+    'attributes': attributes
+  }, header=1).content.decode()), sep='\t')
+  return res
 
 def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomart", 
-  useCache=False, cache_folder=".genepycache/", attributes=[]):
+                      useCache=False, cache_folder='/'.join(__file__.split('/')[:-3])+"/", attributes=[]):
   """generate a genelist dataframe from ensembl's biomart
 
   Args:
@@ -718,25 +840,22 @@ def generateGeneNames(ensemble_server="http://nov2020.archive.ensembl.org/biomar
   Returns:
       [type]: [description]
   """
-  defattr = ['ensembl_gene_id', 'clone_based_ensembl_gene', 'hgnc_symbol', 'gene_biotype',
+  attr = ['ensembl_gene_id', 'clone_based_ensembl_gene', 'hgnc_symbol', 'gene_biotype',
              'entrezgene_id']
   assert cache_folder[-1] == '/'
+  
+  cache_folder = os.path.expanduser(cache_folder)
   createFoldersFor(cache_folder)
-  cachefile = os.path.join(cache_folder, 'biomart_ensembltohgnc.csv')
-  cachefile = os.path.expanduser(cachefile)
+  cachefile = os.path.join(cache_folder, '.biomart.csv')
   if useCache & os.path.isfile(cachefile):
     print('fetching gene names from biomart cache')
     res = pd.read_csv(cachefile)
   else:
     print('downloading gene names from biomart')
-    server = BiomartServer(ensemble_server)
-    ensmbl = server.datasets['hsapiens_gene_ensembl']
-    res = pd.read_csv(io.StringIO(ensmbl.search({
-        'attributes': defattr+attributes
-    }, header=1).content.decode()), sep='\t')
+    res = _fetchFromServer(ensemble_server, attr + attributes)
     res.to_csv(cachefile, index=False)
 
-  res.columns = defattr+attributes
+  res.columns = attr+attributes
   if type(res) is not type(pd.DataFrame()):
     raise ValueError('should be a dataframe')
   res = res[~(res[

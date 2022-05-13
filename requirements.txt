@@ -1,14 +1,12 @@
-bokeh
+bokeh>= 2.2
 colorcet
 firecloud_dalmatian>=0.0.17
 gseapy==0.9.18
 gsheets==0.4.1
 gspread==3.6.0
 matplotlib
-numpy
 oauth2client>=4.1.3
 pandas
-Pillow
 pybedtools
 pyBigWig
 pysam
@@ -19,10 +17,6 @@ scikit_learn
 scipy>=1.0.0
 seaborn
 statsmodels
-taigapy==2.12
+taigapy>=2.12
 venn
-itermplot
-autopep8
-io
-os
 biomart
