@@ -11,7 +11,9 @@ import gzip
 import seaborn as sns
 
 
-def vcf_to_df(path, additional_cols=[], **kwargs):
+def vcf_to_df(
+    path, additional_cols=[], additional_filters=[], parse_filter=False, **kwargs
+):
     """
     transforms a vcf file into a dataframe file as best as it can
 
@@ -37,9 +39,27 @@ def vcf_to_df(path, additional_cols=[], **kwargs):
         "ReverseComplementedAlleles",
     ] + additional_cols
 
+    filters = [
+        "PASS",
+        "base_qual",
+        "clustered_events",
+        "fragment",
+        "germline",
+        "haplotype",
+        "map_qual",
+        "multiallelic",
+        "panel_of_normals",
+        "position",
+        "slippage",
+        "strand_bias",
+        "weak_evidence",
+    ] + additional_filters
+
+    FUNCO_DESC = "Functional annotation from the Funcotator tool."
+
     def read_comments(f):
-        fields = {}
         description = {}
+        colnames = []
         for l in f:
             l = l.decode("utf-8") if type(l) is not str else l
             if l.startswith("##"):
@@ -52,25 +72,24 @@ def vcf_to_df(path, additional_cols=[], **kwargs):
                     if res == "FUNCOTATION":
                         print("parsing funcotator special")
                         for val in l.split("Description=")[1][:-2].split("|"):
-                            fields.update({val: []})
-                            description.update({val: "Funcotaror: " + val})
+                            val = val.split("Funcotation fields are: ")[-1]
+                            description.update({val: FUNCO_DESC})
                     else:
                         desc = l.split("Description=")[1][:-2]
                         description.update({res: desc})
-                        fields.update({res: []})
             elif l.startswith("#"):
                 colnames = l[1:-1].split("\t")
             else:
                 break
-        return fields, description, colnames
+        return description, colnames
 
     if path.endswith(".gz"):
         with gzip.open(path, "r") as f:
-            fields, description, colnames = read_comments(f)
+            description, colnames = read_comments(f)
     else:
         with open(path, "r") as f:
-            fields, description, colnames = read_comments(f)
-    colnames = [i.lower() for i in colnames]
+            description, colnames = read_comments(f)
+    colnames = [i for i in colnames]
     csvkwargs = {
         "sep": "\t",
         "index_col": False,
@@ -78,34 +97,75 @@ def vcf_to_df(path, additional_cols=[], **kwargs):
         "names": colnames,
         "comment": "#",
     }
-    data = pd.read_csv(path, **csvkwargs)
+    data = pd.read_csv(path, **{**csvkwargs, **kwargs})
     print(description)
-    try:
-        for j, val in enumerate(data["info"].str.split(";").values.tolist()):
-            for v in val:
-                if v in uniqueargs:
-                    res.update({v: True})  
-                elif:
+    funco_fields = [k for k, v in description.items() if FUNCO_DESC in v]
 
-                elif '=' in v:
-                    tuple(v.split("="))
+    fields = {k: [] for k, _ in description.items()}
+    try:
+        for j, info in enumerate(data["INFO"].str.split(";").values.tolist()):
+            res = {}
+            # show speed
+            if j % 10_000 == 0:
+                print(j, end="\r")
+            for annot in info:
+                if annot in uniqueargs:
+                    res.update({annot: True})
+                elif "=" in annot:
+                    # taking care of the funcotator special fields
+                    if "FUNCOTATION" in annot:
+                        # for multi allelic site:
+                        annot = annot.replace("FUNCOTATION=", "")[1:-1]
+                        res.update({name: [] for name in funco_fields})
+                        for site in annot.split("],["):
+                            site = (
+                                site.replace("_%7C_", " ")
+                                .replace("_%20_", " ")
+                                .replace("_%2C_", ",")
+                                .replace("_%3D_", "=")
+                                .split("|")
+                            )
+                            for i, sub_annot in enumerate(site):
+                                res[funco_fields[i]].append(sub_annot)
+                        for k in funco_fields:
+                            res[k] = ",".join(res[k])
+                    else:
+                        k, annot = annot.split("=")
+                        res.update({k: annot})
                 else:
-                    raise ValueError("unknown argument: " + v)
-            for k in fields.keys():
+                    raise ValueError("unknown argument: " + annot)
+            for k in list(fields.keys()):
                 fields[k].append(res.get(k, None))
     except ValueError:
-        print(val)
+        print(annot)
         raise ValueError("unknown field")
-    except:
-        import pdb
 
-        pdb.set_trace()
     data = pd.concat(
-        [data.drop(columns="info"), pd.DataFrame(data=fields, index=data.index)], axis=1
+        [data.drop(columns="INFO"), pd.DataFrame(data=fields, index=data.index)], axis=1
     )
-    samples = colnames[9:]
+
+    cols_to_drop = []
+    for f in funco_fields:
+        # drop columns that have the same value across all rows
+        uniq = data[f].unique()
+        if len(uniq) == 1:
+            cols_to_drop.append(f)
+            continue
+        elif len(uniq) < 10:
+            # checking multi allelic stuff
+            uni = []
+            for v in uniq:
+                uni += v.split(",")
+            if len(set(uni)) == 1:
+                cols_to_drop.append(f)
+                continue
+    print("dropping uninformative funcotator columns:", cols_to_drop)
+    data = data.drop(columns=cols_to_drop)
+    data.columns = [i.lower() for i in data.columns]
+    samples = [i.lower() for i in colnames[9:]]
+    print("the samples are:", samples)
+    sorting = data["format"][0].split(":")
     for sample in samples:
-        sorting = data["format"][0].split(":")
         res = data[sample].str.split(":").values.tolist()
         maxcols = max([len(v) for v in res])
         if maxcols - len(sorting) > 0:
@@ -120,6 +180,13 @@ def vcf_to_df(path, additional_cols=[], **kwargs):
             ],
             axis=1,
         )
+
+    # subsetting filters
+    if parse_filter:
+        data[filters] = False
+        for f in filters:
+            data.loc[data["filter"].str.contains(f), f] = True
+        data = data.drop(columns="filter")
     return data.drop(columns="format"), description
 
 
