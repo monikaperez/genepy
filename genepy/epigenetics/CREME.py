@@ -116,6 +116,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         x = df['x']
         plt.gca()
         sns.kdeplot(x)
+    
     print("/!/ should only be passed peaks with at least one good replicate")
     # for a df containing a set of peaks in bed format and an additional column of different TF
     tfs = list(set(peaks['tf']))
@@ -125,8 +126,10 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
     tomergebam = []
     ratiosofunique = {}
     h.createFoldersFor(saveloc)
+    h.createFoldersFor(saveloc+"additionalpeaks/")
     f = open(saveloc+'results.txt', 'w')
     warnings.simplefilter("ignore")
+
     for tf in tfs:
         if only and tf != only:
             continue
@@ -146,13 +149,16 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             f.write("we only have one replicate for " + tf + " .. pass"+"\n")
             mergedpeaksdict.update({tf: cpeaks})
             continue
+
         print("merging " + tf + " peaks")
         f.write("merging " + tf + " peaks"+"\n")
+        # merge peak bedfiles & recomputes pvals and foldchange
         merged = simpleMergePeaks(cpeaks, window=window, maxp=False)
         merged_bed = merged[merged.columns[8:]]
         finalpeaks = merged[merged.columns[:8]]
         print('--> finish first overlaps lookup')
         f.write('--> finish first overlaps lookup'+"\n")
+        
         # flag when  biggest is <1000 peaks
         if len(finalpeaks) < 1000:
             print('!TF has less than 1000 PEAKS!')
@@ -171,6 +177,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
         else:
             print('too many replicates for Venn: '+str(peakmatrix.shape[1]))
             f.write('too many replicates for Venn: '+str(peakmatrix.shape[1])+"\n")
+
         if doPlot:
             fig = sns.pairplot(merged_bed, corner=True, diag_kind="kde",
                                                  kind="reg", plot_kws={"scatter_kws": {"alpha": .05}})
@@ -180,11 +187,13 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if saveloc:
                 fig.savefig(saveloc+tf+"_before_pairplot.pdf")
             plt.show()
+            # per sample/column
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(
                     np.delete(peakmatrix, i, axis=1).sum(1).astype(bool) == 0, peakmatrix[:, i])
-                sns.kdeplot(merged_bed[val][unique_inval], legend=True).set(xlim=(0, None))
+                sns.kdeplot(merged_bed[val][unique_inval], label=val).set(xlim=(0, None))
             plt.title("distribution of unique peaks in each replicate")
+            plt.legend(loc="upper right")
             if saveloc:
                 plt.savefig(saveloc+tf+"_before_unique_kdeplot.pdf")
             plt.show()
@@ -259,9 +268,11 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                             str((additionalpeaksinsec[additionalpeaksinsec > 0].min(), additionalpeaksinsec[additionalpeaksinsec > 0].max())))
                 f.write('  min,max from newly found peaks: '+str((additionalpeaksinsec[additionalpeaksinsec > 0].min(
                 ), additionalpeaksinsec[additionalpeaksinsec > 0].max()))+'\n')
+            
             # for testing purposes mainly
             finalpeaks[additionalpeaksinsec.astype(bool)].to_csv(
-                'additionalpeaksinsec_mp'+merged_bed.columns[val]+'.bed', sep='\t', index=None, header=False)
+                saveloc+"additionalpeaks/"+'additionalpeaksinsec_'+tf+'_'+merged_bed.columns[val]+'.bed', sep='\t', index=None, header=True)
+            
             peakmatrix[val] = np.logical_or(
                 peakmatrix[val], additionalpeaksinsec.astype(bool))
             overlap = np.sum(np.logical_and(
@@ -269,8 +280,8 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             if overlap < MINOVERLAP:
                 newsmalloverlap = np.sum(np.logical_and(
                     peakmatrix[val], peakmatrix[biggest_ind]))/np.sum(peakmatrix[val])
-                print("  we did not had enough initial overlap.")
-                f.write("  we did not had enough initial overlap."+'\n')
+                print("  we did not have enough initial overlap.")
+                f.write("  we did not have enough initial overlap."+'\n')
                 if newsmalloverlap < MINOVERLAP:
                     if merged_bed.columns[val].split('-')[0] in markedasbad:
                         print('  replicate ' +
@@ -298,7 +309,7 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
                     bigwigfolder, biggest), sampling=sampling, mincov=mincov, window=window, minKL=minKL, use=use)
                 if len(additionalpeaksinbig[additionalpeaksinbig > 0]) > 0:
                     sns.kdeplot(additionalpeaksinbig[additionalpeaksinbig > 0],
-                                            label=biggest, legend=True).set(xlim=(0, None))
+                                            label=val, legend=True).set(xlim=(0, None))
                     print('  min,max from newly found peaks: ' +
                                 str((additionalpeaksinbig[additionalpeaksinbig > 0].min(), additionalpeaksinbig[additionalpeaksinbig > 0].max())))
                     f.write('  min,max from newly found peaks: '+str((additionalpeaksinbig[additionalpeaksinbig > 0].min(
@@ -332,7 +343,9 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             #the quality is good enough in the end we can pop from the list if it exists
             if tf in remove:
                 remove.remove(tf)
+        
         plt.title('distribution of new found peaks')
+        plt.legend(loc="upper right")
         if saveloc:
             plt.savefig(saveloc+tf+"_new_found_peaks_kdeplot.pdf")
         plt.show()
@@ -352,11 +365,13 @@ def mergeReplicatePeaks(peaks, bigwigfolder, markedasbad=None, window=100,
             for i, val in enumerate(merged_bed):
                 unique_inval = np.logical_and(
                     np.delete(peakmatrix, i, axis=0).sum(0).astype(bool) == 0, peakmatrix[i])
-                sns.kdeplot(merged_bed[val][unique_inval], legend=True).set(xlim=(0, None))
+                sns.kdeplot(merged_bed[val][unique_inval], label=val).set(xlim=(0, None))
             plt.title("distribution of unique peaks in each replicate after recovery")
+            plt.legend(loc="upper right")
             if saveloc:
                 plt.savefig(saveloc+tf+"_after_unique_kdeplot.pdf")
             plt.show()
+        
         if len(peakmatrix.shape) > 1 and doPlot:
             if peakmatrix.shape[0] < 7:
                 presence = []
