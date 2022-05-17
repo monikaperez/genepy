@@ -84,10 +84,8 @@ def vcf_to_df(path, additional_cols=[], **kwargs):
         for j, val in enumerate(data["info"].str.split(";").values.tolist()):
             for v in val:
                 if v in uniqueargs:
-                    res.update({v: True})  
-                elif:
-
-                elif '=' in v:
+                    res.update({v: True})
+                elif "=" in v:
                     tuple(v.split("="))
                 else:
                     raise ValueError("unknown argument: " + v)
