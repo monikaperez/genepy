@@ -60,9 +60,11 @@ def vcf_to_df(
     def read_comments(f):
         description = {}
         colnames = []
+        rows = 0
         for l in f:
             l = l.decode("utf-8") if type(l) is not str else l
             if l.startswith("##"):
+                rows += 1
                 if "FORMAT" in l[:20]:
                     res = l.split("ID=")[1].split(",")[0]
                     desc = l.split("Description=")[1][:-2]
@@ -79,28 +81,28 @@ def vcf_to_df(
                         description.update({res: desc})
             elif l.startswith("#"):
                 colnames = l[1:-1].split("\t")
+                rows += 1
             else:
                 break
-        return description, colnames
+        return description, colnames, rows
 
     if path.endswith(".gz"):
         with gzip.open(path, "r") as f:
-            description, colnames = read_comments(f)
+            description, colnames, nrows_toskip = read_comments(f)
     else:
         with open(path, "r") as f:
-            description, colnames = read_comments(f)
+            description, colnames, nrows_toskip = read_comments(f)
     colnames = [i for i in colnames]
     csvkwargs = {
         "sep": "\t",
         "index_col": False,
         "header": None,
         "names": colnames,
-        "comment": "#",
+        "skiprows": nrows_toskip,
     }
     data = pd.read_csv(path, **{**csvkwargs, **kwargs})
     print(description)
     funco_fields = [k for k, v in description.items() if FUNCO_DESC in v]
-
     fields = {k: [] for k, _ in description.items()}
     try:
         for j, info in enumerate(data["INFO"].str.split(";").values.tolist()):
@@ -159,12 +161,13 @@ def vcf_to_df(
             if len(set(uni)) == 1:
                 cols_to_drop.append(f)
                 continue
-    print("dropping uninformative funcotator columns:", cols_to_drop)
+    print("dropping uninformative columns:", cols_to_drop)
     data = data.drop(columns=cols_to_drop)
     data.columns = [i.lower() for i in data.columns]
     samples = [i.lower() for i in colnames[9:]]
-    print("the samples are:", samples)
+    print("\nthe samples are:", samples)
     sorting = data["format"][0].split(":")
+    # this is a debugger line
     for sample in samples:
         res = data[sample].str.split(":").values.tolist()
         maxcols = max([len(v) for v in res])
@@ -187,7 +190,22 @@ def vcf_to_df(
         for f in filters:
             data.loc[data["filter"].str.contains(f), f] = True
         data = data.drop(columns="filter")
-    return data.drop(columns="format"), description
+
+    # cleaning empty cols
+    data = data[data.columns[data.isna().sum() < len(data)]]
+    data = data.drop(columns="format")
+    if "dp" in data.columns.tolist():
+        data = data.drop(columns="dp")
+
+    # weird bug sometimes
+    if "SB_1" in data.columns.tolist():
+        loc = ~data.SB_1.isna()
+        data.loc[loc, "PGT"] = data.loc[loc, "SB"]
+        data.loc[loc, "SB"] = data.loc[loc, "SB_1_2_3"]
+        data = data.drop(columns=["SB_1", "SB_1_2_3"])
+        data = data.rename(columns={"SB_1_2": "PS", "SB_1": "PID"})
+    # sorting out issue with
+    return data, description
 
 
 def mafToMat(
