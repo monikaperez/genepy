@@ -17,6 +17,7 @@ def vcf_to_df(
     additional_filters=[],
     parse_filter=False,
     drop_null=False,
+    force_keep=[],
     **kwargs,
 ):
     """
@@ -157,7 +158,7 @@ def vcf_to_df(
         for f in funco_fields:
             # drop columns that have the same value across all rows
             uniq = data[f].unique()
-            if len(uniq) == 1:
+            if len(uniq) == 1 and f.lower() not in force_keep:
                 cols_to_drop.append(f)
                 continue
             elif len(uniq) < 10:
@@ -165,7 +166,7 @@ def vcf_to_df(
                 multi = []
                 for v in uniq:
                     multi += v.split(",")
-                if len(set(multi)) == 1:
+                if len(set(multi)) == 1 and f.lower() not in force_keep:
                     cols_to_drop.append(f)
         print("dropping uninformative columns:", cols_to_drop)
         data = data.drop(columns=cols_to_drop)
@@ -206,10 +207,11 @@ def vcf_to_df(
     for val in ["gt", "ad", "af", "dp", "f1r2", "f2r1", "fad", "sb"]:
         if val in data.columns.tolist():
             todrop.append(val)
-        data = data.drop(columns=todrop)
+    data = data.drop(columns=todrop)
 
     if drop_null:
         empty = data.columns[data.isna().sum() == len(data)].tolist()
+        empty = list(set(empty) - set(force_keep))
         print("dropping empty columns:", empty)
         data = data.drop(columns=empty)
         dropped_cols += empty
