@@ -18,6 +18,19 @@ def vcf_to_df(
     parse_filter=False,
     drop_null=False,
     force_keep=[],
+    cols_to_drop=[
+        "clinvar_vcf_mc",
+        "oreganno_build",
+        "gt",
+        "ad",
+        "af",
+        "dp",
+        "f1r2",
+        "f2r1",
+        "fad",
+        "sb",
+        "pid",
+    ],
     **kwargs,
 ):
     """
@@ -154,12 +167,12 @@ def vcf_to_df(
         [data.drop(columns="INFO"), pd.DataFrame(data=fields, index=data.index)], axis=1
     )
     if drop_null:
-        cols_to_drop = []
+        to_drop = []
         for f in funco_fields:
             # drop columns that have the same value across all rows
             uniq = data[f].unique()
             if len(uniq) == 1 and f.lower() not in force_keep:
-                cols_to_drop.append(f)
+                to_drop.append(f)
                 continue
             elif len(uniq) < 10:
                 # checking multi allelic stuff
@@ -167,10 +180,10 @@ def vcf_to_df(
                 for v in uniq:
                     multi += v.split(",")
                 if len(set(multi)) == 1 and f.lower() not in force_keep:
-                    cols_to_drop.append(f)
-        print("dropping uninformative columns:", cols_to_drop)
-        data = data.drop(columns=cols_to_drop)
-        dropped_cols += cols_to_drop
+                    to_drop.append(f)
+        print("dropping uninformative columns:", to_drop)
+        data = data.drop(columns=to_drop)
+        dropped_cols += to_drop
     data.columns = [i.lower() for i in data.columns]
     samples = [i.lower() for i in colnames[9:]]
     print("\nthe samples are:", samples)
@@ -204,7 +217,7 @@ def vcf_to_df(
     dropped_cols.append("format")
 
     todrop = []
-    for val in ["gt", "ad", "af", "dp", "f1r2", "f2r1", "fad", "sb"]:
+    for val in cols_to_drop:
         if val in data.columns.tolist():
             todrop.append(val)
     data = data.drop(columns=todrop)
