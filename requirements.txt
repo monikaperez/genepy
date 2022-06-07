@@ -12,7 +12,6 @@ pyBigWig
 pysam
 pytest
 requests>=2.24.0
-rpy2>=3.3.2
 scikit_learn
 scipy>=1.0.0
 seaborn

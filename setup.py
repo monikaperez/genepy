@@ -25,6 +25,7 @@ try:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    subprocess.run("pip install rpy2")
 except:
     print("R packages not installed")
 print("if it did not work. please install R or check your R installation")

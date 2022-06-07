@@ -40,6 +40,7 @@ def scatter(
     alpha=0.8,
     colprovided=False,
     shape=None,
+    no_xy=False,
     **kwargs
 ):
     """
@@ -82,15 +83,20 @@ def scatter(
     if shape is None:
         shape = [0] * data.shape[0]
     shape = np.array(shape)
-    TOOLTIPS = [
-        ("(x,y)", "(@x, @y)"),
-    ]
+
+    TOOLTIPS = (
+        []
+        if no_xy
+        else [
+            ("(x,y)", "(@x, @y)"),
+        ]
+    )
     if type(labels) is list:
         TOOLTIPS.append(("label", "@labels"))
     elif type(labels) is dict:
         TOOLTIPS.extend([(str(i), "@" + str(i)) for i in list(labels.keys())])
 
-    p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title)
+    p = figure(tools=TOOLS, tooltips=TOOLTIPS, title=title, output_backend="webgl")
 
     shaplot = {
         0: p.circle,
@@ -151,7 +157,6 @@ def scatter(
             render_mode="canvas",
         )
         p.add_layout(labels)
-    p.output_backend = "svg"
     try:
         show(p)
     except:
@@ -159,6 +164,7 @@ def scatter(
     if folder:
         save(p, folder + title.replace(" ", "_") + "_scatter.html")
         try:
+            p.output_backend = "svg"
             export_svg(p, filename=folder + title.replace(" ", "_") + "_scatter.svg")
         except RuntimeError:
             print("You need to install Selenium to save the svg!")
